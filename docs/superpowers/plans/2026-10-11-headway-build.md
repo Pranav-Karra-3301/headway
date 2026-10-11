@@ -584,3 +584,15 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 - **Copy:** the stadium crowd is ~1,030 fans; trains every 5½ min. Read numbers from `SCENARIOS`/`TOWN`, never hard-code.
 - Known web test breakages from the new rail (owners fix in their tracks or the integration fixes): traffic level-crossing count, camera fit, terrain tunnel/triangle bound, water plan (a beach lamp sits on the track).
 - **Camera study (18:25):** default camera = true iso 35.26° elevation, 45° azimuth, HUD-safe Overview fit. With two placement moves (campus library, a Downtown oak) 0 % of queues and stops are hidden, but **42 % of bus-route length is hidden** behind about 10 tall camera-side buildings — the integration/art loop must move those buildings to the far (north/west) side of their streets or lower them, and the camera rig's x-ray fade must cover moving buses.
+
+---
+
+## v11 (18:55) — binding for G5 and the grand integration: fit the greater town INTO the world, organically
+
+`world-v1-day` (E4) now frames the playable town with the Nittany Ridge behind and the lake wrapping the front, with a beach right at the town edge. Do **not** push the world outward to insert a uniform 28 u rectangular ring. Instead:
+- **North / west (ridge side):** the highway runs along the foot of the ridge (an easy curve following the contour), the interchange sits where the north exit meets it, and the highway disappears into the ridge tunnels at both ends; suburbs climb the lower foothills in irregular clusters between forest patches.
+- **East:** a suburban fringe and the small works yard near the rail, thinning into fields and forest.
+- **South / lakeside:** no suburbs on the beach — the lakeshore parkway, promenade/boardwalk (G3) and the marina; roads leave across the causeway bridges.
+- Roundabouts only where they read naturally (exit roads meeting the highway/parkway); the ring road becomes curved connector roads, not a rectangle.
+- Every outer road joins the playable town's exits; cars enter/leave only via the ridge tunnels and the causeway bridges.
+- Keep it cheap and readable: the playable town stays the visual focus; outer areas are quieter (lower saturation, fewer props).
