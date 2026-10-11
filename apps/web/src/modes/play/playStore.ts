@@ -10,7 +10,8 @@ import type { PacePoint } from './logic';
 export interface AiState {
   status: 'idle' | 'running' | 'done' | 'error';
   champion: HeadlessRun | null; baseline: HeadlessRun | null;
-  championId: string; error: string | null;
+  /** `${seed}:${championId}` the runs belong to. */
+  championId: string; key: string; error: string | null;
 }
 
 export interface PlayLocal {
@@ -38,7 +39,7 @@ export interface PlayLocal {
   set(p: Partial<PlayLocal>): void;
 }
 
-export const freshAi = (championId = ''): AiState => ({ status: 'idle', champion: null, baseline: null, championId, error: null });
+export const freshAi = (championId = '', key = ''): AiState => ({ status: 'idle', champion: null, baseline: null, championId, key, error: null });
 
 export const freshRun = (): Pick<PlayLocal, 'obs' | 'picker' | 'preview' | 'tracked' | 'you' | 'replay' | 'youPace' | 'spectating' | 'finishing' | 'nudge' | 'submit'> => ({
   obs: null, picker: null, preview: null, tracked: [], you: null, replay: null, youPace: [], spectating: false, finishing: null,

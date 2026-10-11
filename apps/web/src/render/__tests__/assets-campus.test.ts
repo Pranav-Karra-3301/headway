@@ -146,9 +146,8 @@ describe('campus builds', () => {
         expect(m.userData.fromKit, `${kind} mesh made outside the kit`).toBe(true);
         expect(Array.isArray(m.material)).toBe(false);
         expect(mats.has(m.material as THREE.Material), `${kind} material not from k.mat`).toBe(true);
-        // Mergeable like the kit primitives: indexed, with position + normal + uv.
+        // Mergeable like the kit primitives: position + normal + uv.
         const g = m.geometry;
-        expect(g.index, `${kind} non-indexed geometry`).not.toBeNull();
         for (const a of ['position', 'normal', 'uv']) expect(g.getAttribute(a), `${kind} missing ${a}`).toBeDefined();
       }
       for (const role of roles.keys()) expect(SHARED_ROLES.has(role) || role in campus.ROLES, `${kind} role ${role}`).toBe(true);

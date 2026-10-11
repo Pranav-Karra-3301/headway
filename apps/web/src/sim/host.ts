@@ -29,6 +29,8 @@ export interface HeadwayProbe {
   readonly t: number; readonly simT: number; readonly mode: AppState['mode']; readonly ready: boolean;
   readonly sim: AppState['simKind']; readonly renderer: 'three' | 'flat' | 'none'; readonly frames: number;
   readonly session: string | null; readonly error: string | null;
+  /** The app store, for smoke tests and screenshot scripts (e.g. __headway.app.getState().select({ kind: 'bus', id: 'b1' })). */
+  readonly app: typeof useApp;
 }
 declare global { interface Window { __headway?: HeadwayProbe } }
 
@@ -48,6 +50,16 @@ function mapReady(): boolean {
 }
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** True when the renderer (or an object it holds, two levels deep) owns a three.js WebGLRenderer on this canvas. */
+function holdsWebGl(r: unknown, canvas: HTMLCanvasElement, depth = 0): boolean {
+  if (!r || typeof r !== 'object' || depth > 2) return false;
+  if ((r as { domElement?: unknown }).domElement === canvas) return true;
+  for (const v of Object.values(r as Record<string, unknown>)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && holdsWebGl(v, canvas, depth + 1)) return true;
+  }
+  return false;
+}
 
 export interface HostOptions {
   canvas: HTMLCanvasElement; container: HTMLElement; win?: Window;
@@ -96,8 +108,9 @@ export function startHost(a: HostOptions): () => void {
       renderer = null;
     }
     // No WebGL context on the canvas means the 3D renderer is absent or still a no-op stub: draw the flat map instead.
+    // (getContext('2d') returns null once WebGL owns the canvas, so a working 3D renderer is never displaced.)
     try {
-      const flat = FlatTownRenderer.tryCreate(a.canvas, TOWN);
+      const flat = holdsWebGl(renderer, a.canvas) ? null : FlatTownRenderer.tryCreate(a.canvas, TOWN);
       if (flat) {
         try { renderer?.dispose(); } catch { /* stub */ }
         renderer = flat;
@@ -308,6 +321,7 @@ export function startHost(a: HostOptions): () => void {
     get frames() { return frames; },
     get session() { return session?.key ?? null; },
     get error() { return lastError; },
+    get app() { return store; },
   };
   Object.defineProperty(win, '__headway', { value: probe, configurable: true, writable: true });
 

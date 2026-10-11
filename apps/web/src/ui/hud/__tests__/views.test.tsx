@@ -46,7 +46,8 @@ describe('MetricsView', () => {
   });
   it('shows the Play pace chip: green when ahead, red when behind, neutral when even', () => {
     const ahead = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 6.24, vsBaselinePaxH: 9.1, ahead: true, tone: 'ahead', t: 660 }} paceClock="21:41" />);
-    expect(ahead).toContain('You vs AI at 21:41');
+    expect(ahead).toContain('You vs AI · 21:41');
+    expect(ahead).toContain('baseline');
     expect(ahead).toContain('+6.2');
     expect(ahead).toContain('pax-h');
     expect(ahead).toContain('data-tone="ahead"');

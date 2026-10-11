@@ -1,0 +1,257 @@
+{
+  "createdAt": "2026-10-11T20:21:52.052Z",
+  "simVersion": "1",
+  "mapVersion": "1",
+  "model": "typesafe/jev-1.13",
+  "championId": "g0",
+  "instances": [
+    {
+      "scenarioId": "stadium_exit",
+      "seed": 1001,
+      "split": "train"
+    },
+    {
+      "scenarioId": "stadium_exit",
+      "seed": 1002,
+      "split": "train"
+    }
+  ],
+  "arms": [
+    {
+      "id": "rules",
+      "label": "Rules only (g0)",
+      "policyId": "g0",
+      "advisor": null,
+      "score": {
+        "J": 3312313,
+        "runs": 2,
+        "metrics": {
+          "J": 3312313,
+          "spawned": 2694,
+          "completed": 2406,
+          "unfinished": 288,
+          "completionPct": 89.31,
+          "meanJourneyS": 846.88,
+          "meanWaitS": 509.01,
+          "p95WaitS": 1290.41,
+          "maxWaitS": 1440,
+          "transfersMade": 121,
+          "missedConnections": 78,
+          "leftBehind": 892,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 7024.91,
+            "deadheadDistanceU": 0,
+            "holdS": 0,
+            "trainDwellS": 2003
+          }
+        }
+      },
+      "deltaPct": 0,
+      "runs": [
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1001,
+          "J": 1638425,
+          "completionPct": 89.47,
+          "meanWaitS": 486.46,
+          "missedConnections": 31,
+          "transfersMade": 56,
+          "holdS": 0,
+          "hash": "8a581e6b"
+        },
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1002,
+          "J": 1673888,
+          "completionPct": 89.15,
+          "meanWaitS": 531.3,
+          "missedConnections": 47,
+          "transfersMade": 65,
+          "holdS": 0,
+          "hash": "e0584df4"
+        }
+      ],
+      "jev": null
+    },
+    {
+      "id": "jev_generic",
+      "label": "Jev, generic instructions",
+      "policyId": "g0-jev-generic",
+      "advisor": {
+        "provider": "jev",
+        "enabled": true,
+        "askWhen": [
+          {
+            "f": "train_eta_s",
+            "op": "<=",
+            "v": 120
+          }
+        ],
+        "holdOptionsS": [
+          0,
+          20,
+          40,
+          60
+        ],
+        "instructions": "You dispatch city buses. A bus is ready to leave a stop next to a train station. Decide whether it departs now or holds briefly. Holding can let riders from an arriving train catch this bus, and can space out a bus that is running too close behind the one ahead. Holding also delays everyone aboard and everyone waiting further along the route. Hold only when the gain clearly outweighs the delay; otherwise depart now."
+      },
+      "score": {
+        "J": 3312313,
+        "runs": 2,
+        "metrics": {
+          "J": 3312313,
+          "spawned": 2694,
+          "completed": 2406,
+          "unfinished": 288,
+          "completionPct": 89.31,
+          "meanJourneyS": 846.88,
+          "meanWaitS": 509.01,
+          "p95WaitS": 1290.41,
+          "maxWaitS": 1440,
+          "transfersMade": 121,
+          "missedConnections": 78,
+          "leftBehind": 892,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 7024.91,
+            "deadheadDistanceU": 0,
+            "holdS": 0,
+            "trainDwellS": 2003
+          }
+        }
+      },
+      "deltaPct": 0,
+      "runs": [
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1001,
+          "J": 1638425,
+          "completionPct": 89.47,
+          "meanWaitS": 486.46,
+          "missedConnections": 31,
+          "transfersMade": 56,
+          "holdS": 0,
+          "hash": "8a581e6b"
+        },
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1002,
+          "J": 1673888,
+          "completionPct": 89.15,
+          "meanWaitS": 531.3,
+          "missedConnections": 47,
+          "transfersMade": 65,
+          "holdS": 0,
+          "hash": "e0584df4"
+        }
+      ],
+      "jev": {
+        "asked": 20,
+        "answered": 20,
+        "timeouts": 0,
+        "errors": 0,
+        "chosen": {
+          "Depart now": 20
+        },
+        "meanLatencyMs": 0,
+        "samples": [
+          {
+            "situation": "Bus b5 (Route 3) at Stadium Station. 0 aboard of 40. Train is at the platform now with 0 riders transferring to Route 3. Next Route 3 bus is 2 min behind. No Route 3 bus has left here yet (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" in 9.5 min.",
+            "options": [
+              "Depart now",
+              "Hold 20 s",
+              "Hold 40 s",
+              "Hold 60 s"
+            ],
+            "chosen": "Depart now",
+            "p": 0.9
+          },
+          {
+            "situation": "Bus b5 (Route 3) at Stadium Station. 0 aboard of 40. Train is at the platform now with 0 riders transferring to Route 3. Next Route 3 bus is 3 min behind. Previous Route 3 bus left 3.5 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" in 2.5 min.",
+            "options": [
+              "Depart now",
+              "Hold 20 s",
+              "Hold 40 s",
+              "Hold 60 s"
+            ],
+            "chosen": "Depart now",
+            "p": 0.92
+          },
+          {
+            "situation": "Bus b2 (Route 1) at University Station. 1 aboard of 40. Train arrives in 84 s with 0 riders transferring to Route 1. Next Route 1 bus is 4 min behind. Previous Route 1 bus left 4 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" in 2 min.",
+            "options": [
+              "Depart now",
+              "Hold 20 s",
+              "Hold 40 s",
+              "Hold 60 s"
+            ],
+            "chosen": "Depart now",
+            "p": 0.87
+          },
+          {
+            "situation": "Bus b2 (Route 1) at University Station. 7 aboard of 40. Train arrives in 30 s with 0 riders transferring to Route 1. Next Route 1 bus is 3.5 min behind. Previous Route 1 bus left 4 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" was 6 min ago.",
+            "options": [
+              "Depart now",
+              "Hold 20 s",
+              "Hold 40 s",
+              "Hold 60 s"
+            ],
+            "chosen": "Depart now",
+            "p": 0.91
+          }
+        ]
+      }
+    }
+  ],
+  "notes": [
+    "No evolved Jev instructions yet (the champion has no advisor of its own): the evolved arm is omitted.",
+    "Live Jev calls: 19 (0 failed), mean latency 208 ms; repeated situations were served from the SHA-256 cache."
+  ],
+  "design": {
+    "candidates": [
+      {
+        "round": 1,
+        "designer": 0,
+        "valid": false,
+        "summary": "",
+        "rationale": "",
+        "errors": [
+          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: timed out after 90000 ms"
+        ],
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "advisor": null,
+        "J": null,
+        "deltaPct": null
+      },
+      {
+        "round": 1,
+        "designer": 1,
+        "valid": false,
+        "summary": "",
+        "rationale": "",
+        "errors": [
+          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: timed out after 90000 ms"
+        ],
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "advisor": null,
+        "J": null,
+        "deltaPct": null
+      },
+      {
+        "round": 1,
+        "designer": 2,
+        "valid": false,
+        "summary": "",
+        "rationale": "",
+        "errors": [
+          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: empty content"
+        ],
+        "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+        "advisor": null,
+        "J": null,
+        "deltaPct": null
+      }
+    ]
+  }
+}

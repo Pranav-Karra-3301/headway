@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · town dev (TownRenderer + stub sim)</title>
+    <link rel="preload" href="/fonts/GumballRounded.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("/fonts/GumballRounded.ttf") format("truetype"); font-display: block; }
+      :root { --ink: #1F2A44; --paper: #FFFBF2; --accent: #2E5BDA; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: var(--ink);
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .gb { font-family: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif; font-weight: 400; }
+      .brand { position: fixed; top: 20px; left: 26px; pointer-events: none; }
+      .brand h1 { margin: 0; font-size: 44px; line-height: 1; }
+      .brand p { margin: 6px 0 0 2px; font-size: 14px; opacity: .6; }
+      body.dusk .brand, body.dusk #stats { color: #FFF4E2; }
+      .panel { position: fixed; top: 16px; right: 16px; background: var(--paper); border-radius: 16px; padding: 10px 12px;
+        box-shadow: 0 10px 30px rgba(20,30,50,.14); display: grid; gap: 6px; }
+      .row { display: flex; gap: 5px; align-items: center; }
+      .row .lbl { width: 58px; font-size: 13px; opacity: .55; }
+      .chip { border: 0; border-radius: 999px; padding: 6px 11px; font-size: 14px; background: rgba(31,42,68,.07); color: var(--ink); cursor: pointer; }
+      .chip.on { background: var(--accent); color: #fff; }
+      #stats { position: fixed; left: 26px; bottom: 16px; font-size: 13px; opacity: .7; }
+      #sel { position: fixed; left: 26px; bottom: 40px; font-size: 14px; }
+      body.clean .panel, body.clean #stats, body.clean #sel, body.clean .brand { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="brand"><h1 class="gb">HEADWAY</h1><p class="gb">town renderer · stub sim</p></div>
+    <div class="panel">
+      <div class="row"><span class="lbl gb">Palette</span>
+        <button class="chip gb" data-k="palette" data-v="a">Wooden Toy</button>
+        <button class="chip gb" data-k="palette" data-v="b">Railway</button>
+        <button class="chip gb" data-k="palette" data-v="c">Autumn</button></div>
+      <div class="row"><span class="lbl gb">Detail</span>
+        <button class="chip gb" data-k="detail" data-v="min">Min</button>
+        <button class="chip gb" data-k="detail" data-v="toy">Toy</button></div>
+      <div class="row"><span class="lbl gb">Light</span>
+        <button class="chip gb" data-k="light" data-v="day">Day</button>
+        <button class="chip gb" data-k="light" data-v="dusk">Dusk</button></div>
+      <div class="row"><span class="lbl gb">Route</span>
+        <button class="chip gb" data-k="route" data-v="none">All</button>
+        <button class="chip gb" data-k="route" data-v="r1">R1</button>
+        <button class="chip gb" data-k="route" data-v="r2">R2</button>
+        <button class="chip gb" data-k="route" data-v="r3">R3</button></div>
+      <div class="row"><span class="lbl gb">Speed</span>
+        <button class="chip gb" data-k="speed" data-v="1">1×</button>
+        <button class="chip gb" data-k="speed" data-v="4">4×</button>
+        <button class="chip gb" data-k="speed" data-v="8">8×</button>
+        <button class="chip gb" data-k="speed" data-v="16">16×</button></div>
+    </div>
+    <div id="sel" class="gb"></div>
+    <div id="stats" class="gb"></div>
+    <script type="module" src="./dev.ts"></script>
+  </body>
+</html>

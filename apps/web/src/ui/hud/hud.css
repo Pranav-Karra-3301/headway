@@ -219,23 +219,51 @@
 .hud-stat-dim { opacity: 0.45; }
 
 .hud-pace {
-  display: grid;
-  grid-template-columns: auto auto;
+  position: fixed;
+  top: var(--hud-top, 88px);
+  left: 50%;
+  z-index: 30;
+  display: flex;
   align-items: center;
-  column-gap: 7px;
-  row-gap: 4px;
+  gap: 10px;
+  height: 40px;
   padding: 0 16px;
   border-radius: 999px;
   color: #fff;
   background: var(--hud-bad);
-  box-shadow: var(--hud-shadow-sm);
-  transition: background-color 300ms ease, color 300ms ease;
+  box-shadow: var(--hud-shadow);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  transition: background-color 300ms ease, color 300ms ease, opacity 200ms ease, transform 240ms var(--hud-ease);
+}
+@starting-style {
+  .hud-pace { opacity: 0; transform: translate(-50%, -6px); }
 }
 .hud-pace[data-tone="ahead"] { background: var(--hud-ok); }
 .hud-pace[data-tone="even"] { background: var(--hud-glass); color: var(--hud-ink); }
-.hud-pace .hud-label { color: currentColor; opacity: 0.8; grid-column: 1 / -1; }
-.hud-pace-value { font-family: var(--hud-display); font-size: 21px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.hud-pace-unit { font-family: var(--hud-display); font-size: 12px; opacity: 0.85; white-space: nowrap; }
+.hud-pace .hud-label { color: currentColor; opacity: 0.82; }
+.hud-pace-value { font-family: var(--hud-display); font-size: 21px; line-height: 1; font-variant-numeric: tabular-nums; }
+.hud-pace-unit { margin-left: -5px; font-family: var(--hud-display); font-size: 12px; opacity: 0.85; }
+.hud-pace-base { padding-left: 10px; border-left: 1.5px solid color-mix(in srgb, currentColor 30%, transparent); font-size: 12px; font-weight: 700; opacity: 0.85; }
+.hud-pace-base b { font-family: var(--hud-display); font-weight: 400; }
+
+/* ---------- compact top bar (laptops / 1280 px projectors) ---------- */
+.hud-l-short { display: none; }
+@media (max-width: 1520px) {
+  .hud-stat { min-width: 0; padding: 0 9px; }
+  .hud-stat-value { font-size: 19px; }
+  .hud-scn-tl { width: 104px; }
+  .hud-scenario { gap: 10px; padding: 0 14px 0 12px; }
+}
+@media (max-width: 1380px) {
+  .hud-l-long { display: none; }
+  .hud-l-short { display: inline; }
+  .hud-stat { padding: 0 8px; }
+  .hud-scn-tl { width: 84px; }
+  .hud-scn-status { font-size: 11px; }
+  .hud-seg, .hud-seg-pill { width: 40px; }
+  .hud-seg-pill { transform: translateX(calc(var(--i, 2) * 40px)); }
+}
 
 /* ---------- route legend (bottom-left) ---------- */
 
@@ -520,7 +548,7 @@
   height: 0;
   pointer-events: none;
 }
-.hud-toasts[data-offset="true"] { --hud-toast-offset: 56px; } /* below Play's finishing / spectate banner */
+.hud-toasts[data-offset="true"] { --hud-toast-offset: 50px; } /* below the pace chip / Play's finishing and spectate banners */
 .hud-toast {
   position: absolute;
   top: 0;
@@ -548,6 +576,10 @@
   opacity: 0;
   transform: translate(-50%, calc(var(--i, 0) * 45px - 10px)) scale(0.97);
   transition: transform 160ms ease-out, opacity 140ms ease-out;
+}
+/* Short screens (1280×720 projectors): only the two front toasts, so the town stays visible. */
+@media (max-height: 820px) {
+  .hud-toast[data-i="2"], .hud-toast[data-i="3"] { opacity: 0; pointer-events: none; }
 }
 .hud-toast-icon {
   display: grid;

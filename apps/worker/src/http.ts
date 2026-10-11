@@ -8,12 +8,13 @@ export function jsonError(c: Context, status: ContentfulStatusCode, error: strin
 
 export type JsonBody = { ok: true; value: unknown } | { ok: false; status: 400 | 413; error: string };
 
-/** Reads a JSON request body, refusing anything larger than `maxBytes`. */
-export async function readJson(req: Request, maxBytes: number): Promise<JsonBody> {
+/** Reads a JSON request body, refusing anything larger than `maxBytes`. With `emptyAs`, a blank body reads as that value. */
+export async function readJson(req: Request, maxBytes: number, o: { emptyAs?: unknown } = {}): Promise<JsonBody> {
   const declared = Number(req.headers.get('content-length') ?? '0');
   if (declared > maxBytes) return { ok: false, status: 413, error: `body larger than ${maxBytes} bytes` };
   const text = await req.text();
   if (new TextEncoder().encode(text).byteLength > maxBytes) return { ok: false, status: 413, error: `body larger than ${maxBytes} bytes` };
+  if ('emptyAs' in o && text.trim() === '') return { ok: true, value: o.emptyAs };
   try {
     return { ok: true, value: JSON.parse(text) as unknown };
   } catch {

@@ -170,6 +170,14 @@ describe.each(KINDS)('$kind', (c) => {
     }
   });
 
+  it('uses merge-friendly meshes: the stock attribute set (position/normal/uv) and a single material', () => {
+    for (const m of meshes(build(c.kind), false)) {
+      const g = m.geometry;
+      expect(Object.keys(g.attributes).sort(), m.name || g.type).toEqual(['normal', 'position', 'uv']);
+      expect(Array.isArray(m.material)).toBe(false);
+    }
+  });
+
   it('is deterministic for the same seed', () => {
     const a = build(c.kind, {}, 5), b = build(c.kind, {}, 5);
     expect(triangles(a)).toBe(triangles(b));
@@ -200,6 +208,16 @@ describe('lm.stadium showpiece', () => {
     expect(named(s, 'gate').length).toBeGreaterThanOrEqual(3);
     expect(named(s, 'banner').length).toBeGreaterThanOrEqual(8);
     expect(named(s, 'flag').length).toBeGreaterThanOrEqual(6);
+  });
+  it('exports STADIUM_FLOODLIGHTS matching the lamp heads (for FX light cones)', () => {
+    const heads = named(s, 'lampHead');
+    expect(landmarks.STADIUM_FLOODLIGHTS).toHaveLength(4);
+    for (const f of landmarks.STADIUM_FLOODLIGHTS) {
+      const p = new THREE.Vector3(f.x, f.y, f.z);
+      expect(heads.some((h) => h.getWorldPosition(new THREE.Vector3()).distanceTo(p) < 1e-6)).toBe(true);
+      // aimed inward: the yawed +z axis points toward the pitch centre
+      expect(Math.sin(f.yaw) * -f.x + Math.cos(f.yaw) * -f.z).toBeGreaterThan(0);
+    }
   });
   it('has a main gate on the front (+z) side', () => {
     expect(named(s, 'gate').some((g) => g.position.z > 3)).toBe(true);
@@ -236,7 +254,9 @@ describe('stations face the platform (+z)', () => {
       expect(canopy.length).toBeGreaterThanOrEqual(1);
       const cb = bounds(canopy[0]!);
       const ob = bounds(o);
-      expect(cb.max.z).toBeGreaterThan(ob.max.z - 0.4);
+      expect((cb.min.z + cb.max.z) / 2).toBeGreaterThan(0.3);
+      expect(cb.max.z).toBeGreaterThan(ob.max.z * 0.75);
+      expect(cb.max.y).toBeGreaterThan(1.4);
       expect(named(o, 'bench').length).toBeGreaterThanOrEqual(1);
     });
   }

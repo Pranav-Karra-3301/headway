@@ -719,10 +719,10 @@
 .pl-deadhead {
   fill: none;
   stroke: var(--accent);
-  stroke-width: 4;
+  stroke-width: 6;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 2 9;
+  stroke-dasharray: 0.1 11;
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 55%, transparent));
   animation: pl-march 0.9s linear infinite;
 }

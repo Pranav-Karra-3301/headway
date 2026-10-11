@@ -1,11 +1,6 @@
-// Owner: T1c. Metrics collector, findings, hashing, sentences (spec §7, §8.4). Stub until filled.
-import type { FailureFinding } from '../contracts';
-import type { Collector, CollectorInit } from '../internal';
-function ni(what: string): never {
-  throw new Error(`not implemented yet: ${what}`);
-}
-
-export function createCollector(init: CollectorInit): Collector { return ni('createCollector ' + init.scenario.id); }
-export function canonicalHash(x: unknown): string { return ni('canonicalHash ' + typeof x); }
-export function findingSentence(f: FailureFinding, clockStart: string): string { return ni(`findingSentence ${f.kind} ${clockStart}`); }
-export function clockAt(clockStart: string, t: number): string { return ni(`clockAt ${clockStart} ${t}`); }
+// Owner: T1c. Metrics collector, findings, hashing, sentences (spec §5.4, §7, §8.4, §12).
+// Public surface (stub-table signatures): createCollector(init) · canonicalHash(x) · findingSentence(f, clockStart) ·
+// clockAt(clockStart, t). Helpers in the sibling files stay internal to the package.
+export { createCollector } from './collector';
+export { canonicalHash } from './hash';
+export { clockAt, findingSentence } from './sentences';

@@ -3,9 +3,16 @@
 import { TOWN, deadheadPath, pointAt, routeById } from '@headway/sim';
 import type { PersonView, Polyline, RouteId, SimSnapshot, StationId, StopId, TownMap, VehicleView } from '@headway/sim';
 import { PALETTES } from '../../render/palettes';
+import { SCENERY } from '../../render/scenery';
+import type { SceneryItem } from '../../render/scenery';
 import type { LightMode, PaletteId, Pick, TownRendererApi } from '../../render/types';
 
 const ROUTES: RouteId[] = ['r1', 'r2', 'r3'];
+/** Kit footprints (w along x, d along z with the front facing +z), from render/scenery.ts. */
+const FOOTPRINT: Record<string, [number, number]> = {
+  small: [3, 3], tall: [3.2, 3.2], hall: [6.6, 3.2], shop: [2.6, 2.4], house: [2.8, 2.2], townhouses: [4.5, 2.4],
+  cafe: [2.8, 2.3], dorm: [4.6, 3.2], library: [5.4, 4], clockTower: [2.3, 2.3], stadium: [10.8, 8.4],
+};
 const TOP_PX = 96;
 const BOTTOM_PX = 130;
 const SIDE_PX = 40;
@@ -115,8 +122,16 @@ export class FlatTownRenderer implements TownRendererApi {
     c.roundRect(this.sx(b.minX), this.sz(b.minZ), (b.maxX - b.minX) * s, (b.maxZ - b.minZ) * s, 18);
     c.fill();
 
-    // roads, rail, route ribbons
+    // lawns, then roads, rail and buildings, then route ribbons
+    for (const it of SCENERY) {
+      if (it.kind !== 'lawn') continue;
+      c.fillStyle = P.lawn;
+      c.beginPath();
+      c.roundRect(this.sx(it.x - (it.w ?? 4) / 2), this.sz(it.z - (it.d ?? 4) / 2), (it.w ?? 4) * s, (it.d ?? 4) * s, 0.6 * s);
+      c.fill();
+    }
     for (const e of this.map.roads.edges) this.stroke(e.path, P.road, 2.4 * s);
+    for (const it of SCENERY) this.drawScenery(it, P);
     this.stroke(this.map.rail.loop, P.ballast, 1.6 * s);
     this.stroke(this.map.rail.loop, P.rail, 0.35 * s, [0.6 * s, 0.5 * s]);
     ROUTES.forEach((id, i) => {
@@ -204,6 +219,49 @@ export class FlatTownRenderer implements TownRendererApi {
       c.restore();
     }
     this.last = { vehicles: drawn };
+  }
+
+  private drawScenery(it: SceneryItem, P: (typeof PALETTES)['a']): void {
+    if (it.kind === 'lawn' || it.kind === 'station') return;
+    const c = this.ctx;
+    const s = this.xf.s;
+    if (it.kind === 'tree') {
+      const leaf = P.leaf[(it.leaf ?? 0) % P.leaf.length] ?? P.lawn;
+      c.fillStyle = leaf;
+      c.beginPath();
+      c.arc(this.sx(it.x), this.sz(it.z), 0.85 * (it.scale ?? 1) * s, 0, Math.PI * 2);
+      c.fill();
+      return;
+    }
+    const fp = FOOTPRINT[it.building ?? it.kind] ?? [3, 3];
+    const quarter = Math.round(((it.rot ?? 0) / (Math.PI / 2)) % 2) !== 0;
+    const w = (quarter ? fp[1] : fp[0]) * (it.scale ?? 1) * s;
+    const d = (quarter ? fp[0] : fp[1]) * (it.scale ?? 1) * s;
+    const x = this.sx(it.x) - w / 2;
+    const y = this.sz(it.z) - d / 2;
+    c.fillStyle = 'rgba(31, 42, 68, 0.12)';
+    c.beginPath();
+    if (it.kind === 'stadium') c.ellipse(this.sx(it.x) + 0.25 * s, this.sz(it.z) + 0.35 * s, w / 2, d / 2, 0, 0, Math.PI * 2);
+    else c.roundRect(x + 0.25 * s, y + 0.35 * s, w, d, 0.5 * s);
+    c.fill();
+    if (it.kind === 'stadium') {
+      c.fillStyle = P.stadium;
+      c.beginPath();
+      c.ellipse(this.sx(it.x), this.sz(it.z), w / 2, d / 2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = P.field;
+      c.beginPath();
+      c.ellipse(this.sx(it.x), this.sz(it.z), w * 0.32, d * 0.28, 0, 0, Math.PI * 2);
+      c.fill();
+      return;
+    }
+    const roof = it.kind === 'hall' && it.building === 'hall' ? P.hallRoof
+      : it.kind === 'clockTower' ? P.towerRoof
+      : P.roof[(it.roof ?? 0) % P.roof.length] ?? P.roof[0]!;
+    c.fillStyle = roof;
+    c.beginPath();
+    c.roundRect(x, y, w, d, 0.45 * s);
+    c.fill();
   }
 
   private personPos(p: PersonView, t: number): { x: number; z: number } | null {

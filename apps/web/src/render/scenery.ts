@@ -37,47 +37,51 @@ export const SCENERY: SceneryItem[] = [
   lawn(-10.5, -4.6, 5.6, 4.0),
   lawn(-10.5, -11.6, 5.0, 2.6),
   { kind: 'clockTower', x: -10.5, z: -9.0, rot: S },
-  b('hall', 'hall', -14.8, -7.0, W, 0, 1),
+  b('hall', 'hall', -15.3, -7.0, W, 0, 1),
   b('hall', 'library', -5.8, -8.2, E, 1, 1),
-  b('tall', 'dorm', -22.5, -10.5, E, 0, 0),
-  b('tall', 'dorm', -22.5, -4.5, E, 1, 2),
+  b('tall', 'dorm', -23.15, -10.5, E, 0, 0),
+  b('tall', 'dorm', -23.15, -4.5, E, 1, 2),
   tree(-13.2, -12.4, 0, 0), tree(-7.8, -12.4, 1, 1), tree(-16.6, -2.6, 3, 2, 0.9), tree(-4.6, -3.0, 0, 1, 0.9),
 
   // ---- downtown (Main St, Beaver Ave, Allen St)
   b('small', 'small', 1.2, -11.3, S, 1, 0),
   b('small', 'shop', 5.0, -11.3, S, 0, 2),
   b('small', 'cafe', 8.6, -11.4, S, 2, 1),
-  b('tall', 'tall', 1.2, -3.4, S, 2, 1),
-  b('small', 'small', 4.9, -3.5, S, 0, 2),
-  b('small', 'shop', 8.8, -3.3, S, 1, 0),
-  b('small', 'cafe', 8.5, 3.3, N, 0, 0),
+  b('small', 'small', 1.4, -3.4, S, 0, 2),
+  b('tall', 'tall', 5.2, -3.4, S, 2, 1),
+  b('small', 'shop', 8.9, -3.3, S, 1, 0),
+  b('small', 'cafe', 1.8, 3.3, N, 0, 0),
   b('tall', 'tall', 15.3, -5.2, W, 1, 2),
   b('tall', 'tall', 19.0, -11.2, N, 0, 1),
   b('small', 'small', 15.2, -11.0, N, 2, 0),
   b('small', 'small', 19.4, -3.2, S, 1, 1),
-  tree(17.4, -7.9, 4, 0, 1.1),
+  tree(20.2, -7.2, 4, 0, 1.0),
 
-  // ---- apartments (SE): four towers, a house, rows along the South Rd
-  b('tall', 'tall', 15.3, 3.4, S, 2, 0),
-  b('tall', 'tall', 15.3, 10.7, N, 0, 2),
-  b('tall', 'tall', 1.6, 10.5, N, 1, 1),
-  b('tall', 'tall', 8.7, 10.5, N, 2, 2),
-  b('small', 'house', 5.15, 11.4, S, 0, 0),
-  b('small', 'townhouses', 5.0, 18.3, N, 1, 1),
-  b('small', 'house', 10.2, 18.4, N, 2, 2),
-  b('small', 'house', 14.2, 18.4, N, 0, 1),
-  b('small', 'townhouses', 19.4, 18.3, N, 2, 0),
-  b('small', 'house', 26.3, 10.8, W, 1, 2),
+  // ---- south side (between Park Ave and the South Rd): small homes
+  b('small', 'townhouses', 3.0, 10.7, S, 1, 1),
+  b('small', 'house', 8.5, 10.8, S, 2, 2),
+  tree(6.2, 8.9, 1, 0, 0.8),
 
-  // ---- north band (along the North Rd, east of the arterial)
+  // ---- apartments (SE, around Central Station): four towers
+  b('tall', 'tall', 15.3, 3.4, N, 2, 0),
+  b('tall', 'tall', 15.3, 10.7, S, 0, 2),
+  b('tall', 'tall', 26.6, 6.2, N, 1, 1),
+  b('tall', 'tall', 26.6, 11.0, S, 2, 2),
+  lawn(15.3, 7.0, 3.0, 2.2),
+
+  // ---- north band (along the North Rd, east of the arterial) and south band (along the South Rd)
   b('small', 'house', 2.6, -18.4, S, 1, 0),
   b('small', 'townhouses', 8.2, -18.3, S, 0, 2),
   b('small', 'house', 13.8, -18.4, S, 2, 1),
   b('small', 'small', 18.8, -18.3, S, 0, 0),
+  b('small', 'townhouses', 5.0, 18.3, N, 1, 1),
+  b('small', 'house', 10.2, 18.4, N, 2, 2),
+  b('small', 'house', 14.2, 18.4, N, 0, 1),
+  b('small', 'townhouses', 19.4, 18.3, N, 2, 0),
 
   // ---- stadium (SW)
-  { kind: 'stadium', x: -13.9, z: 7.3, rot: S },
-  tree(-22.8, 3.2, 0, 0), tree(-22.8, 11.4, 1, 2), tree(-5.4, 3.0, 3, 1, 0.9),
+  { kind: 'stadium', x: -19.8, z: 7.3, rot: S },
+  tree(-5.4, 3.0, 3, 1, 0.9), tree(-8.8, 4.2, 0, 0), tree(-5.6, 9.6, 1, 2, 0.9),
 
   // ---- stations (kit station models; districts may swap in their own buildings)
   station('stn_stadium'),

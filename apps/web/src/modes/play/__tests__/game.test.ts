@@ -73,7 +73,7 @@ beforeEach(async () => {
     play: { phase: 'intro', seed: 50000, intents: [], pace: [], results: null },
   });
   game.resetLocal();
-  usePlay.getState().set({ ai: { status: 'idle', champion: null, baseline: null, championId: '', error: null }, tour: null, board: { status: 'idle', rows: [] } });
+  usePlay.getState().set({ ai: { status: 'idle', champion: null, baseline: null, championId: '', key: '', error: null }, tour: null, board: { status: 'idle', rows: [] } });
   game.enterPlay();
   await flush();
 });
@@ -151,10 +151,11 @@ describe('play orchestration', () => {
     tick();
     game.finish();
     expect(useApp.getState().play.phase).toBe('finishing');
-    expect(useApp.getState().paused).toBe(true);
+    expect(useApp.getState().paused).toBe(false); // the clock visibly races; nothing is "paused"
     tick(40);
     expect(sim.done).toBe(true);
     expect(useApp.getState().play.phase).toBe('results');
+    expect(useApp.getState().paused).toBe(true);
     const local = usePlay.getState();
     expect(local.you?.metrics.J).toBe(3000);
     expect(local.youPace.map((p) => p.t).filter((t) => t % 30 === 0).length).toBeGreaterThanOrEqual(9);
@@ -183,9 +184,9 @@ describe('play orchestration', () => {
     game.start();
     game.setTour(null);
     tick();
-    const ev = (key: string, target: unknown = { tagName: 'DIV', isContentEditable: false }) => {
+    const ev = (key: string, target: unknown = { tagName: 'DIV', isContentEditable: false }, repeat = false) => {
       const e = { key, code: key === ' ' ? 'Space' : '', shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, isComposing: false,
-        defaultPrevented: false, target, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+        repeat, defaultPrevented: false, target, preventDefault: vi.fn(), stopPropagation: vi.fn() };
       game.handleKey(e as unknown as KeyboardEvent);
       return e;
     };
@@ -195,5 +196,9 @@ describe('play orchestration', () => {
     expect(useApp.getState().paused).toBe(true);
     ev(']');
     expect(useApp.getState().selection).toEqual({ kind: 'bus', id: 'b1' });
+    ev('h', undefined, true); // auto-repeat: swallowed, nothing sent
+    expect(sim.intents).toEqual([]);
+    ev('h');
+    expect(sim.intents).toEqual([{ type: 'hold', vehicleId: 'b1', seconds: 30 }]);
   });
 });

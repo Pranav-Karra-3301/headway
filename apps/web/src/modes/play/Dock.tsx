@@ -87,7 +87,7 @@ function TrainPicker({ obs }: { obs: Observation }) {
   const when = (p: typeof ext) => (p && p.departAt !== null ? `departs ${clock(obs.scenario.clockStart, p.departAt)}` : p ? `waits ${p.dwellS} s there` : '');
   return (
     <div className="pl-pop" role="menu" aria-label="Set the train departure">
-      <div className="pl-pop__head"><span className="hw-label">Train {at}</span></div>
+      <div className="pl-pop__head"><span className="hw-label">Train {at}</span><span>dwell 30 s to 2 min</span></div>
       <button type="button" role="menuitem" className="pl-pop__row" aria-disabled={!ext || (ext.capped && ext.immediate && obs.train.departAt !== null && ext.departAt !== null && ext.departAt <= obs.train.departAt)}
         onClick={() => act({ kind: 'train', mode: 'extend' })}>
         <span className="pl-pop__name"><b>+30 s</b> hold for connections</span>
@@ -95,7 +95,7 @@ function TrainPicker({ obs }: { obs: Observation }) {
         <span className="pl-kbd pl-kbd--sm">T</span>
       </button>
       <button type="button" role="menuitem" className="pl-pop__row" onClick={() => act({ kind: 'train', mode: 'now' })}>
-        <span className="pl-pop__name"><b>Depart now</b> 30 s minimum dwell</span>
+        <span className="pl-pop__name"><b>Depart now</b> no more boarding</span>
         <span className="pl-pop__meta">{now?.immediate ? when(now) : 'leaves after 30 s'}</span>
         <span className="pl-kbd pl-kbd--sm">{'⇧T'}</span>
       </button>
@@ -105,6 +105,7 @@ function TrainPicker({ obs }: { obs: Observation }) {
 
 function Nudge() {
   const nudge = usePlay((s) => s.nudge);
+  const picker = usePlay((s) => s.picker);
   const [shown, setShown] = useState<number | null>(null);
   useEffect(() => {
     if (!nudge) return;
@@ -112,7 +113,7 @@ function Nudge() {
     const id = setTimeout(() => setShown((n) => (n === nudge.n ? null : n)), 2400);
     return () => clearTimeout(id);
   }, [nudge]);
-  if (!nudge || shown !== nudge.n) return null;
+  if (!nudge || shown !== nudge.n || picker) return null;
   return <div className="pl-nudge" data-tone={nudge.tone} role="status" key={nudge.n}>{nudge.text}</div>;
 }
 
@@ -143,7 +144,7 @@ function DockBody() {
             return (
               <button key={b.id} type="button" role="option" aria-selected={sel === b.id} className="pl-veh" data-state={b.state}
                 onClick={() => select(sel === b.id ? null : { kind: 'bus', id: b.id })}
-                title={busLine(b, t)}>
+                aria-label={busLine(b, t)}>
                 <span className="hw-route-dot" data-route={b.routeId} />
                 <span className="pl-veh__id">{b.id}</span>
                 {b.state === 'holding' && b.holdUntil !== null
@@ -155,7 +156,7 @@ function DockBody() {
           })}
           {obs && (
             <button type="button" role="option" aria-selected={sel === TRAIN_ID} className="pl-veh pl-veh--train" data-state={obs.train.state}
-              onClick={() => select(sel === TRAIN_ID ? null : { kind: 'train', id: TRAIN_ID })} title={trainLine(obs)}>
+              onClick={() => select(sel === TRAIN_ID ? null : { kind: 'train', id: TRAIN_ID })} aria-label={trainLine(obs)}>
               <span className="pl-veh__id">Train</span>
               <span className="pl-veh__load" aria-hidden="true"><i style={{ transform: `scaleX(${Math.min(1, obs.train.onboard / Math.max(1, obs.train.capacity))})` }} /></span>
               {badgeFor(tracked, TRAIN_ID) && <span className="pl-veh__badge">{badgeFor(tracked, TRAIN_ID)}</span>}

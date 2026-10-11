@@ -158,12 +158,12 @@ function hall(o: Required<BuildingOpts>, rnd: () => number): THREE.Group {
   g.add(at(rbox(w, h, d, 0.14, 'hall'), 0, h / 2, 0));
   g.add(at(prism(d + 0.4, 1.25, w + 0.3, 'x', 'hallRoof'), 0, h, 0));
   g.add(detail(at(box(w + 0.1, 0.12, d + 0.1, 'trim'), 0, h - 0.06, 0)));
-  // Portico: stylobate, 4 columns, entablature, pediment.
-  g.add(at(rbox(2.2, 0.16, 1.1, 0.05, 'column'), 0, 0.08, d / 2 + 0.55));
-  for (const x of [-0.72, -0.24, 0.24, 0.72]) g.add(at(cyl(0.09, 0.1, 1.9, 'column', 0, 12), x, 1.11, d / 2 + 0.72));
-  g.add(at(rbox(2.0, 0.22, 0.6, 0.05, 'column'), 0, 2.17, d / 2 + 0.62));
-  g.add(at(prism(2.1, 0.45, 0.6, 'z', 'column'), 0, 2.28, d / 2 + 0.62));
-  g.add(detail(at(box(2.4, 0.07, 0.34, 'curb'), 0, 0.035, d / 2 + 1.25)));
+  // Portico (stays within 1.1 of the front wall): stylobate + step, 4 columns, entablature, pediment.
+  g.add(at(rbox(2.2, 0.16, 0.9, 0.05, 'column'), 0, 0.08, d / 2 + 0.45));
+  g.add(detail(at(box(2.3, 0.07, 0.2, 'curb'), 0, 0.035, d / 2 + 1.0)));
+  for (const x of [-0.72, -0.24, 0.24, 0.72]) g.add(at(cyl(0.09, 0.1, 1.9, 'column', 0, 12), x, 1.11, d / 2 + 0.62));
+  g.add(at(rbox(2.0, 0.22, 0.6, 0.05, 'column'), 0, 2.17, d / 2 + 0.55));
+  g.add(at(prism(2.1, 0.45, 0.6, 'z', 'column'), 0, 2.28, d / 2 + 0.55));
   g.add(onFace(doorUnit({ w: 0.7, h: 1.2, canopy: null, step: false }), 'front', w, d, 0, 0));
   windowRow(g, rnd, 'front', w, d, [-2.5, -1.6, 1.6, 2.5], 1.3, 0.5, 0.9, { arch: true });
   windowRow(g, rnd, 'back', w, d, [-2.5, -1.6, -0.5, 0.5, 1.6, 2.5], 1.3, 0.5, 0.9, { arch: true });
@@ -227,34 +227,35 @@ function townhouses(o: Required<BuildingOpts>, rnd: () => number): THREE.Group {
 }
 
 function cafe(o: Required<BuildingOpts>, rnd: () => number): THREE.Group {
-  // Footprint 3.2 × 3.4: the café block sits at the back, a small terrace with tables in front.
-  const g = new THREE.Group(), w = 2.8, d = 2.3, h = 1.6, z0 = -0.7;
+  // Corner café inside a 2.8 × 2.3 footprint: café block on the left, a small side terrace with tables on the right.
+  const g = new THREE.Group(), W = 2.8, D = 2.3, w = 1.9, d = D, h = 1.6, x0 = -(W - w) / 2;
   const body = new THREE.Group();
   body.add(at(rbox(w, h, d, 0.1, 'wall', o.wall), 0, h / 2, 0));
   body.add(at(rbox(w + 0.12, 0.14, d + 0.12, 0.05, 'roof', o.roof), 0, h + 0.05, 0));
-  body.add(onFace(doorUnit({ w: 0.5, canopy: null }), 'front', w, d, 0.9, 0));
-  body.add(onFace(windowUnit(1.25, 0.72, rnd() < 0.8, { sill: false }), 'front', w, d, -0.35, 0.62));
-  body.add(onFace(windowUnit(1.25, 0.72, rnd() < 0.8, { sill: false }), 'right', w, d, 0.2, 0.62));
-  body.add(onFace(awning(2.6, 0.6, o.roof, true), 'front', w, d, 0, 1.28));
-  body.add(onFace(awning(2.1, 0.6, o.roof, true), 'right', w, d, 0.2, 1.28));
-  body.add(onFace(group(at(box(1.2, 0.22, 0.05, 'paper'), 0, 0, 0.025)), 'front', w, d, 0, 1.5));
-  body.add(detail(onFace(group(at(box(0.8, 0.06, 0.02, 'awning', o.roof), 0, 0, 0.06)), 'front', w, d, 0, 1.5)));
-  windowRow(body, rnd, 'back', w, d, [-0.7, 0.7], 0.8, 0.5, 0.5);
-  windowRow(body, rnd, 'left', w, d, [0], 0.8, 0.5, 0.5);
-  body.position.z = z0;
+  body.add(onFace(doorUnit({ w: 0.5, canopy: null }), 'front', w, d, 0.55, 0));
+  body.add(onFace(windowUnit(0.8, 0.72, rnd() < 0.8, { sill: false }), 'front', w, d, -0.3, 0.62));
+  body.add(onFace(windowUnit(1.2, 0.72, rnd() < 0.8, { sill: false }), 'right', w, d, 0, 0.62));
+  body.add(onFace(awning(1.8, 0.55, o.roof, true), 'front', w, d, 0, 1.28));
+  body.add(onFace(awning(1.0, 0.55, o.roof, true), 'right', w, d, 0.55, 1.28));
+  body.add(onFace(group(at(box(1.0, 0.22, 0.05, 'paper'), 0, 0, 0.025)), 'front', w, d, 0, 1.5));
+  body.add(detail(onFace(group(at(box(0.66, 0.06, 0.02, 'awning', o.roof), 0, 0, 0.06)), 'front', w, d, 0, 1.5)));
+  windowRow(body, rnd, 'back', w, d, [-0.45, 0.45], 0.8, 0.5, 0.5);
+  windowRow(body, rnd, 'left', w, d, [-0.6, 0.6], 0.8, 0.5, 0.5);
+  body.position.x = x0;
   g.add(body);
-  // Terrace: paving, two tables with stools, one parasol.
-  g.add(detail(at(box(3.0, 0.03, 1.3, 'curb'), 0, 0.015, z0 + d / 2 + 0.68)));
-  for (const [tx, tz, para] of [[-0.8, 1.3, false], [0.55, 1.42, true]] as const) {
+  // Side terrace: paving, two tables with stools, one parasol.
+  const tx = x0 + w / 2 + (W - w) / 2;
+  g.add(detail(at(box(W - w - 0.02, 0.03, D - 0.1, 'curb'), tx, 0.015, 0)));
+  for (const [tz, para] of [[-0.55, false], [0.55, true]] as const) {
     const t = new THREE.Group();
     t.add(at(cyl(0.035, 0.05, 0.36, 'metal', 0, 8), 0, 0.18, 0));
-    t.add(at(cyl(0.22, 0.22, 0.04, 'stripe', 0, 14), 0, 0.38, 0));
-    for (const a of [0, Math.PI]) t.add(at(cyl(0.08, 0.08, 0.22, 'awning', o.roof, 10), Math.cos(a) * 0.36, 0.11, Math.sin(a) * 0.36));
+    t.add(at(cyl(0.2, 0.2, 0.04, 'stripe', 0, 14), 0, 0.38, 0));
+    for (const a of [Math.PI / 2, -Math.PI / 2]) t.add(at(cyl(0.075, 0.075, 0.22, 'awning', o.roof, 10), Math.cos(a) * 0.32, 0.11, Math.sin(a) * 0.32));
     if (para) {
-      t.add(at(cyl(0.02, 0.02, 0.8, 'metal', 0, 6), 0, 0.8, 0));
-      t.add(at(cone(0.42, 0.22, 'awning', o.roof, 12), 0, 1.25, 0));
+      t.add(at(cyl(0.02, 0.02, 0.85, 'metal', 0, 6), 0, 0.82, 0));
+      t.add(at(cone(0.4, 0.2, 'awning', o.roof, 12), 0, 1.3, 0));
     }
-    g.add(detail(at(t, tx, 0, tz)));
+    g.add(detail(at(t, tx + 0.08, 0, tz)));
   }
   return g;
 }

@@ -25,7 +25,8 @@ describe('scenarios', () => {
     const se = scenarioDef('stadium_exit');
     expect(se.clockStart).toBe('21:30');
     expect(se.durationS + se.clearingS).toBe(2700);
-    expect(se.demand.find((d) => d.id === 'stadium_crowd')).toMatchObject({ total: 1200, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 } });
+    // total tuned from the spec's 1,200 in Wave 1 integration (g0 completion gate)
+    expect(se.demand.find((d) => d.id === 'stadium_crowd')).toMatchObject({ total: 1000, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 } });
     expect(se.demand.find((d) => d.id === 'background')?.total).toBe(300);
     expect(se.advertised).toEqual([{ kind: 'stadium_closing', t: 600, label: 'Stadium closes' }]);
     const shares = se.demand[0]!.to.map((t) => t.share);

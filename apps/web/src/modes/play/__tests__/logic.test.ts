@@ -163,6 +163,11 @@ describe('verdict', () => {
     expect(v.tone).toBe('loss');
     expect(v.line).toBe('You matched the baseline — the AI wins by 5%');
   });
+  it('a full tie reads as one clear sentence', () => {
+    const v = verdict(100, 100, 100);
+    expect(v).toMatchObject({ tone: 'tie', headline: 'Dead heat with the AI', line: 'Same score as the AI and the baseline' });
+    expect(verdict(95, 95, 100).line).toBe('You beat the baseline by 5% \u2014 level with the AI');
+  });
   it('loses to both', () => {
     const v = verdict(110, 95, 100);
     expect(v.headline).toBe('The AI wins');

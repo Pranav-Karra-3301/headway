@@ -38,7 +38,9 @@ const STADIUM_EXIT: ScenarioDef = {
         { sel: HALLS, share: 0.15 },
         { sel: { zones: ['z_stn_central'] }, share: 0.15 },
       ],
-      total: 1200, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 },
+      // Tuned (Wave 1 integration): 1,000 rather than the spec's 1,200 keeps g0 above 85% completion on every
+      // train/val/showcase/play seed while Old Main still queues 250–300 at the peak.
+      total: 1000, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 },
     },
     background(300),
   ],

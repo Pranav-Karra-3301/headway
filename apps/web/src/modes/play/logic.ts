@@ -144,7 +144,9 @@ export function verdict(you: number, ai: number, base: number): Verdict {
     return { tone: 'win', headline: 'You beat the AI dispatcher', line };
   }
   if (aiCmp === 0) {
-    const line = baseCmp > 0 ? `You beat the baseline by ${pBase}${D}dead heat with the AI` : `Dead heat with the AI`;
+    const line = baseCmp > 0 ? `You beat the baseline by ${pBase}${D}level with the AI`
+      : baseCmp === 0 ? 'Same score as the AI and the baseline'
+      : `Level with the AI${D}the baseline beat you both by ${pBase}`;
     return { tone: 'tie', headline: 'Dead heat with the AI', line };
   }
   if (baseCmp > 0) return { tone: 'partial', headline: 'You beat the baseline', line: `You beat the baseline by ${pBase}${D}the AI wins by ${pAi}` };

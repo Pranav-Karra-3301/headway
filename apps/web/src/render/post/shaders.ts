@@ -54,11 +54,14 @@ export function gradeShader() {
       uGrain: { value: 0.018 },
       uTime: { value: 0 },
       uAspect: { value: 1.6 },
+      /** Split-tone multipliers: shadows → uShadowTint, highlights → uHighlightTint. */
+      uShadowTint: { value: new THREE.Color(0.985, 0.995, 1.025) },
+      uHighlightTint: { value: new THREE.Color(1.02, 1.0, 0.975) },
     },
     vertexShader: VERT,
     fragmentShader: /* glsl */ `
 uniform sampler2D tDiffuse;
-uniform vec3 uLift, uGain;
+uniform vec3 uLift, uGain, uShadowTint, uHighlightTint;
 uniform float uSaturation, uWarmth, uVignette, uGrain, uTime, uAspect;
 varying vec2 vUv;
 float hash( vec2 p ) { p = fract( p * vec2( 123.34, 456.21 ) ); p += dot( p, p + 45.32 ); return fract( p.x * p.y ); }
@@ -69,6 +72,7 @@ void main() {
   float l = dot( col, vec3( 0.2126, 0.7152, 0.0722 ) );
   col = mix( vec3( l ), col, uSaturation );
   col *= vec3( 1.0 + uWarmth, 1.0 + uWarmth * 0.3, 1.0 - uWarmth * 0.6 );
+  col *= mix( uShadowTint, uHighlightTint, smoothstep( 0.05, 0.75, l ) );
   vec2 q = ( vUv - 0.5 ) * vec2( uAspect, 1.0 );
   float v = smoothstep( 0.55, 1.35, length( q ) );
   col *= 1.0 - uVignette * v;

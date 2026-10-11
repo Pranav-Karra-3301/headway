@@ -1,7 +1,7 @@
 // Hand-rolled structural checks for request bodies (the worker has no direct zod dependency).
 // Every error is one short line naming the path, e.g. `generations[0].train.J: expected number`.
 import { validatePolicy } from '@headway/sim';
-import type { Generation, Round, SplitScore } from '@headway/sim';
+import type { Generation, Intent, Metrics, Replay, Round, RouteId, SplitScore } from '@headway/sim';
 
 type Check = (v: unknown, path: string, errs: string[]) => void;
 type Result<T> = { ok: true; value: T } | { ok: false; errors: string[] };
@@ -156,4 +156,164 @@ export function parseJevRequest(v: unknown): Result<JevDecideRequest> {
   const r = run<JevDecideRequest>(jevShape, v, 'body');
   if (!r.ok) return { ok: false, errors: r.errors.map((e) => e.replace(/^body\./, '')) };
   return { ok: true, value: { instructions: r.value.instructions, situation: r.value.situation, options: [...r.value.options] } };
+}
+
+// ---------- leaderboard submissions ----------
+/** Spec §11: at most 16 characters of [A-Za-z0-9 _-] (trimmed, inner whitespace collapsed — same as the web's cleanName). */
+export function cleanName(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim().replace(/\s+/g, ' ');
+  return /^[A-Za-z0-9 _-]{1,16}$/.test(s) ? s : null;
+}
+
+export const MAX_INTENTS = 1000;
+const VEHICLE_ID = /^[A-Za-z0-9_-]{1,16}$/;
+const ROUTE_IDS: readonly RouteId[] = ['r1', 'r2', 'r3'];
+
+/** What the server needs to re-simulate a play run: `expect` comes from the bundled sim and map, `tMax` from the scenario. */
+export interface ReplayExpect { simVersion: string; mapVersion: string; scenarioId: string; tMax: number; seedOk: (seed: number) => string | null }
+export interface Submission { name: string; replay: Replay & { intents: Array<{ t: number; intent: Intent }> } }
+
+function parseIntent(x: unknown, p: string, tMax: number, errs: string[]): { t: number; intent: Intent } | null {
+  if (!isObj(x)) {
+    errs.push(`${p}: expected { t, intent }`);
+    return null;
+  }
+  const n0 = errs.length;
+  const t = x.t;
+  if (typeof t !== 'number' || !Number.isInteger(t) || t < 0 || t > tMax) errs.push(`${p}.t: expected a whole second 0..${tMax}`);
+  const i = x.intent;
+  if (!isObj(i)) {
+    errs.push(`${p}.intent: expected object`);
+    return null;
+  }
+  const vehicle = () => {
+    if (typeof i.vehicleId !== 'string' || !VEHICLE_ID.test(i.vehicleId)) errs.push(`${p}.intent.vehicleId: expected a vehicle id like "b3"`);
+    return i.vehicleId as string;
+  };
+  const seconds = (k: 'seconds' | 'dwellS') => {
+    const v = i[k];
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 600) errs.push(`${p}.intent.${k}: expected a number of seconds 0..600`);
+    return v as number;
+  };
+  let intent: Intent | null = null;
+  switch (i.type) {
+    case 'dispatch': intent = { type: 'dispatch', vehicleId: vehicle() }; break;
+    case 'hold': intent = { type: 'hold', vehicleId: vehicle(), seconds: seconds('seconds') }; break;
+    case 'reassign': {
+      const vehicleId = vehicle();
+      if (!ROUTE_IDS.includes(i.to as RouteId)) errs.push(`${p}.intent.to: expected one of "r1", "r2", "r3"`);
+      intent = { type: 'reassign', vehicleId, to: i.to as RouteId };
+      break;
+    }
+    case 'setTrainDeparture': intent = { type: 'setTrainDeparture', dwellS: seconds('dwellS') }; break;
+    default: errs.push(`${p}.intent.type: expected one of "dispatch", "hold", "reassign", "setTrainDeparture"`);
+  }
+  return errs.length === n0 && intent ? { t: t as number, intent } : null;
+}
+
+/**
+ * Body of `POST /api/leaderboard`: `{ name, replay }`. The replay must be the play scenario on a recent play seed, made with
+ * the current sim and map, by the baseline g0 plus human intents only (recorded decisions are refused, spec §10 fairness).
+ * Returns a normalized replay (known fields only) the server re-simulates and stores.
+ */
+export function parseSubmission(v: unknown, expect: ReplayExpect): Result<Submission> {
+  const errors: string[] = [];
+  if (!isObj(v)) return { ok: false, errors: ['body: expected { name, replay }'] };
+  const name = cleanName(v.name);
+  if (!name) errors.push('name: use 1–16 letters, digits, spaces, _ or -');
+  const r = v.replay;
+  if (!isObj(r)) return { ok: false, errors: [...errors, 'replay: expected the replay object from a finished run'] };
+
+  const reload = '(reload the page to get the current game)';
+  if (r.simVersion !== expect.simVersion) errors.push(`replay.simVersion: ${JSON.stringify(r.simVersion)} is not the server's sim version "${expect.simVersion}" ${reload}`);
+  if (r.mapVersion !== expect.mapVersion) errors.push(`replay.mapVersion: ${JSON.stringify(r.mapVersion)} is not the server's map version "${expect.mapVersion}" ${reload}`);
+  if (r.scenarioId !== expect.scenarioId) errors.push(`replay.scenarioId: ${JSON.stringify(r.scenarioId)} is not the play scenario "${expect.scenarioId}"`);
+  const seed = r.seed;
+  if (typeof seed !== 'number' || !Number.isSafeInteger(seed)) errors.push('replay.seed: expected an integer play seed');
+  else {
+    const why = expect.seedOk(seed);
+    if (why) errors.push(`replay.seed: ${why}`);
+  }
+  const c = r.controller;
+  const humanOnG0 = isObj(c) && ((c.kind === 'human' && c.basePolicyId === 'g0') || (c.kind === 'policy' && c.policyId === 'g0'));
+  if (!humanOnG0) errors.push('replay.controller: must be the baseline plus your interventions ({"kind":"human","basePolicyId":"g0"})');
+  if (r.decisions !== undefined && !(Array.isArray(r.decisions) && r.decisions.length === 0)) {
+    errors.push('replay.decisions: recorded decisions are not accepted; submit your intents only');
+  }
+
+  const intents: Array<{ t: number; intent: Intent }> = [];
+  if (r.intents !== undefined) {
+    if (!Array.isArray(r.intents)) errors.push(`replay.intents: expected an array of at most ${MAX_INTENTS} { t, intent }`);
+    else if (r.intents.length > MAX_INTENTS) errors.push(`replay.intents: at most ${MAX_INTENTS} intents (got ${r.intents.length})`);
+    else {
+      r.intents.forEach((x, k) => {
+        const ok = parseIntent(x, `replay.intents[${k}]`, expect.tMax, errors);
+        if (ok) intents.push(ok);
+      });
+    }
+  }
+  if (errors.length) return { ok: false, errors: errors.slice(0, 50) };
+  return {
+    ok: true,
+    value: {
+      name: name!,
+      replay: {
+        simVersion: expect.simVersion, mapVersion: expect.mapVersion, scenarioId: expect.scenarioId, seed: seed as number,
+        controller: { kind: 'human', basePolicyId: 'g0' }, intents,
+      },
+    },
+  };
+}
+
+// ---------- sealed evaluation (body shape of packages/evolve/src/cli/eval-sealed.ts, T8) ----------
+export interface SealedResultBody {
+  role: 'champion' | 'baseline' | 'reference'; policyId: string; simVersion: string; jTest: number; metrics: Metrics;
+  score?: SplitScore; byScenario?: Record<string, SplitScore>; deltaVsBaselinePct?: number | null; createdAt?: string;
+}
+/** `POST /api/admin/sealed-eval` with precomputed results (`eval-sealed --url …`). Contains no seeds. */
+export interface SealedEvalBody {
+  simVersion: string; mapVersion: string; seedSet: string; scenarios: string[]; seedsPerScenario: number; runs: number; createdAt: string;
+  results: SealedResultBody[];
+}
+
+const isoDate: Check = (v, p, e) => {
+  if (typeof v !== 'string' || v.length > 40 || Number.isNaN(Date.parse(v))) e.push(`${p}: expected an ISO timestamp`);
+};
+const record = (c: Check): Check => (v, p, e) => {
+  if (!isObj(v)) return void e.push(`${p}: expected object`);
+  const keys = Object.keys(v);
+  if (keys.length > 10) e.push(`${p}: at most 10 entries`);
+  for (const k of keys.slice(0, 10)) c(v[k], `${p}.${k}`, e);
+};
+const sealedResult = object({
+  role: oneOf('champion', 'baseline', 'reference'), policyId: str(1, 64), simVersion: str(1, 32), jTest: num, metrics,
+  score: optional(splitScore), byScenario: optional(record(splitScore)), deltaVsBaselinePct: optional(nullable(num)), createdAt: optional(isoDate),
+});
+const sealedShape = object({
+  simVersion: str(1, 32), mapVersion: str(1, 32), seedSet: str(1, 64), scenarios: array(str(1, 40), 1, 10), seedsPerScenario: int(1),
+  runs: int(1), createdAt: isoDate, results: array(sealedResult, 1, 10),
+});
+
+export function parseSealedEval(v: unknown): Result<SealedEvalBody> {
+  const r = run<SealedEvalBody>(sealedShape, v, 'body');
+  if (!r.ok) return { ok: false, errors: r.errors.map((e) => e.replace(/^body\./, '')) };
+  return r;
+}
+
+/** SEALED_TEST_SEEDS: a JSON array (or comma list) of 1–10 distinct positive integers. Errors never echo the value. */
+export function parseSealedSeeds(value: string): number[] | null {
+  const t = value.trim();
+  let xs: unknown;
+  if (t.startsWith('[')) {
+    try {
+      xs = JSON.parse(t);
+    } catch {
+      return null;
+    }
+  } else xs = t ? t.split(',').map((s) => (/^\s*\d+\s*$/.test(s) ? Number(s) : NaN)) : [];
+  if (!Array.isArray(xs) || xs.length < 1 || xs.length > 10) return null;
+  if (!xs.every((x) => typeof x === 'number' && Number.isSafeInteger(x) && x > 0)) return null;
+  if (new Set(xs).size !== xs.length) return null;
+  return xs as number[];
 }

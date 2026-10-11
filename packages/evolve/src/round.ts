@@ -5,6 +5,7 @@ import { G0, REF, validatePolicy } from '@headway/sim';
 import type { Emphasis, EvolveEvent, FailureFinding, Generation, Policy, Proposal, Round, RunResult, SplitScore } from '@headway/sim';
 import { topFindings, worstGap } from './aggregate';
 import { buildDigest, signedPct } from './digest';
+import { policyBody } from './evaluate';
 import { extractJson } from './extract';
 import type { LlmClient, LlmRequest } from './llm';
 import { proposalNarrative } from './narrative';
@@ -42,7 +43,8 @@ const MAX_ECHO = 12_000;           // previous reply shown back in the repair re
 
 type Designer = (typeof DESIGNERS)[number];
 type Evaluated = { score: SplitScore; results: RunResult[] };
-type Parsed = { ok: true; policy: Policy; summary: string; rationale: string } | { ok: false; errors: string[]; summary: string };
+export type DesignerReply = { ok: true; policy: Policy; summary: string; rationale: string } | { ok: false; errors: string[]; summary: string };
+type Parsed = DesignerReply;
 
 interface Draft {
   designer: Designer; id: string; emphasis: Emphasis; model: string;
@@ -65,17 +67,6 @@ const clip = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n -
 const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 const noDot = (s: string): string => s.replace(/[.\s]+$/, '');
 const emphasisFor = (designer: number, round: number): Emphasis => EMPHASES[(designer + round) % EMPHASES.length]!;
-
-/** Sorted-key JSON, so two policies compare equal regardless of key order. */
-function stable(x: unknown): string {
-  if (Array.isArray(x)) return `[${x.map(stable).join(',')}]`;
-  if (isRecord(x)) {
-    return `{${Object.keys(x).filter((k) => x[k] !== undefined).sort().map((k) => `${JSON.stringify(k)}:${stable(x[k])}`).join(',')}}`;
-  }
-  return JSON.stringify(x) ?? 'null';
-}
-/** Everything but meta: what the simulator actually runs. */
-const policyBody = (p: Policy): string => stable({ ...p, meta: null });
 
 function pctChange(value: number, base: number): number {
   return base > 0 ? Math.round((10_000 * (value - base)) / base) / 100 : 0;
@@ -103,6 +94,11 @@ function parseReply(text: string, meta: Omit<Policy['meta'], 'summary'>, champio
   const changes = Array.isArray(json.changes) ? json.changes.map(str).filter(Boolean).slice(0, 5).map(noDot) : [];
   const rationale = clip([str(json.rationale), changes.length ? `Changes: ${changes.join('; ')}.` : ''].filter(Boolean).join(' '), MAX_RATIONALE);
   return { ok: true, policy: v.policy, summary, rationale };
+}
+
+/** Extract, stamp and validate one designer reply exactly as `runRound` does (spec §8.3). Used by the CLI smoke check. */
+export function parseDesignerReply(text: string, a: { meta: Omit<Policy['meta'], 'summary'>; champion: Policy }): DesignerReply {
+  return parseReply(text, a.meta, policyBody(a.champion));
 }
 
 function newDraft(designer: Designer, n: number, model: string): Draft {

@@ -8,7 +8,7 @@ import {
   makePersonBody, makePersonHead, makeRoad, makeStadium, makeStation, makeStop, makeStreetLamp, makeTrain, recolorBaked,
   setBakedDetail, TRAIN, TREE_VARIANTS, type Baked, type BuildingType, type TreePlacement,
 } from './kit';
-import { KitMaterial } from './materials';
+import { addInstanceFade, KitMaterial } from './materials';
 import { colorOf, DEFAULT_DETAIL, DEFAULT_LIGHT, DEFAULT_PALETTE, PALETTES } from './palettes';
 import { Stage } from './post';
 import type { Quality } from './post';
@@ -21,6 +21,7 @@ const state = {
   detail: pick<DetailMode>('detail', ['min', 'toy'], DEFAULT_DETAIL),
   light: pick<LightMode>('light', ['day', 'dusk'], DEFAULT_LIGHT),
   quality: pick<Quality>('quality', ['high', 'low'], 'high'),
+  focus: pick<'off' | 'r1'>('focus', ['off', 'r1'], 'off'),
 };
 const anim = q.get('anim') !== '0';
 if (q.get('labels') === '0') document.body.classList.add('nolabels');
@@ -110,16 +111,17 @@ tag('Trees', '5 variants · sway', 16.7, 3.4, -13.2);
 // ---------------------------------------------------------------- vehicles
 const dynMat = new KitMaterial();
 const bakes: Baked[] = [staticBaked];
-const buses: Array<{ mesh: THREE.Mesh; x0: number; speed: number; z: number; dir: number }> = [];
+const buses: Array<{ mesh: THREE.Mesh; x0: number; speed: number; z: number; dir: number; route: number; mat: KitMaterial }> = [];
 const addBus = (route: number, x: number, z: number, dir: number, speed: number) => {
   const b = bakeGeometry(makeBus(route), state.palette);
   bakes.push(b);
-  const m = new THREE.Mesh(b.geometry, dynMat);
+  const mat = new KitMaterial();
+  const m = new THREE.Mesh(b.geometry, mat);
   m.castShadow = m.receiveShadow = true;
   m.position.set(x, 0.06, z);
   m.rotation.y = dir > 0 ? 0 : Math.PI;
   stage.scene.add(m);
-  buses.push({ mesh: m, x0: x, speed, z, dir });
+  buses.push({ mesh: m, x0: x, speed, z, dir, route, mat });
 };
 addBus(0, -11.5, 6.0, -1, 0);           // at the stop, door facing the shelter
 addBus(1, -21, 13.2, 1, 1.6);
@@ -135,7 +137,8 @@ stage.scene.add(train);
 tag('Train', '2 cars', 3.2, 2.5, 5.4);
 
 // Cars: one InstancedMesh per variant, body colour per instance (palette role `car`).
-const carMeshes: Array<{ mesh: THREE.InstancedMesh; cars: Array<{ x: number; z: number; dir: number; speed: number; color: number }> }> = [];
+const carMat = new KitMaterial({ instanceFade: true });
+const carMeshes: Array<{ mesh: THREE.InstancedMesh; fade: THREE.InstancedBufferAttribute; cars: Array<{ x: number; z: number; dir: number; speed: number; color: number }> }> = [];
 const carPlan: Array<[number, number, number, number, number]> = [ // variant, x, lane z, dir, colour
   [0, -4, 12.0, -1, 0], [1, 2.5, 12.0, -1, 1], [2, 9, 12.0, -1, 2], [0, 15.5, 12.0, -1, 3],
   [1, -2, 13.2, 1, 4], [2, 5, 13.2, 1, 5], [0, 19, 13.2, 1, 1],
@@ -144,11 +147,11 @@ CAR_VARIANTS.forEach((_, v) => {
   const list = carPlan.filter((c) => c[0] === v).map(([, x, z, dir, color]) => ({ x, z, dir, speed: 2.2 + (color % 3) * 0.3, color }));
   const b = bakeGeometry(makeCar(v), state.palette);
   bakes.push(b);
-  const mesh = new THREE.InstancedMesh(b.geometry, dynMat, list.length);
+  const mesh = new THREE.InstancedMesh(b.geometry, carMat, list.length);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.frustumCulled = false;
   stage.scene.add(mesh);
-  carMeshes.push({ mesh, cars: list });
+  carMeshes.push({ mesh, fade: addInstanceFade(mesh), cars: list });
 });
 tag('Cars', '3 variants', 9, 1.5, 12.0);
 
@@ -172,7 +175,16 @@ function recolorInstances(): void {
   people.forEach((p, i) => bodies.setColorAt(i, col.set(colorOf(P, 'shirt', p.shirt))));
   if (bodies.instanceColor) bodies.instanceColor.needsUpdate = true;
 }
+function applyFocus(): void {
+  const f = state.focus === 'r1' ? 0.6 : 0;
+  staticMat.fade.value = f;
+  forest.material.fade.value = f;
+  dynMat.fade.value = f;
+  for (const b of buses) b.mat.fade.value = b.route === 0 ? 0 : f;
+  for (const { fade } of carMeshes) { (fade.array as Float32Array).fill(f); fade.needsUpdate = true; }
+}
 function apply(): void {
+  applyFocus();
   for (const b of bakes) { recolorBaked(b, state.palette); setBakedDetail(b, state.detail === 'toy'); }
   forest.setPalette(state.palette);
   forest.setDetail(state.detail);
@@ -193,6 +205,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-k]').forEach((b) => b.addEve
   if (k === 'detail') state.detail = v as DetailMode;
   if (k === 'light') { state.light = v as LightMode; stage.setLight(state.light); }
   if (k === 'quality') { state.quality = v as Quality; stage.setQuality(state.quality); }
+  if (k === 'focus') state.focus = v as 'off' | 'r1';
   apply();
 }));
 apply();

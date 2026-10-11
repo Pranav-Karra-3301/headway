@@ -37,7 +37,7 @@ const you = result(youJ, { meanWaitS: 288, p95WaitS: 842, completionPct: 97.4, m
 const ai = result(aiJ, { meanWaitS: 276, p95WaitS: 798, completionPct: 97.9, missedConnections: 12, walkaways: 11, effort: { busDistanceU: 14_900, deadheadDistanceU: 210, holdS: 610, trainDwellS: 1680 } },
   [gap('stop_apts_south', 'r2', 1400 * 3, 420, 900), missed(5200 * 3, 12), overload(2500, 31)]);
 const base = result(baseJ, {}, [gap('stop_apts_south', 'r2', 8000 * 3, 900, 860), missed(6400 * 3, 31), overload(9000, 96)]);
-const aiState = { status: 'done' as const, championId: 'g6', error: null, champion: run('champion', aiJ, ai, 1), baseline: run('baseline', baseJ, base, 1.02) };
+const aiState = { status: 'done' as const, championId: 'g6', key: '50000:g6', error: null, champion: run('champion', aiJ, ai, 1), baseline: run('baseline', baseJ, base, 1.02) };
 
 type Bus = Observation['buses'][number];
 const bus = (id: string, routeId: Bus['routeId'], state: Bus['state'], p: Partial<Bus> = {}): Bus => ({
@@ -79,6 +79,7 @@ const advance = (toT: number) => {
 
 /** Fake-data scenes are re-applied for a while to win races with async init; live scenes drive the real flow once. */
 const scenes: Record<string, { fake?: () => void; live?: () => void }> = {
+  live: {},
   goal: { fake: () => usePlay.getState().set({ ai: aiState }) },
   tour: {
     live: () => {
@@ -138,3 +139,5 @@ setInterval(() => {
   const a = usePlay.getState().ai;
   document.body.dataset.debug = JSON.stringify({ ai: a.status, err: a.error, c: a.champion?.samples.length ?? 0, pace: useApp.getState().play.pace.length, phase: useApp.getState().play.phase, sim: useApp.getState().simKind, simErr: useApp.getState().simError, t: frame.runner?.sim.t ?? null });
 }, 300);
+// handle for the CDP driver
+(window as unknown as { __play: unknown }).__play = { usePlay, useApp, frame, start, act, finish, setTour };

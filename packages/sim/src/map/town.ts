@@ -5,8 +5,9 @@
 // - A ring road runs inside the railway (7.4 u in from the rail) so every station has a road alongside its platform.
 // - Main St (E–W, exits west) ends at Central Station; Atherton St (N–S arterial) exits north and south; the South
 //   Rd continues east off the board. Side streets: Burrowes St (campus), Beaver Ave + Allen St (downtown), Park Ave
-//   (apartments).
-// - Campus NW (Old Main clock tower on the quad), Downtown centre/east on Main St, Apartments SE, Stadium SW.
+//   (south side).
+// - Campus NW (Old Main clock tower on the quad), Downtown centre/east on Main St, Apartments SE around Central
+//   Station, Stadium far SW (its gates 35–45 u from the apartments, so the crowd rides rather than walks).
 //
 // Conventions: road and route paths are road centrelines; stop.p sits on the kerb (1.15 u from the centreline) and
 // `queueDir` points away from the road. A station's `dist` is its platform centre along `rail.loop`; `platform` is the
@@ -35,18 +36,18 @@ const KERB = 1.15;
 const BOUNDS = { minX: -36, maxX: 36, minZ: -26, maxZ: 26 };
 const RAIL_HX = 30, RAIL_HZ = 22, RAIL_R = 6, RAIL_SEGS = 12;
 const RING_INSET = 7.4;
-const XW = -26;                     // West Rd
+const XW = -26.8;                   // West Rd (no station on the west side: hugs the rail)
 const XE = RAIL_HX - RING_INSET;    // East Rd (22.6), Central Station side
 const ZN = -(RAIL_HZ - RING_INSET); // North Rd (-14.6), University Station side
 const ZS = RAIL_HZ - RING_INSET;    // South Rd (14.6), Stadium Station side
-const X_BURROWES = -19, X_ATHERTON = -2, X_ALLEN = 12;
+const X_BURROWES = -19.5, X_ATHERTON = -2, X_ALLEN = 12;
 const Z_BEAVER = -8, Z_MAIN = 0, Z_PARK = 6.8;
 
 /** Platform centres along the rail straights (see header). */
 const STATION_AT: Record<StationId, { side: 'n' | 'e' | 's'; at: number }> = {
-  stn_stadium: { side: 's', at: -16 },
+  stn_stadium: { side: 's', at: -19 },
   stn_university: { side: 'n', at: -12 },
-  stn_central: { side: 'e', at: -8 },
+  stn_central: { side: 'e', at: -2 },
 };
 /** Platform queue point / paired stop: distance in from the rail and along the track from the platform centre. */
 const PLATFORM_IN = 2.4, PLATFORM_ALONG = 2.4;
@@ -62,11 +63,11 @@ const NODES: Array<[string, number, number]> = [
   ['j_north_burrowes', X_BURROWES, ZN], ['j_north_atherton', X_ATHERTON, ZN], ['j_north_allen', X_ALLEN, ZN],
   // Beaver Ave, Park Ave
   ['j_beaver_atherton', X_ATHERTON, Z_BEAVER], ['j_beaver_allen', X_ALLEN, Z_BEAVER],
-  ['j_park_atherton', X_ATHERTON, Z_PARK], ['j_park_allen', X_ALLEN, Z_PARK], ['j_park_east', XE, Z_PARK],
+  ['j_park_atherton', X_ATHERTON, Z_PARK], ['j_park_allen', X_ALLEN, Z_PARK],
   // South Rd
   ['j_south_atherton', X_ATHERTON, ZS], ['j_south_allen', X_ALLEN, ZS], ['j_south_east', XE, ZS],
   // terminals (mid-street, so routes pass straight through them)
-  ['t_central', XE, STATION_AT.stn_central.at - PLATFORM_ALONG], ['t_stadium_gate', -5.5, ZS],
+  ['t_central', XE, STATION_AT.stn_central.at - PLATFORM_ALONG], ['t_stadium_gate', -11.5, ZS],
 ];
 
 /** [id, name, from, to, bends] — bends are rounded corners inside an edge. */
@@ -87,8 +88,7 @@ const EDGES: Array<[string, string, string, string, Vec2[]?]> = [
   ['north_2', 'North Rd', 'j_north_atherton', 'j_north_allen'],
   ['north_e', 'North Rd', 'j_north_allen', 't_central', [v(XE, ZN)]],
   ['east_1', 'Station Rd', 't_central', 'j_main_east'],
-  ['east_2', 'Station Rd', 'j_main_east', 'j_park_east'],
-  ['east_3', 'Station Rd', 'j_park_east', 'j_south_east'],
+  ['east_2', 'Station Rd', 'j_main_east', 'j_south_east'],
   ['south_e', 'South Rd', 'j_south_east', 'j_south_allen'],
   ['south_1', 'South Rd', 'j_south_allen', 'j_south_atherton'],
   ['south_2', 'South Rd', 'j_south_atherton', 't_stadium_gate'],
@@ -100,8 +100,7 @@ const EDGES: Array<[string, string, string, string, Vec2[]?]> = [
   ['allen_2', 'Allen St', 'j_beaver_allen', 'j_main_allen'],
   ['allen_3', 'Allen St', 'j_main_allen', 'j_park_allen'],
   ['allen_4', 'Allen St', 'j_park_allen', 'j_south_allen'],
-  ['park_1', 'Park Ave', 'j_park_atherton', 'j_park_allen'],
-  ['park_2', 'Park Ave', 'j_park_allen', 'j_park_east'],
+  ['park', 'Park Ave', 'j_park_atherton', 'j_park_allen'],
 ];
 
 /** Street names per edge id (for labels and the map preview). */
@@ -159,10 +158,10 @@ const STOP_DEFS: StopDef[] = [
   { id: 'stop_stadium_stn', name: 'Stadium Station', neighborhood: 'stadium', servedRoutes: ['r3'], stationId: 'stn_stadium', ...stationStop('stn_stadium') },
   { id: 'stop_university_stn', name: 'University Station', neighborhood: 'campus', servedRoutes: ['r1'], stationId: 'stn_university', ...stationStop('stn_university') },
   { id: 'stop_old_main', name: 'Old Main', neighborhood: 'campus', servedRoutes: ['r1', 'r3'], road: v(-9, Z_MAIN), away: v(0, -1) },
-  { id: 'stop_downtown', name: 'Downtown', neighborhood: 'downtown', servedRoutes: ['r1', 'r2', 'r3'], road: v(3.5, Z_MAIN), away: v(0, 1) },
+  { id: 'stop_downtown', name: 'Downtown', neighborhood: 'downtown', servedRoutes: ['r1', 'r2', 'r3'], road: v(6.5, Z_MAIN), away: v(0, 1) },
   { id: 'stop_central_stn', name: 'Central Station', neighborhood: 'downtown', servedRoutes: ['r1', 'r2'], stationId: 'stn_central', ...stationStop('stn_central') },
-  { id: 'stop_apts_north', name: 'Apartments North', neighborhood: 'apartments', servedRoutes: ['r2'], road: v(XE, 3.4), away: v(-1, 0) },
-  { id: 'stop_apts_south', name: 'Apartments South', neighborhood: 'apartments', servedRoutes: ['r2'], road: v(XE, 10.7), away: v(-1, 0) },
+  { id: 'stop_apts_north', name: 'Apartments North', neighborhood: 'apartments', servedRoutes: ['r2'], road: v(XE, 5.0), away: v(-1, 0) },
+  { id: 'stop_apts_south', name: 'Apartments South', neighborhood: 'apartments', servedRoutes: ['r2'], road: v(XE, 10.6), away: v(-1, 0) },
 ];
 const STOPS: Stop[] = STOP_DEFS.map((s) => ({
   id: s.id, name: s.name, p: v(s.road.x + s.away.x * KERB, s.road.z + s.away.z * KERB), queueDir: s.away,
@@ -174,13 +173,13 @@ const ROUTE_DEFS: Array<{ id: RouteId; name: string; color: string; stops: StopI
   {
     id: 'r1', name: 'Campus Loop', color: '#1FA99A',
     stops: ['stop_central_stn', 'stop_downtown', 'stop_old_main', 'stop_university_stn'],
-    nodes: ['t_central', 'j_main_east', 'j_main_allen', 'j_main_atherton', 'j_main_burrowes', 'j_main_west',
+    nodes: ['t_central', 'j_main_east', 'j_main_allen', 'j_main_atherton', 'j_main_burrowes',
       'j_north_burrowes', 'j_north_atherton', 'j_north_allen', 't_central'],
   },
   {
     id: 'r2', name: 'Apartments', color: '#F0A830',
     stops: ['stop_central_stn', 'stop_apts_north', 'stop_apts_south', 'stop_downtown'],
-    nodes: ['t_central', 'j_main_east', 'j_park_east', 'j_south_east', 'j_south_allen', 'j_south_atherton',
+    nodes: ['t_central', 'j_main_east', 'j_south_east', 'j_south_allen', 'j_south_atherton',
       'j_park_atherton', 'j_main_atherton', 'j_main_allen', 'j_beaver_allen', 'j_north_allen', 't_central'],
   },
   {
@@ -235,10 +234,10 @@ export function stationPlacement(id: StationId): { x: number; z: number; rot: nu
 
 // ---------------------------------------------------------------- neighbourhoods and zones
 const NEIGHBORHOODS: Neighborhood[] = [
-  { id: 'campus', name: 'Campus', center: v(-14, -7.5), radius: 10.5 },
-  { id: 'downtown', name: 'Downtown', center: v(11, -6.5), radius: 11.5 },
-  { id: 'apartments', name: 'Apartments', center: v(11, 9.5), radius: 10.5 },
-  { id: 'stadium', name: 'Stadium', center: v(-14, 7.5), radius: 9.5 },
+  { id: 'campus', name: 'Campus', center: v(-13.5, -8), radius: 10.5 },
+  { id: 'downtown', name: 'Downtown', center: v(9, -6.5), radius: 12 },
+  { id: 'apartments', name: 'Apartments', center: v(20.5, 7.5), radius: 9 },
+  { id: 'stadium', name: 'Stadium', center: v(-17.5, 9.5), radius: 10 },
 ];
 
 const Z = (id: string, neighborhood: NeighborhoodId, name: string, x: number, z: number, weight: number, tags: ZoneTag[]): Zone =>
@@ -247,27 +246,27 @@ const Z = (id: string, neighborhood: NeighborhoodId, name: string, x: number, z:
 const ZONES: Zone[] = [
   // campus halls (Old Main is the clock tower on the quad)
   Z('z_old_main', 'campus', 'Old Main', -10.5, -7.7, 2, ['hall']),
-  Z('z_willard', 'campus', 'Willard Hall', -17.6, -7.0, 2, ['hall']),
+  Z('z_willard', 'campus', 'Willard Hall', -18.1, -7.0, 2, ['hall']),
   Z('z_pattee', 'campus', 'Pattee Library', -3.4, -8.2, 2, ['hall']),
-  Z('z_west_halls', 'campus', 'West Halls', -20.6, -10.5, 1.5, ['hall']),
-  // downtown retail
-  Z('z_main_market', 'downtown', 'Main St Market', 8.8, -1.6, 2, ['retail']),
+  Z('z_west_halls', 'campus', 'West Halls', -21.4, -10.5, 1.5, ['hall']),
+  // downtown retail (Main St, Beaver Ave, Allen St)
+  Z('z_main_market', 'downtown', 'Main St Market', 1.4, -1.6, 2, ['retail']),
   Z('z_beaver_shops', 'downtown', 'Beaver Ave Shops', 5, -9.6, 1.5, ['retail']),
   Z('z_allen_corner', 'downtown', 'Allen Corner', 13.4, -5.2, 1.5, ['retail']),
   Z('z_central_plaza', 'downtown', 'Central Plaza', 19.0, -13.1, 1.5, ['retail']),
-  // apartments
-  Z('z_eastview', 'apartments', 'Eastview Towers', 15.3, 5.2, 2, ['housing']),
-  Z('z_parkside', 'apartments', 'Parkside Towers', 15.3, 8.9, 2, ['housing']),
-  Z('z_southside', 'apartments', 'Southside Court', 1.6, 8.7, 1.5, ['housing']),
-  Z('z_garden_row', 'apartments', 'Garden Row', 8.7, 8.7, 1.5, ['housing']),
+  // apartments around Central Station (SE)
+  Z('z_eastview', 'apartments', 'Eastview Towers', 15.3, 1.6, 2, ['housing']),
+  Z('z_parkside', 'apartments', 'Parkside Towers', 15.3, 12.5, 2, ['housing']),
+  Z('z_southside', 'apartments', 'Station Court', 26.6, 4.3, 2, ['housing']),
+  Z('z_garden_row', 'apartments', 'Garden Row', 26.6, 12.9, 1.5, ['housing']),
   // stadium gates
-  Z('z_stadium_east', 'stadium', 'Stadium East Gate', -8.1, 7.3, 3, ['stadium']),
-  Z('z_stadium_south', 'stadium', 'Stadium South Gate', -10.8, 11.0, 2, ['stadium']),
-  Z('z_stadium_north', 'stadium', 'Stadium North Gate', -13.9, 2.8, 1, ['stadium']),
+  Z('z_stadium_east', 'stadium', 'Stadium East Gate', -14.0, 7.3, 3, ['stadium']),
+  Z('z_stadium_south', 'stadium', 'Stadium South Gate', -20.5, 11.8, 2, ['stadium']),
+  Z('z_stadium_north', 'stadium', 'Stadium North Gate', -19.8, 2.8, 1, ['stadium']),
   // stations (station squares beside the station buildings)
-  Z('z_stn_stadium', 'stadium', 'Stadium Station', -8, 18.6, 1, ['station']),
+  Z('z_stn_stadium', 'stadium', 'Stadium Station', -10.8, 19.0, 1, ['station']),
   Z('z_stn_university', 'campus', 'University Station', -8, -17.6, 1, ['station']),
-  Z('z_stn_central', 'downtown', 'Central Station', 24.6, -2.5, 1.5, ['station']),
+  Z('z_stn_central', 'downtown', 'Central Station', 24.6, -11.5, 1.5, ['station']),
 ];
 
 // ---------------------------------------------------------------- the map

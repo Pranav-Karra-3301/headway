@@ -28,10 +28,17 @@ export async function resetDb(): Promise<void> {
 
 export const ADMIN = 'test-admin-token';
 export const OR_KEY = 'test-openrouter-key';
+export const LUMINAL_KEY = 'test-luminal-key';
 
-/** The real test env (D1, vars) with fake secrets, so assertions never touch real keys. */
+/** The real test env (D1, vars) with fake secrets, so assertions never touch real keys (and no sealed seeds). */
 export function testEnv(over: Partial<AppEnv> = {}): AppEnv {
-  return { ...env, ADMIN_TOKEN: ADMIN, OPENROUTER_API_KEY: OR_KEY, ...over };
+  return { ...env, ADMIN_TOKEN: ADMIN, OPENROUTER_API_KEY: OR_KEY, LUMINAL_API_KEY: LUMINAL_KEY, SEALED_TEST_SEEDS: undefined, ...over };
+}
+
+/** Parses an NDJSON body into one value per non-empty line. */
+export async function readNdjson<T>(res: Response): Promise<T[]> {
+  const text = new TextDecoder().decode(await res.arrayBuffer());
+  return text.split('\n').filter((l) => l.trim().length > 0).map((l) => JSON.parse(l) as T);
 }
 
 type App = ReturnType<typeof createApp>;

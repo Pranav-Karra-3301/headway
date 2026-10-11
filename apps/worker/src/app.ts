@@ -4,10 +4,11 @@ import { cors } from 'hono/cors';
 import type { AppContext, AppDeps } from './env';
 import { jsonError } from './http';
 import { adminRoutes } from './routes/admin';
-import { evolveRoutes } from './routes/evolve';
+import { defaultDesigner, evolveRoutes } from './routes/evolve';
 import { jevRoutes } from './routes/jev';
 import { leaderboardRoutes } from './routes/leaderboard';
 import { publicRoutes } from './routes/public';
+import { evaluateSplit } from './score';
 
 /** Local dev servers (Vite on any port) may call the API cross-origin; production is same-origin. */
 const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
@@ -17,6 +18,8 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
     fetch: (input, init) => fetch(input, init),
     cache: () => (typeof caches === 'undefined' ? null : caches.default),
     now: () => Date.now(),
+    designer: (env) => defaultDesigner(env, deps.fetch),
+    evaluate: evaluateSplit,
     ...overrides,
   };
   const app = new Hono<AppContext>();

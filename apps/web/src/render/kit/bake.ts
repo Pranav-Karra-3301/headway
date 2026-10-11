@@ -9,45 +9,70 @@ import { colorOf, DEFAULT_PALETTE, glowOf, paletteOf, type Palette, type Role } 
 import type { PaletteId } from '../types';
 import { partOf } from './prims';
 
-export interface BakeRange { role: Role; idx: number; start: number; count: number; detail: boolean; tint: boolean }
+/** A vertex range of one part kind. `role` is a palette Role, a custom role (resolved by `BakeOptions.resolve`),
+ *  or '' for untagged meshes, whose colour is frozen in `fixed` (taken from their material). */
+export interface BakeRange { role: string; idx: number; start: number; count: number; detail: boolean; tint: boolean; fixed?: string }
 export interface Baked {
   geometry: THREE.BufferGeometry;
   /** Consecutive vertex ranges per (role, idx, detail, tint); counts sum to the vertex count. */
   ranges: BakeRange[];
   /** Index count of the non-detail parts (draw range for detail = 'min'). */
   baseIndexCount: number;
+  /** Colour resolver for roles the Palette does not know (kept for recolorBaked). */
+  resolve?: RoleResolver;
 }
+/** Colour (hex) for a custom role in a palette, or undefined to keep the colour captured at bake time. */
+export type RoleResolver = (role: string, idx: number, palette: Palette) => string | undefined;
+export interface BakeOptions { resolve?: RoleResolver }
 
-interface Item { geo: THREE.BufferGeometry; matrix: THREE.Matrix4; role: Role; idx: number; detail: boolean; tint: boolean }
+interface Item { geo: THREE.BufferGeometry; matrix: THREE.Matrix4; role: string; idx: number; detail: boolean; tint: boolean; fixed?: string }
 
 const tmpM = new THREE.Matrix4();
 const tmpN = new THREE.Matrix3();
 const v = new THREE.Vector3();
 const c = new THREE.Color();
 
+const ROLE_NAME = /^([A-Za-z_][\w-]*)#(\d+)$/;
+
+/** Role of a mesh: kit tag, else material.userData.role/idx, else a material named "role#idx", else none. */
+function roleOf(mesh: THREE.Mesh): { role: string; idx: number; fixed?: string } {
+  const p = partOf(mesh);
+  if (p) return p;
+  const m = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.Material & { color?: THREE.Color };
+  if (m?.userData?.role) return { role: String(m.userData.role), idx: Number(m.userData.idx ?? 0) };
+  const hit = m?.name ? ROLE_NAME.exec(m.name) : null;
+  if (hit) return { role: hit[1]!, idx: Number(hit[2]) };
+  return { role: '', idx: 0, fixed: m?.color ? '#' + m.color.getHexString() : '#9aa0a6' };
+}
+
 function collect(o: THREE.Object3D, inv: THREE.Matrix4, det: boolean, tnt: boolean, out: Item[]): void {
   if (!o.visible) return;
   const detail = det || !!o.userData.detail;
   const tint = tnt || !!o.userData.tint;
-  const p = partOf(o);
-  if (p && (o as THREE.Mesh).isMesh) {
+  if ((o as THREE.Mesh).isMesh && !o.userData.noBake) {
     const mesh = o as THREE.Mesh;
+    const p = roleOf(mesh);
     const base = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld);
     const inst = (o as THREE.InstancedMesh).isInstancedMesh ? (o as THREE.InstancedMesh) : null;
     if (inst) {
       for (let i = 0; i < inst.count; i++) {
         inst.getMatrixAt(i, tmpM);
-        out.push({ geo: mesh.geometry, matrix: new THREE.Matrix4().multiplyMatrices(base, tmpM), role: p.role, idx: p.idx, detail, tint });
+        out.push({ geo: mesh.geometry, matrix: new THREE.Matrix4().multiplyMatrices(base, tmpM), role: p.role, idx: p.idx, detail, tint, fixed: p.fixed });
       }
     } else {
-      out.push({ geo: mesh.geometry, matrix: base, role: p.role, idx: p.idx, detail, tint });
+      out.push({ geo: mesh.geometry, matrix: base, role: p.role, idx: p.idx, detail, tint, fixed: p.fixed });
     }
   }
   for (const ch of o.children) collect(ch, inv, detail, tint, out);
 }
 
-/** Merge every visible role-tagged mesh under `root` (in root-local space) into one geometry. */
-export function bakeGeometry(root: THREE.Object3D, palette: Palette | PaletteId = DEFAULT_PALETTE): Baked {
+/**
+ * Merge every visible mesh under `root` (in root-local space) into one geometry. Kit parts carry their role;
+ * other meshes may name their material "role#idx" or set material.userData.role/idx (custom roles need
+ * `opts.resolve`); untagged meshes keep their material colour. `userData.detail` / `userData.tint` /
+ * `userData.noBake` on any object apply to its subtree (noBake: skip that mesh).
+ */
+export function bakeGeometry(root: THREE.Object3D, palette: Palette | PaletteId = DEFAULT_PALETTE, opts: BakeOptions = {}): Baked {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const all: Item[] = [];
@@ -92,8 +117,8 @@ export function bakeGeometry(root: THREE.Object3D, palette: Palette | PaletteId 
     io += cnt;
     if (!it.detail) baseIndexCount += cnt;
     const last = ranges[ranges.length - 1];
-    if (last && last.role === it.role && last.idx === it.idx && last.detail === it.detail && last.tint === it.tint) last.count += n;
-    else ranges.push({ role: it.role, idx: it.idx, start: vo, count: n, detail: it.detail, tint: it.tint });
+    if (last && last.role === it.role && last.idx === it.idx && last.detail === it.detail && last.tint === it.tint && last.fixed === it.fixed) last.count += n;
+    else ranges.push({ role: it.role, idx: it.idx, start: vo, count: n, detail: it.detail, tint: it.tint, ...(it.fixed ? { fixed: it.fixed } : {}) });
     vo += n;
   }
 
@@ -106,10 +131,15 @@ export function bakeGeometry(root: THREE.Object3D, palette: Palette | PaletteId 
   geometry.setIndex(new THREE.BufferAttribute(index, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  const baked: Baked = { geometry, ranges, baseIndexCount };
+  const baked: Baked = { geometry, ranges, baseIndexCount, ...(opts.resolve ? { resolve: opts.resolve } : {}) };
   geometry.userData.kit = baked;
   recolorBaked(baked, palette);
   return baked;
+}
+
+function rangeColor(P: Palette, r: BakeRange, resolve: RoleResolver | undefined): string {
+  if (r.role && r.role in P && r.role !== 'name') return colorOf(P, r.role as Role, r.idx);
+  return (r.role && resolve?.(r.role, r.idx, P)) || r.fixed || '#9aa0a6';
 }
 
 /** Rewrite colour + glow attributes for a palette (in place). Accepts a Baked or a baked geometry. */
@@ -121,9 +151,9 @@ export function recolorBaked(b: Baked | THREE.BufferGeometry, palette: Palette |
   const glow = baked.geometry.getAttribute('aGlow') as THREE.BufferAttribute;
   const ca = col.array as Float32Array, ga = glow.array as Float32Array;
   for (const r of baked.ranges) {
-    c.set(colorOf(P, r.role, r.idx));
+    c.set(rangeColor(P, r, baked.resolve));
     for (let i = r.start; i < r.start + r.count; i++) { ca[i * 3] = c.r; ca[i * 3 + 1] = c.g; ca[i * 3 + 2] = c.b; }
-    const gl = glowOf(P, r.role, r.idx);
+    const gl = r.role && r.role in P ? glowOf(P, r.role as Role, r.idx) : null;
     if (gl) c.set(gl.color).multiplyScalar(gl.intensity); else c.setRGB(0, 0, 0);
     for (let i = r.start; i < r.start + r.count; i++) { ga[i * 3] = c.r; ga[i * 3 + 1] = c.g; ga[i * 3 + 2] = c.b; }
   }
@@ -173,7 +203,8 @@ export function mergeBaked(list: Baked[]): Baked {
   geometry.setIndex(new THREE.BufferAttribute(index, 1));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
-  const baked: Baked = { geometry, ranges, baseIndexCount };
+  const resolve = list.find((b) => b.resolve)?.resolve;
+  const baked: Baked = { geometry, ranges, baseIndexCount, ...(resolve ? { resolve } : {}) };
   geometry.userData.kit = baked;
   return baked;
 }

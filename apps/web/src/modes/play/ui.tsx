@@ -1,5 +1,4 @@
 // Owner: T3c. Small shared bits for the Play UI: icons, a springy number ticker, map names with fallbacks.
-import { useEffect, useRef, useState } from 'react';
 import { TOWN, scenarioDef } from '@headway/sim';
 import type { RouteId, StationId, StopId } from '@headway/sim';
 
@@ -63,47 +62,4 @@ export function playFacts(scenarioId: string): { closingT: number; crowd: number
   } catch {
     return { closingT: 600, crowd: 1500, clockStart: '21:30', name: 'Stadium exit' };
   }
-}
-
-// ---------- motion ----------
-export function useReducedMotion(): boolean {
-  const [reduce, setReduce] = useState(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useEffect(() => {
-    if (typeof matchMedia !== 'function') return;
-    const q = matchMedia('(prefers-reduced-motion: reduce)');
-    const on = () => setReduce(q.matches);
-    q.addEventListener('change', on);
-    return () => q.removeEventListener('change', on);
-  }, []);
-  return reduce;
-}
-
-/** A number that glides to its target: a critically damped spring evaluated analytically from elapsed time, so it
- *  lands on time even when frames are dropped; retargeting keeps the current velocity. Jumps under reduced motion. */
-export function useTicker(target: number, opts: { from?: number; stiffness?: number } = {}): number {
-  const reduce = useReducedMotion();
-  const [v, setV] = useState(opts.from ?? target);
-  const s = useRef({ x: opts.from ?? target, vel: 0, raf: 0 });
-  useEffect(() => {
-    const st = s.current;
-    cancelAnimationFrame(st.raf);
-    if (reduce || !Number.isFinite(target)) { st.x = target; st.vel = 0; setV(target); return; }
-    const w = Math.sqrt(opts.stiffness ?? 170);
-    const c1 = st.x - target;
-    const c2 = st.vel + w * c1;
-    const t0 = performance.now();
-    const step = (now: number) => {
-      const t = Math.max(0, (now - t0) / 1000);
-      const e = Math.exp(-w * t);
-      st.x = target + (c1 + c2 * t) * e;
-      st.vel = (c2 - w * (c1 + c2 * t)) * e;
-      const done = Math.abs(st.x - target) < 1e-3 * Math.max(1, Math.abs(target)) && Math.abs(st.vel) < 1e-2;
-      if (done || t > 4) { st.x = target; st.vel = 0; setV(target); return; }
-      setV(st.x);
-      st.raf = requestAnimationFrame(step);
-    };
-    st.raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(st.raf);
-  }, [target, reduce, opts.stiffness]);
-  return v;
 }

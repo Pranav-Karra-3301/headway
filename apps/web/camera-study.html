@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Headway — camera study</title>
+<style>
+@font-face { font-family: GumballRounded; src: url(/fonts/GumballRounded.ttf) format('truetype'); font-display: block; }
+html, body { margin: 0; background: linear-gradient(180deg, #E8F4EC 0%, #DDEFE5 60%, #D3E9DC 100%); color: #1F2A44; font-family: "Avenir Next Rounded Std", Nunito, system-ui, sans-serif; }
+body.single { height: 100%; overflow: hidden; }
+#msg { position: fixed; left: 14px; bottom: 10px; font-size: 13px; opacity: 0.7; }
+#app { padding: 0; }
+body.grid #app { padding: 22px 24px 28px; max-width: 1600px; box-sizing: border-box; }
+header h1 { font-family: GumballRounded, system-ui; font-weight: 400; font-size: 34px; margin: 0 0 4px; letter-spacing: 0.5px; }
+header p { margin: 0 0 14px; font-size: 14px; line-height: 1.45; color: rgba(31,42,68,0.78); max-width: 1500px; }
+.key { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; font-weight: 600; }
+.key .dot { width: 10px; height: 10px; border-radius: 50%; background: #E5484D; box-shadow: 0 0 0 2px #fff; display: inline-block; }
+.key .dot.small { width: 6px; height: 6px; opacity: 0.6; box-shadow: none; }
+.key .dash { width: 22px; height: 0; border-top: 2.5px dashed rgba(46,91,218,0.75); display: inline-block; }
+canvas#grid { display: block; }
+table { border-collapse: separate; border-spacing: 0; margin-top: 18px; width: 100%; background: #FFFBF2; border-radius: 16px; box-shadow: 0 4px 18px rgba(31,42,68,0.08); overflow: hidden; font-size: 13px; font-variant-numeric: tabular-nums; }
+th { font-family: GumballRounded, system-ui; font-weight: 400; font-size: 12px; text-align: right; padding: 10px 8px 8px; color: rgba(31,42,68,0.62); background: #F6EEDC; line-height: 1.15; }
+th:first-child, td.v { text-align: left; }
+td { text-align: right; padding: 6px 8px; border-top: 1px solid rgba(31,42,68,0.07); }
+td.v { font-weight: 700; white-space: nowrap; }
+td.s { font-family: GumballRounded, system-ui; font-size: 15px; }
+tr.best td { background: #FFF1C7; }
+tr.rig td { color: rgba(31,42,68,0.6); font-style: italic; }
+.tag { font-family: GumballRounded, system-ui; font-weight: 400; background: #F2C14E; border-radius: 10px; padding: 1px 8px; font-size: 12px; margin-left: 4px; }
+#notes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+.card { background: #FFFBF2; border-radius: 16px; padding: 12px 18px; box-shadow: 0 4px 18px rgba(31,42,68,0.08); font-size: 13.5px; line-height: 1.45; }
+.card h2 { font-family: GumballRounded, system-ui; font-weight: 400; font-size: 18px; margin: 2px 0 6px; }
+.card ul { margin: 0; padding-left: 18px; }
+.card code { font-size: 12px; background: #F1E4C8; border-radius: 6px; padding: 0 4px; }
+#card { position: fixed; right: 16px; bottom: 16px; background: #FFFBF2ee; border-radius: 16px; padding: 10px 16px; box-shadow: 0 4px 18px rgba(31,42,68,0.12); font-size: 13px; max-width: 420px; }
+#card h2 { font-family: GumballRounded, system-ui; font-weight: 400; font-size: 18px; margin: 0 0 4px; }
+#card p { margin: 2px 0; }
+</style>
+</head><body><div id="app"></div><div id="msg">measuring…</div><script type="module" src="/src/render/camera/study/page.ts"></script></body></html>

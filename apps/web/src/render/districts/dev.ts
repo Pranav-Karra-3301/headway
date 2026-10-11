@@ -4,6 +4,7 @@ import { TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
 import { createBasicKit } from '../assets/basicKit';
 import { createRegistry } from '../assets/index';
+import { kenneyIdsFor, preloadKenney } from '../assets/kenney';
 import { devScene } from '../assets/devScene';
 import { DISTRICTS } from './index';
 
@@ -32,6 +33,7 @@ if (!TOWN.roads) {
   for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#F4EBDD', 0.02);
   strip(TOWN.rail.loop.points, true, 1.6, '#C9B79C', 0.03);
   const registry = createRegistry();
+  await preloadKenney(kenneyIdsFor(ds.flatMap((d) => d.items.map((it) => it.kind)))); // Kenney-backed builders need their models first
   const kit = createBasicKit(registry.roles);
   let count = 0;
   for (const d of ds) {

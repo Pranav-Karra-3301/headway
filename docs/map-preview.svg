@@ -5,23 +5,20 @@
   .street { font-size: 10px; fill: #8A7B63; letter-spacing: 0.4px; }
   .stop { font-size: 12px; font-weight: 700; }
   .zone { font-size: 9px; fill: #5F6F66; }
-  .hood { font-size: 22px; fill: rgba(34,48,74,0.22); letter-spacing: 3px; }
+  .hood { font-size: 15px; fill: rgba(34,48,74,0.55); letter-spacing: 2.5px; font-weight: 700; }
 </style></defs>
 <rect width="1160" height="980" fill="#DDEFE5"/>
 <rect x="40" y="40" width="1080" height="780" rx="18" fill="#A8D8B9" stroke="#7FBF98" stroke-width="6"/>
-<circle cx="370" cy="317.5" r="157.5" fill="none" stroke="rgba(34,48,74,0.10)" stroke-width="2" stroke-dasharray="6 6"/>
-<circle cx="745" cy="332.5" r="172.5" fill="none" stroke="rgba(34,48,74,0.10)" stroke-width="2" stroke-dasharray="6 6"/>
-<circle cx="745" cy="572.5" r="157.5" fill="none" stroke="rgba(34,48,74,0.10)" stroke-width="2" stroke-dasharray="6 6"/>
-<circle cx="370" cy="542.5" r="142.5" fill="none" stroke="rgba(34,48,74,0.10)" stroke-width="2" stroke-dasharray="6 6"/>
 <rect x="380.5" y="331" width="84.00000000000001" height="60" rx="8" fill="#8FCB9B"/>
 <rect x="385" y="236.5" width="75" height="39.00000000000002" rx="8" fill="#8FCB9B"/>
-<polyline points="340,760 220,760 205.6,759.4 192.5,757.5 180.6,754.4 170,750 160.6,744.4 152.5,737.5 145.6,729.4 140,720 135.6,709.4 132.5,697.5 130.6,684.4 130,670 130,190 130.6,175.6 132.5,162.5 135.6,150.6 140,140 145.6,130.6 152.5,122.5 160.6,115.6 170,110 180.6,105.6 192.5,102.5 205.6,100.6 220,100 940,100 954.4,100.6 967.5,102.5 979.4,105.6 990,110 999.4,115.6 1007.5,122.5 1014.4,130.6 1020,140 1024.4,150.6 1027.5,162.5 1029.4,175.6 1030,190 1030,670 1029.4,684.4 1027.5,697.5 1024.4,709.4 1020,720 1014.4,729.4 1007.5,737.5 999.4,744.4 990,750 979.4,754.4 967.5,757.5 954.4,759.4 940,760 340,760" fill="none" stroke="#D9CBB3" stroke-width="30" stroke-linejoin="round"/>
-<polyline points="340,760 220,760 205.6,759.4 192.5,757.5 180.6,754.4 170,750 160.6,744.4 152.5,737.5 145.6,729.4 140,720 135.6,709.4 132.5,697.5 130.6,684.4 130,670 130,190 130.6,175.6 132.5,162.5 135.6,150.6 140,140 145.6,130.6 152.5,122.5 160.6,115.6 170,110 180.6,105.6 192.5,102.5 205.6,100.6 220,100 940,100 954.4,100.6 967.5,102.5 979.4,105.6 990,110 999.4,115.6 1007.5,122.5 1014.4,130.6 1020,140 1024.4,150.6 1027.5,162.5 1029.4,175.6 1030,190 1030,670 1029.4,684.4 1027.5,697.5 1024.4,709.4 1020,720 1014.4,729.4 1007.5,737.5 999.4,744.4 990,750 979.4,754.4 967.5,757.5 954.4,759.4 940,760 340,760" fill="none" stroke="#B08B63" stroke-width="22.5" stroke-dasharray="3 5.25" stroke-linejoin="round"/>
-<polyline points="340,765.7 220,765.7 205.1,765.1 191.4,763.1 178.8,759.8 167.5,755.1 157.3,749 148.5,741.5 141,732.7 134.9,722.5 130.2,711.2 126.9,698.6 124.9,684.9 124.3,670 124.3,190 124.9,175.1 126.9,161.4 130.2,148.8 134.9,137.5 141,127.3 148.5,118.5 157.3,111 167.5,104.9 178.8,100.2 191.4,96.9 205.1,94.9 220,94.3 940,94.3 954.9,94.9 968.6,96.9 981.2,100.2 992.5,104.9 1002.7,111 1011.5,118.5 1019,127.3 1025.1,137.5 1029.8,148.8 1033.1,161.4 1035.1,175.1 1035.7,190 1035.7,670 1035.1,684.9 1033.1,698.6 1029.8,711.2 1025.1,722.5 1019,732.7 1011.5,741.5 1002.7,749 992.5,755.1 981.2,759.8 968.6,763.1 954.9,765.1 940,765.7 340,765.7" fill="none" stroke="#7E848E" stroke-width="2" stroke-linejoin="round"/>
-<polyline points="340,754.3 220,754.3 206.1,753.7 193.6,751.9 182.4,749 172.5,744.9 163.9,739.7 156.5,733.5 150.3,726.1 145.1,717.5 141,707.6 138.1,696.4 136.3,683.9 135.7,670 135.7,190 136.3,176.1 138.1,163.6 141,152.4 145.1,142.5 150.3,133.9 156.5,126.5 163.9,120.3 172.5,115.1 182.4,111 193.6,108.1 206.1,106.3 220,105.7 940,105.7 953.9,106.3 966.4,108.1 977.6,111 987.5,115.1 996.1,120.3 1003.5,126.5 1009.7,133.9 1014.9,142.5 1019,152.4 1021.9,163.6 1023.7,176.1 1024.3,190 1024.3,670 1023.7,683.9 1021.9,696.4 1019,707.6 1014.9,717.5 1009.7,726.1 1003.5,733.5 996.1,739.7 987.5,744.9 977.6,749 966.4,751.9 953.9,753.7 940,754.3 340,754.3" fill="none" stroke="#7E848E" stroke-width="2" stroke-linejoin="round"/>
-<polyline points="40,430 190,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="190,430 295,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,430 550,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="787" y="518.5" width="45" height="32.999999999999986" rx="8" fill="#8FCB9B"/>
+<polyline points="295,760 212.5,760 199.3,759.4 187.3,757.7 176.4,754.8 166.7,750.8 158.1,745.7 150.6,739.4 144.3,731.9 139.2,723.3 135.2,713.6 132.3,702.7 130.6,690.7 130,677.5 130,190 130.6,175.6 132.5,162.5 135.6,150.6 140,140 145.6,130.6 152.5,122.5 160.6,115.6 170,110 180.6,105.6 192.5,102.5 205.6,100.6 220,100 940,100 954.4,100.6 967.5,102.5 979.4,105.6 990,110 999.4,115.6 1007.5,122.5 1014.4,130.6 1020,140 1024.4,150.6 1027.5,162.5 1029.4,175.6 1030,190 1030,670 1029.4,684.4 1027.5,697.5 1024.4,709.4 1020,720 1014.4,729.4 1007.5,737.5 999.4,744.4 990,750 979.4,754.4 967.5,757.5 954.4,759.4 940,760 295,760" fill="none" stroke="#D9CBB3" stroke-width="30" stroke-linejoin="round"/>
+<polyline points="295,760 212.5,760 199.3,759.4 187.3,757.7 176.4,754.8 166.7,750.8 158.1,745.7 150.6,739.4 144.3,731.9 139.2,723.3 135.2,713.6 132.3,702.7 130.6,690.7 130,677.5 130,190 130.6,175.6 132.5,162.5 135.6,150.6 140,140 145.6,130.6 152.5,122.5 160.6,115.6 170,110 180.6,105.6 192.5,102.5 205.6,100.6 220,100 940,100 954.4,100.6 967.5,102.5 979.4,105.6 990,110 999.4,115.6 1007.5,122.5 1014.4,130.6 1020,140 1024.4,150.6 1027.5,162.5 1029.4,175.6 1030,190 1030,670 1029.4,684.4 1027.5,697.5 1024.4,709.4 1020,720 1014.4,729.4 1007.5,737.5 999.4,744.4 990,750 979.4,754.4 967.5,757.5 954.4,759.4 940,760 295,760" fill="none" stroke="#B08B63" stroke-width="22.5" stroke-dasharray="3 5.25" stroke-linejoin="round"/>
+<polyline points="295,765.7 212.5,765.7 198.8,765.1 186.2,763.3 174.6,760.3 164.1,755.9 154.8,750.3 146.6,743.4 139.7,735.2 134.1,725.9 129.7,715.4 126.7,703.8 124.9,691.2 124.3,677.5 124.3,190 124.9,175.1 126.9,161.4 130.2,148.8 134.9,137.5 141,127.3 148.5,118.5 157.3,111 167.5,104.9 178.8,100.2 191.4,96.9 205.1,94.9 220,94.3 940,94.3 954.9,94.9 968.6,96.9 981.2,100.2 992.5,104.9 1002.7,111 1011.5,118.5 1019,127.3 1025.1,137.5 1029.8,148.8 1033.1,161.4 1035.1,175.1 1035.7,190 1035.7,670 1035.1,684.9 1033.1,698.6 1029.8,711.2 1025.1,722.5 1019,732.7 1011.5,741.5 1002.7,749 992.5,755.1 981.2,759.8 968.6,763.1 954.9,765.1 940,765.7 295,765.7" fill="none" stroke="#7E848E" stroke-width="2" stroke-linejoin="round"/>
+<polyline points="295,754.3 212.5,754.3 199.8,753.8 188.4,752.1 178.2,749.4 169.2,745.7 161.4,741 154.7,735.3 149,728.6 144.3,720.8 140.6,711.8 137.9,701.6 136.2,690.2 135.7,677.5 135.7,190 136.3,176.1 138.1,163.6 141,152.4 145.1,142.5 150.3,133.9 156.5,126.5 163.9,120.3 172.5,115.1 182.4,111 193.6,108.1 206.1,106.3 220,105.7 940,105.7 953.9,106.3 966.4,108.1 977.6,111 987.5,115.1 996.1,120.3 1003.5,126.5 1009.7,133.9 1014.9,142.5 1019,152.4 1021.9,163.6 1023.7,176.1 1024.3,190 1024.3,670 1023.7,683.9 1021.9,696.4 1019,707.6 1014.9,717.5 1009.7,726.1 1003.5,733.5 996.1,739.7 987.5,744.9 977.6,749 966.4,751.9 953.9,753.7 940,754.3 295,754.3" fill="none" stroke="#7E848E" stroke-width="2" stroke-linejoin="round"/>
+<polyline points="40,430 178,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="178,430 287.5,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,430 550,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,430 760,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,430 919,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,40 550,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
@@ -30,29 +27,27 @@
 <polyline points="550,430 550,532" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,532 550,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,649 550,820" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="190,430 190,241 190.5,234 191.9,227.9 194.2,222.7 197.5,218.5 201.7,215.2 206.9,212.9 213,211.5 220,211 295,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,211 550,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="178,430 178,241 178.5,234 179.9,227.9 182.2,222.7 185.5,218.5 189.7,215.2 194.9,212.9 201,211.5 208,211 287.5,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,211 550,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,211 760,211" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="760,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,274" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,274 919,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,430 919,532" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,532 919,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="760,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,364" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="919,364 919,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="919,430 919,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="919,649 760,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,649 550,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="550,649 497.5,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="497.5,649 220,649 213,648.5 206.9,647.1 201.7,644.8 197.5,641.5 194.2,637.3 191.9,632.1 190.5,626 190,619 190,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="550,649 407.5,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="407.5,649 208,649 201,648.5 194.9,647.1 189.7,644.8 185.5,641.5 182.2,637.3 179.9,632.1 178.5,626 178,619 178,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="919,649 1120,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,211 295,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,211 287.5,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,310 760,310" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,211 760,310" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,310 760,430" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,430 760,532" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,532 760,649" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,532 760,532" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="760,532 919,532" fill="none" stroke="#D9CDB8" stroke-width="39" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="40,430 190,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="190,430 295,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,430 550,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="40,430 178,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="178,430 287.5,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,430 550,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,430 760,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,430 919,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,40 550,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
@@ -61,90 +56,86 @@
 <polyline points="550,430 550,532" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,532 550,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,649 550,820" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="190,430 190,241 190.5,234 191.9,227.9 194.2,222.7 197.5,218.5 201.7,215.2 206.9,212.9 213,211.5 220,211 295,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,211 550,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="178,430 178,241 178.5,234 179.9,227.9 182.2,222.7 185.5,218.5 189.7,215.2 194.9,212.9 201,211.5 208,211 287.5,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,211 550,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,211 760,211" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="760,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,274" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,274 919,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,430 919,532" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,532 919,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="760,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,364" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="919,364 919,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="919,430 919,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="919,649 760,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,649 550,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="550,649 497.5,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="497.5,649 220,649 213,648.5 206.9,647.1 201.7,644.8 197.5,641.5 194.2,637.3 191.9,632.1 190.5,626 190,619 190,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="550,649 407.5,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="407.5,649 208,649 201,648.5 194.9,647.1 189.7,644.8 185.5,641.5 182.2,637.3 179.9,632.1 178.5,626 178,619 178,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="919,649 1120,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="295,211 295,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="287.5,211 287.5,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,310 760,310" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,211 760,310" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,310 760,430" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,430 760,532" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="760,532 760,649" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
 <polyline points="550,532 760,532" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="760,532 919,532" fill="none" stroke="#F4EBDD" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="927.3,274 927.2,400 926.7,408.2 925,415.7 921.9,422.5 917.3,428.3 911.5,432.9 904.7,436 897.2,437.7 889,438.2 760,438.3 550,438.3 295,438.3 220,438.2 211.8,437.7 204.3,436 197.5,432.9 191.7,428.3 187.1,422.5 184,415.7 182.3,408.2 181.8,400 181.8,241 182.3,232.8 184,225.3 187.1,218.5 191.7,212.7 197.5,208.1 204.3,205 211.8,203.3 220,202.8 295,202.8 550,202.8 760,202.8 889,202.8 897.2,203.3 904.7,205 911.5,208.1 917.3,212.7 921.9,218.5 925,225.3 926.7,232.8 927.2,240.9 927.3,274" fill="none" stroke="#1FA99A" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(927.3,364) rotate(90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(838.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(703.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(568.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(433.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(298.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(181.8,392.2) rotate(-90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(181.8,257.2) rotate(-90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(290.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(425.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(560.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(695.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(830.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(927.3,268.5) rotate(90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="919,274 919,430 919,532 919,619 918.5,626 917.1,632.1 914.8,637.3 911.5,641.5 907.3,644.8 902.1,647.1 896,648.5 889,649 760,649 580,649 573,648.5 566.9,647.1 561.7,644.8 557.5,641.5 554.2,637.3 551.9,632.1 550.5,626 550,619 550,532 550,460 550.5,453 551.9,446.9 554.2,441.7 557.5,437.5 561.7,434.2 566.9,431.9 573,430.5 580,430 730,430 737,429.5 743.1,428.1 748.3,425.8 752.5,422.5 755.8,418.3 758.1,413.1 759.5,407 760,400 760,310 760,241 760.5,234 761.9,227.9 764.2,222.7 767.5,218.5 771.7,215.2 776.9,212.9 783,211.5 790,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,274" fill="none" stroke="#F0A830" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(919,364) rotate(90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(919,499) rotate(90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(916.4,633.7) rotate(114.4)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(787.6,649) rotate(180.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(652.6,649) rotate(180.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(550,605.2) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(550,470.2) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(656.1,430) rotate(0.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(760,387.5) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(760,252.5) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(864.9,211) rotate(0.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<polyline points="497.5,640.8 220,640.8 214.1,640.4 209.5,639.3 206,637.7 203.3,635.7 201.3,633 199.7,629.5 198.6,624.9 198.2,619 198.2,460 198.6,454.1 199.7,449.5 201.3,446 203.3,443.3 206,441.3 209.5,439.7 214.1,438.6 220,438.2 295,438.3 550,438.3 730,438.2 735.9,438.6 740.5,439.7 744,441.3 746.7,443.3 748.7,446 750.3,449.5 751.4,454.1 751.8,460 751.8,532 751.8,619 751.4,624.9 750.3,629.5 748.7,633 746.7,635.7 744,637.7 740.5,639.3 735.9,640.4 730,640.8 550,640.8 497.5,640.8" fill="none" stroke="#8A6BD8" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(407.5,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(272.5,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(198.3,585.1) rotate(-90.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(199.1,452.1) rotate(-77.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(316.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(451.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(586.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(721.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(751.8,537.6) rotate(90.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(725,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M -4 -4 L 3 0 L -4 4" transform="translate(590,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(239.9,649) rotate(0.0)">West Rd</text>
-<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(422.5,430) rotate(0.0)">Main St</text>
-<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(422.5,211) rotate(0.0)">North Rd</text>
-<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(295,320.5) rotate(90.0)">Burrowes St</text>
+<polyline points="927.3,364 927.2,400.1 926.7,408.2 925,415.7 921.9,422.5 917.3,428.3 911.5,432.9 904.7,436 897.2,437.7 889,438.2 760,438.3 550,438.3 317.5,438.2 309.3,437.7 301.8,436 295,432.9 289.2,428.3 284.6,422.5 281.5,415.7 279.8,408.2 279.3,400 279.3,241 279.8,232.8 281.5,225.3 284.6,218.5 289.2,212.7 295,208.1 301.8,205 309.3,203.3 317.5,202.8 550,202.8 760,202.8 889,202.8 897.2,203.3 904.7,205 911.5,208.1 917.3,212.7 921.9,218.5 925,225.3 926.7,232.8 927.2,241 927.3,364" fill="none" stroke="#1FA99A" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(883.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(748.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(613.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(478.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(343.6,438.3) rotate(180.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(279.3,339.7) rotate(-90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(303.4,204.6) rotate(-13.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(440.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(575.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(710.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(845.1,202.8) rotate(0.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(927.3,283.5) rotate(90.0)" fill="none" stroke="#1FA99A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="919,364 919,430 919,619 918.5,626 917.1,632.1 914.8,637.3 911.5,641.5 907.3,644.8 902.1,647.1 896,648.5 889,649 760,649 580,649 573,648.5 566.9,647.1 561.7,644.8 557.5,641.5 554.2,637.3 551.9,632.1 550.5,626 550,619 550,532 550,460 550.5,453 551.9,446.9 554.2,441.7 557.5,437.5 561.7,434.2 566.9,431.9 573,430.5 580,430 730,430 737,429.5 743.1,428.1 748.3,425.8 752.5,422.5 755.8,418.3 758.1,413.1 759.5,407 760,400 760,310 760,241 760.5,234 761.9,227.9 764.2,222.7 767.5,218.5 771.7,215.2 776.9,212.9 783,211.5 790,211 889,211 896,211.5 902.1,212.9 907.3,215.2 911.5,218.5 914.8,222.7 917.1,227.9 918.5,234 919,241 919,364" fill="none" stroke="#F0A830" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(919,454) rotate(90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(919,589) rotate(90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(832.6,649) rotate(180.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(697.6,649) rotate(180.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(563.2,645.4) rotate(-155.6)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(550,515.2) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(611.1,430) rotate(0.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(745.7,426.9) rotate(-24.4)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(760,297.5) rotate(-90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(819.9,211) rotate(0.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(919,258.3) rotate(90.0)" fill="none" stroke="#F0A830" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<polyline points="407.5,640.8 208,640.8 202.1,640.4 197.5,639.3 194,637.7 191.3,635.7 189.3,633 187.7,629.5 186.6,624.9 186.2,619 186.2,460 186.6,454.1 187.7,449.5 189.3,446 191.3,443.3 194,441.3 197.5,439.7 202.1,438.6 208,438.2 287.5,438.3 550,438.3 730,438.2 735.9,438.6 740.5,439.7 744,441.3 746.7,443.3 748.7,446 750.3,449.5 751.4,454.1 751.8,460 751.8,532 751.8,619 751.4,624.9 750.3,629.5 748.7,633 746.7,635.7 744,637.7 740.5,639.3 735.9,640.4 730,640.8 550,640.8 407.5,640.8" fill="none" stroke="#8A6BD8" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(317.5,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(191.3,635.5) rotate(-127.9)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(186.3,507.1) rotate(-90.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(247.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(382.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(517.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(652.3,438.3) rotate(0.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(751.8,468.6) rotate(90.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(751.8,603.6) rotate(90.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(659,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M -4 -4 L 3 0 L -4 4" transform="translate(524,640.8) rotate(180.0)" fill="none" stroke="#8A6BD8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(189.6,644.7) rotate(37.9)">West Rd</text>
+<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(909.1,216.7) rotate(37.9)">North Rd</text>
+<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(418.8,430) rotate(0.0)">Main St</text>
+<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(919,539.5) rotate(90.0)">Station Rd</text>
+<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(287.5,320.5) rotate(90.0)">Burrowes St</text>
 <text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(655,649) rotate(0.0)">South Rd</text>
 <text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(655,310) rotate(0.0)">Beaver Ave</text>
 <text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(655,532) rotate(0.0)">Park Ave</text>
 <text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(550,125.5) rotate(90.0)">Atherton St</text>
-<text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(919,352) rotate(90.0)">Station Rd</text>
 <text class="street" text-anchor="middle" dominant-baseline="central" transform="translate(760,370) rotate(90.0)">Allen St</text>
 <rect x="405.3" y="277.8" width="34.5" height="34.5" rx="4" fill="#F3E6CF" stroke="#3FA796" stroke-width="3"/>
 <line x1="405.3" y1="312.3" x2="439.8" y2="312.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="422.5" y="295" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">clock</text>
-<rect x="317.5" y="273.3" width="64.5" height="103.5" rx="4" fill="#F3E6CF" stroke="#3FA796" stroke-width="3"/>
-<line x1="317.5" y1="273.3" x2="317.5" y2="376.8" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="358" y="325" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">hall</text>
+<rect x="310" y="273.3" width="64.5" height="103.5" rx="4" fill="#F3E6CF" stroke="#3FA796" stroke-width="3"/>
+<line x1="310" y1="273.3" x2="310" y2="376.8" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="350.5" y="325" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">hall</text>
 <rect x="463" y="266.5" width="64.5" height="81.0" rx="4" fill="#F3E6CF" stroke="#3FA796" stroke-width="3"/>
 <line x1="527.5" y1="266.5" x2="527.5" y2="347.5" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="493" y="307" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">library</text>
-<rect x="218.5" y="238" width="48.0" height="69.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="266.5" y1="238" x2="266.5" y2="307" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="242.5" y="272.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">dorm</text>
-<rect x="218.5" y="328" width="48.0" height="69.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="266.5" y1="328" x2="266.5" y2="397" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="242.5" y="362.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">dorm</text>
+<rect x="208.8" y="238" width="48.0" height="69.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="256.8" y1="238" x2="256.8" y2="307" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="232.8" y="272.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">dorm</text>
+<rect x="208.8" y="328" width="48.0" height="69.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="256.8" y1="328" x2="256.8" y2="397" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="232.8" y="362.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">dorm</text>
 <circle cx="382" cy="244" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="463" cy="244" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="331" cy="391" r="10.8" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
@@ -158,18 +149,18 @@
 <rect x="688" y="241.8" width="42.0" height="34.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
 <line x1="688" y1="276.3" x2="730" y2="276.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="709" y="259" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">cafe</text>
-<rect x="572.8" y="353.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="572.8" y1="404.2" x2="623.2" y2="404.2" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="598" y="379" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
-<rect x="629.5" y="353.5" width="48.0" height="48.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="629.5" y1="401.5" x2="677.5" y2="401.5" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="653.5" y="377.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">small</text>
-<rect x="692.5" y="362.5" width="39.0" height="43.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="692.5" y1="406" x2="731.5" y2="406" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="712" y="380.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">shop</text>
-<rect x="686.5" y="462.3" width="42.0" height="34.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="686.5" y1="462.3" x2="728.5" y2="462.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="707.5" y="479.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">cafe</text>
+<rect x="577" y="355" width="48.0" height="48.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="577" y1="403" x2="625" y2="403" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="601" y="379" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">small</text>
+<rect x="632.8" y="353.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="632.8" y1="404.2" x2="683.2" y2="404.2" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="658" y="379" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
+<rect x="694" y="362.5" width="39.0" height="43.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="694" y1="406" x2="733" y2="406" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="713.5" y="380.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">shop</text>
+<rect x="586" y="462.3" width="42.0" height="34.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="586" y1="462.3" x2="628" y2="462.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="607" y="479.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">cafe</text>
 <rect x="784.3" y="326.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
 <line x1="784.3" y1="326.8" x2="784.3" y2="377.2" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="809.5" y="352" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
@@ -182,37 +173,26 @@
 <rect x="847" y="358" width="48.0" height="48.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
 <line x1="847" y1="406" x2="895" y2="406" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="871" y="382" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">small</text>
-<circle cx="841" cy="311.5" r="13.200000000000001" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
+<circle cx="883" cy="322" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
+<rect x="591.3" y="572.5" width="67.5" height="40.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="591.3" y1="613" x2="658.8" y2="613" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="625" y="590.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">townhouses</text>
+<rect x="686.5" y="575.5" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="686.5" y1="613" x2="728.5" y2="613" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="707.5" y="592" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
+<circle cx="673" cy="563.5" r="9.600000000000001" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <rect x="784.3" y="455.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="784.3" y1="506.2" x2="834.7" y2="506.2" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<line x1="784.3" y1="455.8" x2="834.7" y2="455.8" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="809.5" y="481" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
 <rect x="784.3" y="565.3" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="784.3" y1="565.3" x2="834.7" y2="565.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<line x1="784.3" y1="615.7" x2="834.7" y2="615.7" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="809.5" y="590.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
-<rect x="578.8" y="562.3" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="578.8" y1="562.3" x2="629.2" y2="562.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="604" y="587.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
-<rect x="685.3" y="562.3" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="685.3" y1="562.3" x2="735.7" y2="562.3" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="710.5" y="587.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
-<rect x="636.3" y="584.5" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="636.3" y1="622" x2="678.3" y2="622" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="657.3" y="601" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
-<rect x="621.3" y="682" width="67.5" height="40.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="621.3" y1="682" x2="688.8" y2="682" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="655" y="704.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">townhouses</text>
-<rect x="712" y="685" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="712" y1="685" x2="754" y2="685" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="733" y="706" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
-<rect x="772" y="685" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="772" y1="685" x2="814" y2="685" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="793" y="706" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
-<rect x="837.3" y="682" width="67.5" height="40.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="837.3" y1="682" x2="904.8" y2="682" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="871" y="704.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">townhouses</text>
-<rect x="953.5" y="571" width="37.5" height="42.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
-<line x1="953.5" y1="571" x2="953.5" y2="613" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
-<text x="974.5" y="592" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
+<rect x="953.8" y="497.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="953.8" y1="497.8" x2="1004.2" y2="497.8" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="979" y="523" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
+<rect x="953.8" y="569.8" width="50.4" height="50.4" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="953.8" y1="620.2" x2="1004.2" y2="620.2" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="979" y="595" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">tall</text>
 <rect x="598" y="137.5" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
 <line x1="598" y1="175" x2="640" y2="175" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="619" y="154" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
@@ -225,12 +205,24 @@
 <rect x="838" y="131.5" width="48.0" height="48.0" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
 <line x1="838" y1="179.5" x2="886" y2="179.5" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
 <text x="862" y="155.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">small</text>
-<ellipse cx="371.5" cy="539.5" rx="81" ry="63" fill="#F3EDE2" stroke="#9B8E78" stroke-width="2"/>
-<ellipse cx="371.5" cy="539.5" rx="70.5" ry="52.5" fill="#5A8BD6"/>
-<ellipse cx="371.5" cy="539.5" rx="58.5" ry="42" fill="#6FC07F"/>
-<circle cx="238" cy="478" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
-<circle cx="238" cy="601" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
+<rect x="621.3" y="682" width="67.5" height="40.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="621.3" y1="682" x2="688.8" y2="682" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="655" y="704.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">townhouses</text>
+<rect x="712" y="685" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="712" y1="685" x2="754" y2="685" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="733" y="706" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
+<rect x="772" y="685" width="42.0" height="37.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="772" y1="685" x2="814" y2="685" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="793" y="706" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">house</text>
+<rect x="837.3" y="682" width="67.5" height="40.5" rx="4" fill="#F6EEDC" stroke="#E9785A" stroke-width="3"/>
+<line x1="837.3" y1="682" x2="904.8" y2="682" stroke="#C0553A" stroke-width="4" stroke-linecap="round"/>
+<text x="871" y="704.5" text-anchor="middle" dominant-baseline="central" style="font-size:9px;fill:#7A6A55">townhouses</text>
+<ellipse cx="283" cy="539.5" rx="81" ry="63" fill="#F3EDE2" stroke="#9B8E78" stroke-width="2"/>
+<ellipse cx="283" cy="539.5" rx="70.5" ry="52.5" fill="#5A8BD6"/>
+<ellipse cx="283" cy="539.5" rx="58.5" ry="42" fill="#6FC07F"/>
 <circle cx="499" cy="475" r="10.8" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
+<circle cx="448" cy="493" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
+<circle cx="496" cy="574" r="10.8" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="77.5" cy="77.5" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="70" cy="235" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="79" cy="565" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
@@ -243,65 +235,62 @@
 <circle cx="760" cy="799" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="910" cy="61" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
 <circle cx="370" cy="61" r="12" fill="#4FAF6E" stroke="#3E9A5F" stroke-width="1.5"/>
-<rect x="257.5" y="678.3" width="165.0" height="91.5" rx="5" fill="none" stroke="#D7443E" stroke-width="2" stroke-dasharray="5 4"/>
-<rect x="272.5" y="760" width="135.0" height="0.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
-<circle cx="376" cy="724" r="4" fill="#D7443E"/>
-<line x1="376" y1="724" x2="346" y2="724" stroke="#D7443E" stroke-width="2"/>
-<text x="385" y="760" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;fill:#D7443E">🚆 Stadium</text>
+<rect x="212.5" y="678.3" width="165.0" height="91.5" rx="5" fill="none" stroke="#D7443E" stroke-width="2" stroke-dasharray="5 4"/>
+<rect x="227.5" y="712.8" width="135.0" height="36.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
+<circle cx="331" cy="724" r="4" fill="#D7443E"/>
+<line x1="331" y1="724" x2="301" y2="724" stroke="#D7443E" stroke-width="2"/>
 <rect x="317.5" y="90.3" width="165.0" height="91.5" rx="5" fill="none" stroke="#D7443E" stroke-width="2" stroke-dasharray="5 4"/>
-<rect x="332.5" y="100" width="135.0" height="0.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
+<rect x="332.5" y="111.3" width="135.0" height="36.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
 <circle cx="364" cy="136" r="4" fill="#D7443E"/>
 <line x1="364" y1="136" x2="394" y2="136" stroke="#D7443E" stroke-width="2"/>
-<text x="355" y="100" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;fill:#D7443E">🚆 University</text>
-<rect x="948.3" y="227.5" width="91.5" height="165.0" rx="5" fill="none" stroke="#D7443E" stroke-width="2" stroke-dasharray="5 4"/>
-<rect x="982.8" y="195.3" width="36.0" height="171.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
-<circle cx="994" cy="274" r="4" fill="#D7443E"/>
-<line x1="994" y1="274" x2="994" y2="304" stroke="#D7443E" stroke-width="2"/>
-<text x="967" y="202" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;fill:#D7443E">🚆 Central</text>
+<rect x="948.3" y="317.5" width="91.5" height="165.0" rx="5" fill="none" stroke="#D7443E" stroke-width="2" stroke-dasharray="5 4"/>
+<rect x="982.8" y="332.5" width="36.0" height="135.0" rx="3" fill="#E8DCC8" stroke="#D7443E" stroke-width="2.5"/>
+<circle cx="994" cy="364" r="4" fill="#D7443E"/>
+<line x1="994" y1="364" x2="994" y2="394" stroke="#D7443E" stroke-width="2"/>
 <rect x="418.5" y="310.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="429.5" y="317.5">Old Main</text>
-<rect x="312" y="321" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="323" y="328">Willard Hall</text>
+<rect x="304.5" y="321" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="315.5" y="328">Willard Hall</text>
 <rect x="525" y="303" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="536" y="310">Pattee Library</text>
-<rect x="267" y="268.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="278" y="275.5">West Halls</text>
-<rect x="708" y="402" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="719" y="409">Main St Market</text>
+<rect x="255" y="268.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="266" y="275.5">West Halls</text>
+<rect x="597" y="402" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="608" y="409">Main St Market</text>
 <rect x="651" y="282" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="662" y="289">Beaver Ave Shops</text>
 <rect x="777" y="348" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="788" y="355">Allen Corner</text>
 <rect x="861" y="229.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="872" y="236.5">Central Plaza</text>
-<rect x="805.5" y="504" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="816.5" y="511">Eastview Towers</text>
-<rect x="805.5" y="559.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="816.5" y="566.5">Parkside Towers</text>
-<rect x="600" y="556.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="611" y="563.5">Southside Court</text>
-<rect x="706.5" y="556.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="717.5" y="563.5">Garden Row</text>
-<rect x="454.5" y="535.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="465.5" y="542.5">Stadium East Gate</text>
-<rect x="414" y="591" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="425" y="598">Stadium South Gate</text>
-<rect x="367.5" y="468" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="378.5" y="475">Stadium North Gate</text>
-<rect x="456" y="705" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="467" y="712">Stadium Station</text>
+<rect x="805.5" y="450" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="816.5" y="457">Eastview Towers</text>
+<rect x="805.5" y="613.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="816.5" y="620.5">Parkside Towers</text>
+<rect x="975" y="490.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="986" y="497.5">Station Court</text>
+<rect x="975" y="619.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="986" y="626.5">Garden Row</text>
+<rect x="366" y="535.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="377" y="542.5">Stadium East Gate</text>
+<rect x="268.5" y="603" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="279.5" y="610">Stadium South Gate</text>
+<rect x="279" y="468" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="290" y="475">Stadium North Gate</text>
+<rect x="414" y="711" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="425" y="718">Stadium Station</text>
 <rect x="456" y="162" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
 <text class="zone" x="467" y="169">University Station</text>
-<rect x="945" y="388.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
-<text class="zone" x="956" y="395.5">Central Station</text>
-<line x1="497.5" y1="631.8" x2="497.5" y2="595.8" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="497.5" cy="631.8" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="497.5" y="578.3" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Stadium Gate</text>
-<rect x="487.5" y="614.8" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
-<line x1="376" y1="666.3" x2="376" y2="702.3" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="376" cy="666.3" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="376" y="725.8" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Stadium Station</text>
-<rect x="366" y="649.3" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
+<rect x="945" y="253.5" width="8" height="8" rx="2" fill="#C0553A" stroke="#fff" stroke-width="1.5"/>
+<text class="zone" x="956" y="260.5">Central Station</text>
+<line x1="407.5" y1="631.8" x2="407.5" y2="595.8" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="407.5" cy="631.8" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="407.5" y="578.3" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Stadium Gate</text>
+<rect x="397.5" y="614.8" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
+<line x1="331" y1="666.3" x2="331" y2="702.3" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="331" cy="666.3" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="331" y="725.8" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Stadium Station</text>
+<rect x="321" y="649.3" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
 <line x1="364" y1="193.8" x2="364" y2="157.8" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
 <circle cx="364" cy="193.8" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
 <text class="stop" x="364" y="140.3" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">University Station</text>
@@ -311,38 +300,39 @@
 <text class="stop" x="445" y="359.3" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Old Main</text>
 <rect x="435" y="395.8" width="8" height="8" rx="2" fill="#1FA99A" stroke="#fff" stroke-width="1"/>
 <rect x="444" y="395.8" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
-<line x1="632.5" y1="447.3" x2="632.5" y2="483.3" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="632.5" cy="447.3" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="632.5" y="506.8" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Downtown</text>
-<rect x="622.5" y="430.3" width="8" height="8" rx="2" fill="#1FA99A" stroke="#fff" stroke-width="1"/>
-<rect x="631.5" y="430.3" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
-<rect x="640.5" y="430.3" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
-<line x1="936.3" y1="274" x2="972.3" y2="274" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="936.3" cy="274" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="985.8" y="278" text-anchor="start" paint-order="stroke" stroke="#fff" stroke-width="3">Central Station</text>
-<rect x="926.3" y="257" width="8" height="8" rx="2" fill="#1FA99A" stroke="#fff" stroke-width="1"/>
-<rect x="935.3" y="257" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
-<line x1="901.8" y1="481" x2="865.8" y2="481" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="901.8" cy="481" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="852.3" y="485" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">Apartments North</text>
-<rect x="891.8" y="464" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
-<line x1="901.8" y1="590.5" x2="865.8" y2="590.5" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
-<circle cx="901.8" cy="590.5" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
-<text class="stop" x="852.3" y="594.5" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">Apartments South</text>
-<rect x="891.8" y="573.5" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
-<text class="hood" x="370" y="219.8" text-anchor="middle">CAMPUS</text>
-<text class="hood" x="745" y="225.6" text-anchor="middle">DOWNTOWN</text>
-<text class="hood" x="745" y="474.9" text-anchor="middle">APARTMENTS</text>
-<text class="hood" x="370" y="454.1" text-anchor="middle">STADIUM</text>
+<line x1="677.5" y1="447.3" x2="677.5" y2="483.3" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="677.5" cy="447.3" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="677.5" y="506.8" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="3">Downtown</text>
+<rect x="667.5" y="430.3" width="8" height="8" rx="2" fill="#1FA99A" stroke="#fff" stroke-width="1"/>
+<rect x="676.5" y="430.3" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
+<rect x="685.5" y="430.3" width="8" height="8" rx="2" fill="#8A6BD8" stroke="#fff" stroke-width="1"/>
+<line x1="936.3" y1="364" x2="972.3" y2="364" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="936.3" cy="364" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="985.8" y="368" text-anchor="start" paint-order="stroke" stroke="#fff" stroke-width="3">Central Station</text>
+<rect x="926.3" y="347" width="8" height="8" rx="2" fill="#1FA99A" stroke="#fff" stroke-width="1"/>
+<rect x="935.3" y="347" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
+<line x1="901.8" y1="505" x2="865.8" y2="505" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="901.8" cy="505" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="852.3" y="509" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">Apartments North</text>
+<rect x="891.8" y="488" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
+<line x1="901.8" y1="589" x2="865.8" y2="589" stroke="#22304A" stroke-width="2" stroke-dasharray="2 3"/>
+<circle cx="901.8" cy="589" r="7" fill="#F6C945" stroke="#22304A" stroke-width="2"/>
+<text class="stop" x="852.3" y="593" text-anchor="end" paint-order="stroke" stroke="#fff" stroke-width="3">Apartments South</text>
+<rect x="891.8" y="572" width="8" height="8" rx="2" fill="#F0A830" stroke="#fff" stroke-width="1"/>
+<text class="hood" x="422.5" y="256.8" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="rgba(255,255,255,0.75)" stroke-width="4">CAMPUS</text>
+<text class="hood" x="844" y="307.8" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="rgba(255,255,255,0.75)" stroke-width="4">DOWNTOWN</text>
+<text class="hood" x="809.5" y="535" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="rgba(255,255,255,0.75)" stroke-width="4">APARTMENTS</text>
+<text class="hood" x="371.5" y="539.5" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="rgba(255,255,255,0.75)" stroke-width="4">STADIUM</text>
 <text x="40" y="890" style="font-size:24px;font-weight:700">Headway — town map</text>
-<rect x="40" y="908" width="22" height="12" rx="4" fill="#1FA99A"/>
-<text x="70" y="919" style="font-size:14px">r1 Campus Loop · 123 u · loop 8.2 min</text>
-<rect x="300" y="908" width="22" height="12" rx="4" fill="#F0A830"/>
-<text x="330" y="919" style="font-size:14px">r2 Apartments · 103 u · loop 7.0 min</text>
-<rect x="560" y="908" width="22" height="12" rx="4" fill="#8A6BD8"/>
-<text x="590" y="919" style="font-size:14px">r3 Stadium · 102 u · loop 7.0 min</text>
-<rect x="820" y="908" width="22" height="12" rx="3" fill="#D9CBB3" stroke="#B08B63" stroke-width="2"/>
-<text x="850" y="919" style="font-size:14px">rail loop 199 u · 3 stations · Stadium → University → Central</text>
-<text x="40" y="946" class="zone" style="font-size:12px">● stop (dotted line = queue direction) · ■ zone door (5–12 u from access) · red edge = building front · 31 road edges, 18 zones, 56 scenery items · map v1</text>
-<text x="40" y="966" class="zone" style="font-size:12px;fill:#2E7D4F">layout check: no overlaps with roads, rails, stops or each other</text>
+<rect x="40" y="906" width="22" height="12" rx="4" fill="#1FA99A"/>
+<text x="70" y="917" style="font-size:14px">r1 Campus Loop · 110 u · 7.5 min loop</text>
+<rect x="340" y="906" width="22" height="12" rx="4" fill="#F0A830"/>
+<text x="370" y="917" style="font-size:14px">r2 Apartments · 103 u · 7.0 min loop</text>
+<rect x="640" y="906" width="22" height="12" rx="4" fill="#8A6BD8"/>
+<text x="670" y="917" style="font-size:14px">r3 Stadium · 104 u · 7.1 min loop</text>
+<rect x="940" y="906" width="22" height="12" rx="3" fill="#D9CBB3" stroke="#B08B63" stroke-width="2"/>
+<text x="970" y="917" style="font-size:14px">rail loop + 3 stations</text>
+<text x="40" y="938" style="font-size:13px">Train: Stadium → University → Central, 199 u loop. Board 72 × 52 u. Streets run off all four board edges.</text>
+<text x="40" y="958" class="zone" style="font-size:12px">● stop (dotted line = queue direction) · ■ zone door (5–12 u from access) · red edge = building front · 29 road edges, 18 zones, 58 scenery items · map v1</text>
+<text x="40" y="976" class="zone" style="font-size:12px;fill:#2E7D4F">layout check: no overlaps with roads, rails, stops or each other</text>
 </svg>

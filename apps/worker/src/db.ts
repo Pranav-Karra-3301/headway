@@ -1,5 +1,5 @@
 // D1 access: typed rows (migrations/0001_init.sql, 0002_meta.sql), row <-> contract mappers, queries, upserts.
-import type { Emphasis, FailureFinding, Generation, Policy, Proposal, Round, SplitScore } from '@headway/sim';
+import type { Emphasis, FailureFinding, Generation, Metrics, Policy, Proposal, Round, SplitScore } from '@headway/sim';
 
 export interface GenerationRow {
   id: string; number: number; parent_id: string | null; from_proposal: string | null; policy_json: string; explanation: string;
@@ -202,4 +202,120 @@ export function upsertMeta(db: D1Database, key: string, value: unknown, now: str
        ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
     )
     .bind(key, JSON.stringify(value), now);
+}
+
+// ---------- evolution: proposal history, round events ----------
+/** The last `limit` proposals of finished rounds, oldest first (the designers' evidence digest, spec §8.3). */
+export async function recentProposals(db: D1Database, limit: number): Promise<Proposal[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.* FROM proposals p JOIN rounds r ON r.id = p.round_id WHERE r.status != 'running'
+       ORDER BY r.number DESC, p.designer DESC, p.id DESC LIMIT ?1`,
+    )
+    .bind(limit)
+    .all<ProposalRow>();
+  return results.map(rowToProposal).reverse();
+}
+
+export function setRoundEvents(db: D1Database, roundId: string, eventsJson: string): D1PreparedStatement {
+  return db.prepare('UPDATE rounds SET events_json = ?2 WHERE id = ?1').bind(roundId, eventsJson);
+}
+
+/** Marks a round that is still `running` as failed (crash path; a finished round is left alone). */
+export function failRunningRound(db: D1Database, roundId: string, now: string): D1PreparedStatement {
+  return db.prepare(`UPDATE rounds SET status = 'failed', finished_at = ?2 WHERE id = ?1 AND status = 'running'`).bind(roundId, now);
+}
+
+// ---------- leaderboard ----------
+export interface LeaderboardRow {
+  id: string; name: string; scenario_id: string; seed: number; sim_version: string; j: number; metrics_json: string; replay_json: string;
+  verified: number; champion_j: number | null; ip_hash: string | null; created_at: string;
+}
+/** One board line (`GET /api/leaderboard`). */
+export interface LeaderboardEntry { rank: number; id: string; name: string; j: number; verified: boolean; championJ: number | null; createdAt: string }
+
+export function insertLeaderboard(db: D1Database, r: LeaderboardRow): D1PreparedStatement {
+  return db
+    .prepare(
+      `INSERT INTO leaderboard (id, name, scenario_id, seed, sim_version, j, metrics_json, replay_json, verified, champion_j, ip_hash, created_at)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+    )
+    .bind(r.id, r.name, r.scenario_id, r.seed, r.sim_version, r.j, r.metrics_json, r.replay_json, r.verified, r.champion_j, r.ip_hash, r.created_at);
+}
+
+/** Top `limit` for a seed and sim version: each name's best entry (case-insensitive), lowest J first, earliest wins ties. */
+export async function topLeaderboard(db: D1Database, seed: number, simVersion: string, limit = 20): Promise<LeaderboardEntry[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT id, name, j, verified, champion_j, created_at FROM (
+         SELECT id, name, j, verified, champion_j, created_at,
+           ROW_NUMBER() OVER (PARTITION BY lower(name) ORDER BY j ASC, created_at ASC, id ASC) AS rn
+         FROM leaderboard WHERE seed = ?1 AND sim_version = ?2)
+       WHERE rn = 1 ORDER BY j ASC, created_at ASC, id ASC LIMIT ?3`,
+    )
+    .bind(seed, simVersion, limit)
+    .all<Pick<LeaderboardRow, 'id' | 'name' | 'j' | 'verified' | 'champion_j' | 'created_at'>>();
+  return results.map((r, i) => ({
+    rank: i + 1, id: r.id, name: r.name, j: r.j, verified: r.verified === 1, championJ: r.champion_j, createdAt: r.created_at,
+  }));
+}
+
+/** Where `j` would place on the board: 1 + the names (other than `name`) whose best is strictly lower. */
+export async function leaderboardRank(db: D1Database, seed: number, simVersion: string, name: string, j: number): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS better FROM (
+         SELECT lower(name) AS n, MIN(j) AS best FROM leaderboard WHERE seed = ?1 AND sim_version = ?2 GROUP BY lower(name))
+       WHERE n != lower(?3) AND best < ?4`,
+    )
+    .bind(seed, simVersion, name, j)
+    .first<{ better: number }>();
+  return (row?.better ?? 0) + 1;
+}
+
+// ---------- sealed test results ----------
+export type SealedRole = 'champion' | 'baseline' | 'reference';
+/** One policy's sealed-test score (`GET /api/sealed`). Never carries the seeds; `seedSet` is a fingerprint. */
+export interface SealedEntry {
+  id: string; policyId: string; role: SealedRole; simVersion: string; mapVersion: string; jTest: number; metrics: Metrics; runs: number;
+  byScenario: Record<string, SplitScore>; deltaVsBaselinePct: number | null; seedSet: string; scenarios: string[]; createdAt: string;
+}
+export interface SealedResultRow { id: string; policy_id: string; sim_version: string; j_test: number; metrics_json: string; created_at: string }
+/** `metrics_json` holds this envelope (the Metrics plus the evaluation context), like proposals' `{ train, val }`. */
+type SealedDetail = Pick<SealedEntry, 'metrics' | 'role' | 'runs' | 'byScenario' | 'deltaVsBaselinePct' | 'seedSet' | 'scenarios' | 'mapVersion'>;
+
+export function upsertSealed(db: D1Database, e: Omit<SealedEntry, 'id'>): D1PreparedStatement {
+  const id = `${e.seedSet}|${e.createdAt}|${e.role}`;
+  const detail: SealedDetail = {
+    metrics: e.metrics, role: e.role, runs: e.runs, byScenario: e.byScenario, deltaVsBaselinePct: e.deltaVsBaselinePct,
+    seedSet: e.seedSet, scenarios: e.scenarios, mapVersion: e.mapVersion,
+  };
+  return db
+    .prepare(
+      `INSERT INTO sealed_results (id, policy_id, sim_version, j_test, metrics_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(id) DO UPDATE SET policy_id = excluded.policy_id, sim_version = excluded.sim_version, j_test = excluded.j_test,
+         metrics_json = excluded.metrics_json, created_at = excluded.created_at`,
+    )
+    .bind(id, e.policyId, e.simVersion, e.jTest, JSON.stringify(detail), e.createdAt);
+}
+
+export function rowToSealed(r: SealedResultRow): SealedEntry {
+  const d = parse<Partial<SealedDetail> & Partial<Metrics>>(r.metrics_json, {});
+  // A bare Metrics object (rows written by hand / other tools) is accepted too.
+  const metrics = (d.metrics ?? (typeof d.J === 'number' ? d : null)) as Metrics;
+  const role: SealedRole = d.role ?? (r.policy_id === 'g0' ? 'baseline' : r.policy_id === 'ref' ? 'reference' : 'champion');
+  return {
+    id: r.id, policyId: r.policy_id, role, simVersion: r.sim_version, mapVersion: d.mapVersion ?? '', jTest: r.j_test, metrics, runs: d.runs ?? 0,
+    byScenario: d.byScenario ?? {}, deltaVsBaselinePct: d.deltaVsBaselinePct ?? null, seedSet: d.seedSet ?? '', scenarios: d.scenarios ?? [],
+    createdAt: r.created_at,
+  };
+}
+
+/** Newest first. */
+export async function listSealed(db: D1Database, limit = 60): Promise<SealedEntry[]> {
+  const { results } = await db
+    .prepare('SELECT * FROM sealed_results ORDER BY created_at DESC, id ASC LIMIT ?1')
+    .bind(limit)
+    .all<SealedResultRow>();
+  return results.map(rowToSealed);
 }

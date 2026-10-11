@@ -155,6 +155,27 @@ describe('bakeGeometry', () => {
     expect(tinted(makeTree('pine'), 'pine')).toBe(true);
     expect(untinted(makeTree('round'), 'trunk')).toBe(true);
   });
+  it('bakes non-kit meshes: "role#idx" material names, userData roles + resolver, fixed colours, noBake', () => {
+    const g = new THREE.Group();
+    const named = new THREE.MeshStandardMaterial({ color: '#000000' }); named.name = 'roof#1';
+    const custom = new THREE.MeshStandardMaterial({ color: '#000000' }); custom.userData.role = 'stone';
+    const plain = new THREE.MeshStandardMaterial({ color: '#ff0000' });
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    g.add(new THREE.Mesh(geo, named), new THREE.Mesh(geo, custom), new THREE.Mesh(geo, plain));
+    const skipped = new THREE.Mesh(geo, plain); skipped.userData.noBake = true; g.add(skipped);
+    const resolve = (role: string, _i: number, P: { name: string }) => (role === 'stone' ? (P.name === 'Wooden Toy' ? '#00ff00' : '#0000ff') : undefined);
+    const b = bakeGeometry(g, 'a', { resolve });
+    expect(b.geometry.getAttribute('position').count).toBe(72);
+    const col = b.geometry.getAttribute('color');
+    const at = (role: string) => b.ranges.find((r) => r.role === role)!.start;
+    expect(col.getX(at('roof'))).toBeCloseTo(new THREE.Color(PALETTES.a.roof[1]).r, 5);
+    expect(col.getY(at('stone'))).toBeCloseTo(1, 5);
+    expect(col.getX(at(''))).toBeCloseTo(1, 5);
+    recolorBaked(b, 'b');
+    expect(col.getZ(at('stone'))).toBeCloseTo(1, 5);
+    expect(col.getX(at(''))).toBeCloseTo(1, 5);
+    expect(col.getX(at('roof'))).toBeCloseTo(new THREE.Color(PALETTES.b.roof[1]).r, 5);
+  });
   it('mergeBaked keeps every base index before every detail index', () => {
     const a = bakeGeometry(makeBus(0)), b = bakeGeometry(makeBuilding('house'));
     const m = mergeBaked([a, b]);

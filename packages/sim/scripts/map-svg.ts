@@ -109,15 +109,12 @@ out.push(`<defs><style>
   .street { font-size: 10px; fill: #8A7B63; letter-spacing: 0.4px; }
   .stop { font-size: 12px; font-weight: 700; }
   .zone { font-size: 9px; fill: ${C.muted}; }
-  .hood { font-size: 22px; fill: rgba(34,48,74,0.22); letter-spacing: 3px; }
+  .hood { font-size: 15px; fill: rgba(34,48,74,0.55); letter-spacing: 2.5px; font-weight: 700; }
 </style></defs>`);
 out.push(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
 out.push(`<rect x="${X(b.minX)}" y="${Y(b.minZ)}" width="${(b.maxX - b.minX) * PX}" height="${(b.maxZ - b.minZ) * PX}" rx="18" fill="${C.board}" stroke="${C.edge}" stroke-width="6"/>`);
 
 // neighbourhood names (under everything)
-for (const n of TOWN.neighborhoods) {
-  out.push(`<circle cx="${X(n.center.x)}" cy="${Y(n.center.z)}" r="${n.radius * PX}" fill="none" stroke="rgba(34,48,74,0.10)" stroke-width="2" stroke-dasharray="6 6"/>`);
-}
 // lawns
 for (const it of SCENERY.filter((s) => s.kind === 'lawn')) {
   const f = sceneryFootprint(it);
@@ -186,17 +183,14 @@ for (const st of TOWN.rail.stations) {
   }
   const c = pointAt(TOWN.rail.loop, st.dist);
   const tx = Math.cos(c.heading), tz = -Math.sin(c.heading); // track direction
-  const nx = st.platform.x - c.x, nz = st.platform.z - c.z;
-  const nl = Math.hypot(nx, nz) || 1;
-  const inx = (Math.abs(tx) > 0.5 ? 0 : Math.sign(nx)) || 0, inz = (Math.abs(tz) > 0.5 ? Math.sign(nz) : 0) || 0;
-  void nl;
+  // inward normal: perpendicular to the track, toward the platform point
+  let inx = -tz, inz = tx;
+  if (inx * (st.platform.x - c.x) + inz * (st.platform.z - c.z) < 0) { inx = -inx; inz = -inz; }
   const corners = [-4.5, 4.5].flatMap((u) => [0.75, 3.15].map((v) => ({ x: c.x + tx * u + inx * v, z: c.z + tz * u + inz * v })));
   const xs = corners.map((p) => p.x), zs = corners.map((p) => p.z);
   out.push(`<rect x="${X(Math.min(...xs))}" y="${Y(Math.min(...zs))}" width="${((Math.max(...xs) - Math.min(...xs)) * PX).toFixed(1)}" height="${((Math.max(...zs) - Math.min(...zs)) * PX).toFixed(1)}" rx="3" fill="${C.platform}" stroke="${C.canopy}" stroke-width="2.5"/>`);
   out.push(`<circle cx="${X(st.platform.x)}" cy="${Y(st.platform.z)}" r="4" fill="${C.canopy}"/>`);
   out.push(`<line x1="${X(st.platform.x)}" y1="${Y(st.platform.z)}" x2="${X(st.platform.x + st.queueDir.x * 2)}" y2="${Y(st.platform.z + st.queueDir.z * 2)}" stroke="${C.canopy}" stroke-width="2"/>`);
-  const lx = c.x + inx * 4.2, lz = c.z + inz * 4.2;
-  out.push(`<text x="${X(lx + tx * -3)}" y="${Y(lz + tz * -3)}" text-anchor="middle" dominant-baseline="central" style="font-size:13px;font-weight:700;fill:${C.canopy}">🚆 ${esc(st.name)}</text>`);
 }
 // zone doors
 for (const z of TOWN.zones) {
@@ -218,20 +212,25 @@ for (const s of TOWN.stops) {
   });
 }
 // neighbourhood labels on top (faint)
-for (const n of TOWN.neighborhoods) out.push(`<text class="hood" x="${X(n.center.x)}" y="${Y(n.center.z - n.radius * 0.62)}" text-anchor="middle">${esc(n.name.toUpperCase())}</text>`);
+const HOOD_LABEL: Record<string, Vec2> = { campus: { x: -10.5, z: -11.55 }, stadium: { x: -13.9, z: 7.3 }, downtown: { x: 17.6, z: -8.15 }, apartments: { x: 15.3, z: 7.0 } };
+for (const n of TOWN.neighborhoods) {
+  const at = HOOD_LABEL[n.id] ?? n.center;
+  out.push(`<text class="hood" x="${X(at.x)}" y="${Y(at.z)}" text-anchor="middle" dominant-baseline="central" paint-order="stroke" stroke="rgba(255,255,255,0.75)" stroke-width="4">${esc(n.name.toUpperCase())}</text>`);
+}
 
 // legend
 const ly0 = H - LEGEND_H + 8;
 out.push(`<text x="${PAD}" y="${ly0 + 22}" style="font-size:24px;font-weight:700">Headway — town map</text>`);
 TOWN.routes.forEach((r, i) => {
-  const x = PAD + i * 260;
-  out.push(`<rect x="${x}" y="${ly0 + 40}" width="22" height="12" rx="4" fill="${r.color}"/>`);
-  out.push(`<text x="${x + 30}" y="${ly0 + 51}" style="font-size:14px">${r.id} ${esc(r.name)} · ${r.path.length.toFixed(0)} u · loop ${(r.nominalLoopS / 60).toFixed(1)} min</text>`);
+  const x = PAD + i * 300;
+  out.push(`<rect x="${x}" y="${ly0 + 38}" width="22" height="12" rx="4" fill="${r.color}"/>`);
+  out.push(`<text x="${x + 30}" y="${ly0 + 49}" style="font-size:14px">${r.id} ${esc(r.name)} · ${r.path.length.toFixed(0)} u · ${(r.nominalLoopS / 60).toFixed(1)} min loop</text>`);
 });
-out.push(`<rect x="${PAD + 780}" y="${ly0 + 40}" width="22" height="12" rx="3" fill="${C.ballast}" stroke="${C.ties}" stroke-width="2"/>`);
-out.push(`<text x="${PAD + 810}" y="${ly0 + 51}" style="font-size:14px">rail loop ${TOWN.rail.loop.length.toFixed(0)} u · 3 stations · Stadium → University → Central</text>`);
-out.push(`<text x="${PAD}" y="${ly0 + 78}" class="zone" style="font-size:12px">● stop (dotted line = queue direction) · ■ zone door (5–12 u from access) · red edge = building front · ${TOWN.roads.edges.length} road edges, ${TOWN.zones.length} zones, ${SCENERY.length} scenery items · map v${TOWN.version}</text>`);
-out.push(`<text x="${PAD}" y="${ly0 + 98}" class="zone" style="font-size:12px;fill:${problems.length ? '#C0392B' : '#2E7D4F'}">${problems.length ? `${problems.length} layout problems — see console` : 'layout check: no overlaps with roads, rails, stops or each other'}</text>`);
+out.push(`<rect x="${PAD + 900}" y="${ly0 + 38}" width="22" height="12" rx="3" fill="${C.ballast}" stroke="${C.ties}" stroke-width="2"/>`);
+out.push(`<text x="${PAD + 930}" y="${ly0 + 49}" style="font-size:14px">rail loop + 3 stations</text>`);
+out.push(`<text x="${PAD}" y="${ly0 + 70}" style="font-size:13px">Train: Stadium → University → Central, ${TOWN.rail.loop.length.toFixed(0)} u loop. Board 72 × 52 u. Streets run off all four board edges.</text>`);
+out.push(`<text x="${PAD}" y="${ly0 + 90}" class="zone" style="font-size:12px">● stop (dotted line = queue direction) · ■ zone door (5–12 u from access) · red edge = building front · ${TOWN.roads.edges.length} road edges, ${TOWN.zones.length} zones, ${SCENERY.length} scenery items · map v${TOWN.version}</text>`);
+out.push(`<text x="${PAD}" y="${ly0 + 108}" class="zone" style="font-size:12px;fill:${problems.length ? '#C0392B' : '#2E7D4F'}">${problems.length ? `${problems.length} layout problems — see console` : 'layout check: no overlaps with roads, rails, stops or each other'}</text>`);
 out.push('</svg>');
 
 writeFileSync(OUT, out.join('\n'));

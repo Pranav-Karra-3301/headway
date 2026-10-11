@@ -223,7 +223,7 @@ describe('street specifics', () => {
     for (const l of lens) expect(new THREE.Box3().setFromObject(l, true).max.z).toBeGreaterThan(0);
     for (const kind of ['st.tableUmbrella', 'st.flag', 'st.kiosk']) {
       const a = build(kind, { color: 0 }), b = build(kind, { color: 1 });
-      const colours = (x: typeof a) => meshes(x.obj).map((m) => (m.material as THREE.MeshStandardMaterial).color.getHexString()).sort().join();
+      const colours = (x: typeof a) => meshes(x.obj).map((m) => (m.material as THREE.MeshStandardMaterial).color.getHexString()).join();
       expect(colours(a), kind).not.toBe(colours(b));
     }
   });

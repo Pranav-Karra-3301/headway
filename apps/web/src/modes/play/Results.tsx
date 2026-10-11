@@ -9,7 +9,7 @@ import {
   clock, differenceFindings, fmtMin, fmtMMSS, fmtPaxH, raceSeries, sentence, verdict,
 } from './logic';
 import { usePlay } from './playStore';
-import { AgainIcon, CheckIcon, EyeIcon, playFacts, useTicker } from './ui';
+import { AgainIcon, CheckIcon, EyeIcon, playFacts } from './ui';
 
 type Who = 'you' | 'ai' | 'base';
 interface Row { key: string; label: string; get: (m: Metrics) => number; fmt: (v: number) => string; lower: boolean }
@@ -31,7 +31,6 @@ function bestOf(rows: Array<RunResult | null>, row: Row): number | null {
 
 function ScoreCard(p: { who: Who; title: string; sub: string; result: RunResult | null; all: Array<RunResult | null>; maxJ: number; loading?: boolean; stub?: boolean; index: number }) {
   const j = p.result ? p.result.metrics.J : 0;
-  const shown = useTicker(j / 3600, { from: 0, stiffness: 90 });
   const m = p.result?.metrics;
   return (
     <section className="pl-score hw-card" data-who={p.who} style={{ ['--i' as string]: p.index }}>
@@ -43,7 +42,7 @@ function ScoreCard(p: { who: Who; title: string; sub: string; result: RunResult 
       {m ? (
         <>
           <div className="pl-score__j">
-            <span className="hw-num">{shown.toFixed(1)}</span><span className="pl-score__unit">passenger-hours</span>
+            <span className="hw-num">{fmtPaxH(j)}</span><span className="pl-score__unit">passenger-hours</span>
           </div>
           <span className="pl-score__bar" aria-hidden="true"><i style={{ transform: `scaleX(${p.maxJ > 0 ? j / p.maxJ : 0})` }} /></span>
           <dl className="pl-score__rows">
@@ -157,7 +156,7 @@ function Leaderboard() {
                 <span className="pl-board__rank hw-num">{i + 1}</span>
                 <span className="pl-board__name">{r.name}</span>
                 <span className="pl-board__j hw-num">{fmtPaxH(r.j)}</span>
-                <span className="pl-board__v" title={r.verified ? 'Re-simulated on the server' : 'Not yet verified'} data-v={r.verified || undefined}>{r.verified ? <CheckIcon /> : '·'}</span>
+                <span className="pl-board__v" aria-label={r.verified ? 'Re-simulated on the server' : 'Not yet verified'} data-v={r.verified || undefined}>{r.verified ? <CheckIcon /> : '·'}</span>
               </li>
             ))}
           </ol>

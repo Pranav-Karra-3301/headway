@@ -74,6 +74,108 @@ describe('createOpenAICompatClient', () => {
   });
 });
 
+// ---- streaming (Luminal answers 503 to non-streaming calls that run past ~20 s, so the client streams by default) ----
+const enc = new TextEncoder();
+function sse(parts: string[], o: { status?: number; hang?: boolean } = {}): Response {
+  const body = new ReadableStream<Uint8Array>({
+    start(ctrl) {
+      for (const p of parts) ctrl.enqueue(enc.encode(p));
+      if (!o.hang) ctrl.close();
+    },
+  });
+  return new Response(body, { status: o.status ?? 200, headers: { 'content-type': 'text/event-stream; charset=utf-8' } });
+}
+const chunk = (delta: Record<string, unknown>, finish: string | null = null) =>
+  `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+
+describe('createOpenAICompatClient streaming', () => {
+  it('streams by default and joins content deltas, ignoring reasoning', async () => {
+    const fetchImpl = vi.fn(async (_u: string | URL | Request, _i?: RequestInit) => sse([
+      chunk({ role: 'assistant' }), chunk({ reasoning_content: 'We need {"no": 1}' }), chunk({ reasoning_content: ' think' }),
+      chunk({ content: '{"ok"' }), chunk({ content: ': true}' }), chunk({}, 'stop'), 'data: [DONE]\n\n',
+    ]));
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'luminal', fetchImpl: fetchImpl as unknown as typeof fetch });
+    const res = await llm.complete(REQ);
+    expect(res).toMatchObject({ text: '{"ok": true}', provider: 'luminal', model: REQ.model });
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body.stream).toBe(true);
+    expect(new Headers((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].headers).get('accept')).toContain('text/event-stream');
+  });
+
+  it('handles comment lines, CRLF and events split across network reads', async () => {
+    const whole = `: OPENROUTER PROCESSING\r\n\r\n${chunk({ content: 'he' }).replace(/\n/g, '\r\n')}${chunk({ content: 'llo' })}data: [DONE]\n\n`;
+    const pieces = [whole.slice(0, 7), whole.slice(7, 40), whole.slice(40, 41), whole.slice(41)];
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'openrouter',
+      fetchImpl: (async () => sse(pieces)) as unknown as typeof fetch });
+    expect((await llm.complete(REQ)).text).toBe('hello');
+  });
+
+  it('reads a stream that ends without [DONE] and accepts content part arrays', async () => {
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'p',
+      fetchImpl: (async () => sse([chunk({ content: [{ type: 'text', text: 'a' }, { type: 'text', text: 'b' }] }), chunk({ content: 'c' })])) as unknown as typeof fetch });
+    expect((await llm.complete(REQ)).text).toBe('abc');
+  });
+
+  it('turns a mid-stream error event into a retryable LlmError', async () => {
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'luminal',
+      fetchImpl: (async () => sse([chunk({ content: '{"a"' }), `data: ${JSON.stringify({ error: { message: 'overloaded', code: 503 } })}\n\n`])) as unknown as typeof fetch });
+    const err = await llm.complete(REQ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(LlmError);
+    expect((err as LlmError).retryable).toBe(true);
+    expect((err as LlmError).message).toMatch(/overloaded/);
+  });
+
+  it('treats a stream with no content as a retryable empty reply', async () => {
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'p',
+      fetchImpl: (async () => sse([chunk({ reasoning_content: 'hmm' }), 'data: [DONE]\n\n'])) as unknown as typeof fetch });
+    const err = await llm.complete(REQ).catch((e: unknown) => e);
+    expect((err as LlmError).kind).toBe('empty');
+    expect((err as LlmError).retryable).toBe(true);
+  });
+
+  it('times out a stream that stalls', async () => {
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'p',
+      fetchImpl: (async () => sse([chunk({ content: '{"a":' })], { hang: true })) as unknown as typeof fetch });
+    const t0 = Date.now();
+    const err = await llm.complete({ ...REQ, timeoutMs: 60 }).catch((e: unknown) => e);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect((err as LlmError).kind).toBe('timeout');
+    expect((err as LlmError).retryable).toBe(true);
+  });
+
+  it('can be switched off', async () => {
+    const fetchImpl = vi.fn(async (_u: string | URL | Request, _i?: RequestInit) => okResponse('{"x":1}'));
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider: 'p', stream: false, fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect((await llm.complete(REQ)).text).toBe('{"x":1}');
+    expect(JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body)).stream).toBe(false);
+  });
+});
+
+// ---- reasoning: both DeepSeek endpoints out-think the 8k designer budget (no budget control), so it is off by default ----
+describe('createOpenAICompatClient provider extras', () => {
+  async function bodyFor(provider: string, extraBody?: Record<string, unknown>) {
+    const fetchImpl = vi.fn(async (_u: string | URL | Request, _i?: RequestInit) => okResponse('{}'));
+    const llm = createOpenAICompatClient({ baseUrl: 'https://x/v1', apiKey: 'k', provider, fetchImpl: fetchImpl as unknown as typeof fetch, ...(extraBody ? { extraBody } : {}) });
+    await llm.complete(REQ);
+    return JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
+  }
+
+  it('disables thinking on Luminal and reasoning on OpenRouter', async () => {
+    expect((await bodyFor('luminal')).thinking).toEqual({ type: 'disabled' });
+    expect((await bodyFor('luminal')).reasoning).toBeUndefined();
+    expect((await bodyFor('openrouter')).reasoning).toEqual({ enabled: false });
+    expect((await bodyFor('openrouter')).thinking).toBeUndefined();
+    const other = await bodyFor('other');
+    expect(other.thinking).toBeUndefined();
+    expect(other.reasoning).toBeUndefined();
+  });
+
+  it('lets extraBody override or extend the request', async () => {
+    const body = await bodyFor('luminal', { thinking: { type: 'enabled' }, top_p: 0.9 });
+    expect(body).toMatchObject({ thinking: { type: 'enabled' }, top_p: 0.9, model: REQ.model, max_tokens: 8000 });
+  });
+});
+
 describe('withFallback', () => {
   function client(impl: (req: LlmRequest) => Promise<string>, provider: string): LlmClient & { reqs: LlmRequest[] } {
     const reqs: LlmRequest[] = [];

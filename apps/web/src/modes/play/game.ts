@@ -1,6 +1,6 @@
 // Owner: T3c. Play orchestration (non-React): session, tour, intents, pace, Finish fast-forward, results, spectate, submit.
-// The canvas host builds and drives the sim from `useApp().session`; Play only asks for sessions and, while finishing,
-// steps the paused runner itself. Everything the player sees comes from the Observation / snapshots (no future info).
+// The director + canvas host build and drive the play session (g0 + the player's intents); Play steps the runner itself
+// only while finishing. Everything the player sees comes from the Observation / snapshots (no future info).
 import { G0 } from '@headway/sim';
 import type { DecisionRecord, Intent, Observation, RouteId, ScenarioInstance, Sim, SimSnapshot } from '@headway/sim';
 import { fetchChampion, fetchLeaderboard, submitRun } from '../../api';
@@ -18,6 +18,7 @@ export const TOUR_KEY = 'headway.play.tour.v1';
 export const PLAY_SPEED: Speed = 8;
 const PACE_EVERY_S = 30;
 const OBS_EVERY_MS = 250;
+const FINISH_MS = 1200;
 
 let lastSnap: SimSnapshot | null = null;
 let lastObsMs = -Infinity;
@@ -25,6 +26,7 @@ let nextPaceT = 0;
 let intentSeq = 0;
 let nudgeSeq = 0;
 let awaiting: { prev: Sim | null; since: number; then: () => void } | null = null;
+let ffLastMs: number | null = null;
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -58,7 +60,7 @@ function resetCounters(): void {
   nextPaceT = 0;
 }
 
-/** Run `then` once the host has swapped in a new sim (after loadSession / restartSession). */
+/** Run `then` once the host has swapped in a new sim (the director rebuilds the session when the phase returns to intro). */
 function whenFresh(then: () => void): void {
   awaiting = { prev: frame.runner?.sim ?? null, since: performance.now(), then };
 }
@@ -97,10 +99,11 @@ export async function ensureAi(scenario: ScenarioInstance = playScenario()): Pro
     }
   }
   const id = champion.meta.id;
+  const key = `${scenario.seed}:${id}`;
   const cur = usePlay.getState().ai;
-  if (cur.championId === id && cur.status !== 'error' && cur.status !== 'idle') return;
-  usePlay.getState().set({ ai: { ...freshAi(id), status: 'running' } });
-  const mine = () => usePlay.getState().ai.championId === id;
+  if (cur.key === key && cur.status !== 'error' && cur.status !== 'idle') return;
+  usePlay.getState().set({ ai: { ...freshAi(id, key), status: 'running' } });
+  const mine = () => usePlay.getState().ai.key === key;
   try {
     const runs = await aiRunsFor(scenario, champion, G0, (r) => {
       if (mine()) usePlay.getState().set({ ai: { ...usePlay.getState().ai, [r.who]: r } });
@@ -120,6 +123,7 @@ export function start(opts: { tour?: boolean } = {}): void {
   app.setPlay({ phase: 'playing' }); // the director unpauses on intro → playing
   setSpeed(PLAY_SPEED);
   resetCounters();
+  if (usePlay.getState().ai.status === 'error') void ensureAi(); // e.g. the engine finished loading after Play opened
   if (opts.tour || !tourDone()) { usePlay.getState().set({ tour: 0 }); setPaused(true); } else setPaused(false);
 }
 
@@ -139,9 +143,10 @@ export function finish(): void {
   if (r.sim.done) { complete(); return; }
   const o = observe(r.sim);
   const to = o ? o.scenario.durationS + o.scenario.clearingS : r.sim.t + 2700;
+  ffLastMs = null;
   usePlay.getState().set({ finishing: { from: r.sim.t, to, t: r.sim.t }, picker: null, preview: null, tour: null });
   useApp.getState().setPlay({ phase: 'finishing' });
-  setPaused(true);
+  setPaused(false);
 }
 
 /** Results → a fresh run on the same crowd, straight into play (the director rebuilds the sim on 'intro'). */
@@ -155,17 +160,18 @@ export function playAgain(): void {
   useApp.getState().resetPlay(spec().scenario.seed);
 }
 
-/** Results → watch the champion run the identical crowd. The director pins the play session in play mode, so this
- *  swaps the runner's sim in place (the host keeps driving and rendering it); "Play again" rebuilds as usual. */
+/** Results → watch the champion run the identical crowd. The director pins the play session in play mode, so: restart
+ *  it (the host rebuilds and resets its HUD feeds), then swap the champion's sim into the runner in place. */
 export function spectate(): void {
   const app = useApp.getState();
-  const r = frame.runner;
-  if (!r) return;
   const champion = app.champion?.policy ?? G0;
   const scenario = spec().scenario;
   try {
     const made = createSessionSim({ key: `play-ai:${scenario.seed}:${champion.meta.id}`, scenario, policy: champion, label: `AI ${champion.meta.id}` });
     app.select(null);
+    app.restartSession();
+    const r = frame.runner;
+    if (!r) return;
     r.reset(() => made.sim);
     usePlay.getState().set({ spectating: true });
     setSpeed(PLAY_SPEED);
@@ -223,7 +229,7 @@ export function tick(nowMs: number): void {
   const phase = useApp.getState().play.phase;
   if (phase !== 'playing' && phase !== 'finishing') return;
 
-  if (phase === 'finishing') fastForward(r);
+  if (phase === 'finishing') fastForward(r, nowMs);
   if (r.next !== lastSnap) {
     lastSnap = r.next;
     const recs = humanRecords(r.next);
@@ -251,15 +257,19 @@ function humanRecords(s: SimSnapshot): DecisionRecord[] {
   return out;
 }
 
-/** Finish: step the paused runner ~1.25 s worth of frames to the end, sampling pace on the way. */
-function fastForward(r: SimRunner): void {
+/** Finish: race the runner's sim to the end in ~1.2 s of real time (ticks scale with the real time between frames, so
+ *  slow or throttled frames still finish on time), sampling pace on the way. The host keeps rendering runner.next. */
+function fastForward(r: SimRunner, nowMs: number): void {
   const f = usePlay.getState().finishing;
   if (!f || r.sim.done) return;
-  const perFrame = Math.max(24, Math.ceil(Math.max(1, f.to - f.from) / 75));
+  const total = Math.max(1, f.to - f.from);
+  const elapsed = ffLastMs === null ? 16 : Math.min(400, Math.max(0, nowMs - ffLastMs));
+  ffLastMs = nowMs;
+  const want = Math.max(24, Math.ceil((elapsed * total) / FINISH_MS));
   const t0 = performance.now();
   let n = 0;
   try {
-    while (!r.sim.done && n < perFrame && performance.now() - t0 < 12) {
+    while (!r.sim.done && n < want && performance.now() - t0 < 40) {
       r.sim.step();
       n++;
       if (r.sim.t % PACE_EVERY_S === 0) { const o = observe(r.sim); if (o) samplePace(o); }
@@ -441,6 +451,7 @@ export function handleKey(e: KeyboardEvent): void {
   }
   const c = keyCommand(e, { picker: local.picker });
   if (!c) return;
+  if (e.repeat && c.kind !== 'cycle') { e.preventDefault(); e.stopPropagation(); return; } // no bursts from a held key
   if (act(c)) { e.preventDefault(); e.stopPropagation(); }
 }
 

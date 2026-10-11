@@ -1,6 +1,7 @@
 // Owner: T3c. HTML overlays over vehicles: pending-intent badges, hold ring timers, and the deadhead preview path while
 // choosing a reassign target. React renders the set at 4 Hz; positions update every frame via renderer.project.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TOWN, deadheadPath, pointAt, routeById } from '@headway/sim';
 import type { PathRef, Polyline, VehicleView } from '@headway/sim';
 import { frame } from '../../state/frame';
@@ -37,6 +38,9 @@ export function VehicleOverlays() {
   const els = useRef(new Map<string, HTMLDivElement>());
   const holds = useRef(new Map<string, { until: number; start: number }>());
   const pathRef = useRef<SVGPathElement | null>(null);
+  // Render inside the shell's marker layer (same box as the canvas, under the HUD panels) when it exists.
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => { setHost(document.querySelector('.hw-markers')); }, []);
 
   // vehicles worth an overlay: a pending intent or a running hold
   const items: Array<{ id: string; badge: string | null; holding: boolean; human: boolean }> = [];
@@ -123,7 +127,7 @@ export function VehicleOverlays() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  return (
+  const layer = (
     <div className="pl-ov" aria-hidden="true">
       <svg className="pl-ov__svg">
         <path ref={pathRef} className="pl-deadhead" data-from={deadhead?.from ?? ''} data-to={deadhead?.to ?? ''} d="" />
@@ -145,4 +149,5 @@ export function VehicleOverlays() {
       ))}
     </div>
   );
+  return host ? createPortal(layer, host) : layer;
 }

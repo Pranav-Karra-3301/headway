@@ -86,9 +86,11 @@ export class Look {
     this.bloom.enabled = this.quality === 'high' && d > 0.02;
     const u = this.grade.uniforms;
     u.uWarmth!.value = 0.035 + 0.03 * d;
-    u.uSaturation!.value = 1.06 + 0.06 * d;
+    u.uSaturation!.value = 1.08 + 0.1 * d;
     u.uVignette!.value = 0.22 + 0.16 * d;
-    (u.uLift!.value as THREE.Color).setRGB(0.018 + 0.004 * d, 0.014 + 0.004 * d, 0.022 + 0.02 * d);
+    (u.uLift!.value as THREE.Color).setRGB(0.009 + 0.01 * d, 0.007 + 0.009 * d, 0.012 + 0.028 * d);
+    (u.uShadowTint!.value as THREE.Color).setRGB(0.985 - 0.07 * d, 0.995 - 0.01 * d, 1.025 + 0.11 * d);
+    (u.uHighlightTint!.value as THREE.Color).setRGB(1.02 + 0.07 * d, 1.0 + 0.01 * d, 0.975 - 0.06 * d);
     this.gtao.blendIntensity = 0.75 - 0.2 * d;
   }
 

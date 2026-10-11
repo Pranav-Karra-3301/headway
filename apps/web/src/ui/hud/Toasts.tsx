@@ -21,7 +21,7 @@ const ICONS: Record<Toast['kind'], ReactNode> = {
 export interface ToastViewProps {
   toasts: Toast[];
   clockStart: string | null;
-  /** Start the stack lower (Play's finishing / spectate banners sit at top-centre). */
+  /** Start the stack lower (the pace chip and Play's finishing / spectate banners sit at top-centre). */
   offset?: boolean;
   exiting?: ReadonlySet<number>;
   onDismiss(id: number): void;
@@ -35,7 +35,7 @@ export function ToastView({ toasts, clockStart, offset, exiting, onDismiss, onHo
   return (
     <div className="hud-root hud-toasts" data-offset={!!offset} style={style} role="status" aria-live="polite">
       {ordered.map((t, i) => (
-        <div key={t.id} className="hud-toast hud-surface" data-kind={t.kind} data-exiting={exiting?.has(t.id) ?? false}
+        <div key={t.id} className="hud-toast hud-surface" data-kind={t.kind} data-i={i} data-exiting={exiting?.has(t.id) ?? false}
           style={{ '--i': i, zIndex: 10 - i } as CSSProperties}
           onPointerEnter={() => onHold(true)} onPointerLeave={() => onHold(false)}>
           <span className="hud-toast-icon" aria-hidden>{ICONS[t.kind]}</span>
@@ -64,7 +64,7 @@ function useAlertFeed(): void {
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   const palette = useApp((s) => s.palette);
-  const offset = useApp((s) => s.mode === 'play' && (s.play.phase === 'finishing' || s.play.phase === 'results'));
+  const offset = useApp((s) => s.mode === 'play' && s.play.phase !== 'intro');
   const clockStart = useApp((s) => s.observation?.scenario.clockStart ?? null);
   const [exiting, setExiting] = useState<ReadonlySet<number>>(() => new Set());
   const hold = useRef(false);
@@ -94,6 +94,8 @@ export function Toasts() {
       const now = performance.now();
       const dt = now - last;
       last = now;
+      // A toast removed under the pointer never fires pointerleave: trust :hover as the source of truth.
+      if (hold.current && !document.querySelector('.hud-toast:hover')) hold.current = false;
       if (hold.current || document.hidden) return;
       const live = useApp.getState().toasts;
       const ids = new Set(live.map((t) => t.id));
