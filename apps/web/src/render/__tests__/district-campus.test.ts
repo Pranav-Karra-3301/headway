@@ -1,6 +1,7 @@
 // Owner: D1. Campus district: placement validity, gameplay clearances (stops, queues, sight lines), composition.
 import type { Vec2 } from '@headway/sim';
 import { TOWN } from '@headway/sim';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { createBasicKit } from '../assets/basicKit';
 import { CATALOG_BY_KIND } from '../assets/catalog';
@@ -46,13 +47,28 @@ function segmentsCross(a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
   const o = (p: Vec2, q: Vec2, r: Vec2) => Math.sign((q.x - p.x) * (r.z - p.z) - (q.z - p.z) * (r.x - p.x));
   return o(a, b, c) * o(a, b, d) < 0 && o(c, d, a) * o(c, d, b) < 0;
 }
-/** Does item `it` hide ground point q (at height qy) from an iso camera at azimuth 45° (looking from +x/+z)? */
-function occludes(it: PlacedAsset, q: Vec2, qy: number, elevDeg: number): boolean {
-  const bx = boxOf(it), h = (CATALOG_BY_KIND.get(it.kind)?.h ?? 1) * (it.scale ?? 1);
-  const k = Math.SQRT2 * Math.tan((elevDeg * Math.PI) / 180); // height gained per unit step along (+1, +1) in x/z
-  const tmin = Math.max(bx.x0 - q.x, bx.z0 - q.z, 0);
-  const tmax = Math.min(bx.x1 - q.x, bx.z1 - q.z, (h - qy) / k);
-  return tmin < tmax;
+/** Built scene of every campus item (basic kit), for raycast sight-line checks against real geometry. */
+function builtItems(): Array<{ it: PlacedAsset; obj: THREE.Object3D }> {
+  const r = createRegistry();
+  const k = createBasicKit(r.roles);
+  return items.map((it) => { const obj = r.build(k, it); obj.updateMatrixWorld(true); return { it, obj }; });
+}
+/** Items hiding a person standing at q from an iso camera at azimuth 45° (looking from +x/+z): all three rays
+ *  (person centre and ±0.2 u sideways, at 0.45 u up) blocked by the same item. Thin posts cannot hide a person. */
+function hiders(built: ReturnType<typeof builtItems>, q: Vec2, elevDeg: number): PlacedAsset[] {
+  const dir = new THREE.Vector3(1, Math.SQRT2 * Math.tan((elevDeg * Math.PI) / 180), 1).normalize();
+  const side = new THREE.Vector3(1, 0, -1).normalize().multiplyScalar(0.2);
+  const rc = new THREE.Raycaster();
+  const out: PlacedAsset[] = [];
+  for (const { it, obj } of built) {
+    let blocked = 0;
+    for (const s of [-1, 0, 1]) {
+      rc.set(new THREE.Vector3(q.x + side.x * s, 0.45, q.z + side.z * s), dir);
+      if (rc.intersectObject(obj, true).length > 0) blocked++;
+    }
+    if (blocked === 3) out.push(it);
+  }
+  return out;
 }
 const queuePoints = (p: Vec2, dir: Vec2): Vec2[] =>
   [p, ...Array.from({ length: QUEUE_SLOTS }, (_, i) => ({ x: p.x + dir.x * (0.9 + i * 0.45), z: p.z + dir.z * (0.9 + i * 0.45) }))];
@@ -125,12 +141,18 @@ describe('campus district', () => {
     }
   });
 
-  it('never hides a campus stop or its queue from the iso camera (az 45°, elevation 30–36°)', () => {
-    for (const sid of ['stop_old_main', 'stop_university_stn']) {
-      const s = TOWN.stops.find((x) => x.id === sid)!;
-      for (const q of queuePoints(s.p, s.queueDir)) {
+  it('never hides a campus stop, platform or their queues from the iso camera (az 45°, elevation 30–36°)', () => {
+    const built = builtItems();
+    const places = [
+      ...TOWN.stops.filter((s) => s.neighborhood === 'campus').map((s) => ({ id: s.id, p: s.p, dir: s.queueDir })),
+      ...TOWN.rail.stations.filter((s) => s.id === 'stn_university').map((s) => ({ id: s.id, p: s.platform, dir: s.queueDir })),
+    ];
+    expect(places.length).toBe(3);
+    for (const pl of places) {
+      for (const q of queuePoints(pl.p, pl.dir)) {
         for (const elev of [30, 35.26]) {
-          for (const a of items) expect(occludes(a, q, 0.4, elev), `${a.kind} @ ${a.x},${a.z} hides ${sid} (${q.x.toFixed(1)},${q.z.toFixed(1)}) at ${elev}°`).toBe(false);
+          const h = hiders(built, q, elev).map((a) => `${a.kind} @ ${a.x.toFixed(2)},${a.z.toFixed(2)}`);
+          expect(h, `${pl.id} slot (${q.x.toFixed(1)},${q.z.toFixed(1)}) at ${elev}°`).toEqual([]);
         }
       }
     }

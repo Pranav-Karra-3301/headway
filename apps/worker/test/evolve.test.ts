@@ -38,7 +38,8 @@ function setup(over: Partial<AppDeps> = {}, llm = round1Llm()) {
   return { app, ev, llm };
 }
 
-const evolve = (app: ReturnType<typeof createApp>, path = '/api/evolve', e = testEnv()) => call(app, path, { method: 'POST', headers: admin, env: e });
+const evolve = (app: ReturnType<typeof createApp>, path = '/api/evolve', e = testEnv(), headers: Record<string, string> = {}) =>
+  call(app, path, { method: 'POST', headers: { ...admin, ...headers }, env: e });
 const generations = async (app: ReturnType<typeof createApp>) => (await call(app, '/api/generations')).json<Generations>();
 const roundRow = (id: string) =>
   env.DB.prepare('SELECT status, started_at, finished_at, events_json FROM rounds WHERE id = ?1').bind(id)
@@ -49,10 +50,11 @@ beforeEach(resetDb);
 describe('POST /api/evolve', () => {
   it('streams one round as NDJSON, persists every step and promotes the winner', async () => {
     const { app, ev, llm } = setup();
-    const res = await evolve(app);
+    const res = await evolve(app, '/api/evolve', testEnv(), { Origin: 'http://localhost:5173' });
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('application/x-ndjson');
     expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
     const events = await readNdjson<EvolveEvent>(res);
 
     expect(events[0]).toEqual({ type: 'round_start', round: 1, champion: 'g0' });

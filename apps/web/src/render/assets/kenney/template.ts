@@ -23,6 +23,8 @@ export interface KenneyPartInfo {
   /** The paint of a car/boat: its largest saturated part. Recolour it for variety (or set userData.tint). */
   paint: boolean;
   side: THREE.Side;
+  /** Building kits only: the part's faces point up (flat/sloped roofs, ledges). */
+  up?: boolean;
   /** Set by recolorKenney when a part was given a literal colour instead of a role. */
   hex?: string;
 }
@@ -30,7 +32,7 @@ export interface KenneyPart { geometry: THREE.BufferGeometry; info: KenneyPartIn
 export interface KenneyTemplate { id: string; parts: KenneyPart[]; box: THREE.Box3; size: THREE.Vector3; tris: number }
 
 interface Acc {
-  source: string; role: string; idx: number; side: THREE.Side; shade: number;
+  source: string; role: string; idx: number; side: THREE.Side; shade: number; up: boolean;
   pos: number[]; nor: number[]; uv: number[]; index: number[];
   lin: [number, number, number]; samples: number; flat: string | null;
 }
@@ -55,11 +57,22 @@ function block(cm: ColormapPixels, u: number, v: number): { key: string; flat: s
   return { key: `${bx},${by}`, flat: rgbToHex(flat) };
 }
 
+export interface TemplateOptions {
+  /** Mark the largest saturated part as the paint (cars, boats). */
+  paint?: boolean;
+  /** Split up-facing faces (normal.y > 0.5) of colormap parts into their own parts (`info.up`), and remap their role
+   *  through `upRole` (building kits: dark flat roofs → warm roof colour). */
+  splitUp?: boolean;
+  upRole?: Readonly<Record<string, string>>;
+}
+
+const fa = new THREE.Vector3(), fb = new THREE.Vector3(), fc = new THREE.Vector3();
+
 /**
  * Build a template from a glTF scene. `scale` (KENNEY_SCALE of the kit × any extra) is baked into the geometry.
- * `colormap` = the kit's colormap pixels (null for the nature kit). `paint` marks a vehicle's paint part.
+ * `colormap` = the kit's colormap pixels (null for the nature kit).
  */
-export function buildTemplate(id: string, root: THREE.Object3D, scale: number, colormap: ColormapPixels | null, opts: { paint?: boolean } = {}): KenneyTemplate {
+export function buildTemplate(id: string, root: THREE.Object3D, scale: number, colormap: ColormapPixels | null, opts: TemplateOptions = {}): KenneyTemplate {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const S = new THREE.Matrix4().makeScale(scale, scale, scale);
@@ -103,17 +116,22 @@ export function buildTemplate(id: string, root: THREE.Object3D, scale: number, c
       const end = Math.min(count, grp.start + grp.count);
       for (let t = grp.start; t + 2 < end; t += 3) {
         const a = I ? I.getX(t) : t, b = I ? I.getX(t + 1) : t + 1, c = I ? I.getX(t + 2) : t + 2;
-        let key: string, source: string, flat: string | null = null;
+        let key: string, source: string, flat: string | null = null, up = false;
         if (colormap && UV) {
           const bl = block(colormap, (UV.getX(a) + UV.getX(b) + UV.getX(c)) / 3, (UV.getY(a) + UV.getY(b) + UV.getY(c)) / 3);
-          key = `cm:${bl.key}|${side}`; source = bl.flat; flat = bl.flat;
+          if (opts.splitUp) {
+            fa.fromBufferAttribute(P, a).applyMatrix4(M); fb.fromBufferAttribute(P, b).applyMatrix4(M); fc.fromBufferAttribute(P, c).applyMatrix4(M);
+            const n = fb.sub(fa).cross(fc.sub(fa));
+            up = (flip ? -n.y : n.y) > 0.5 * n.length();
+          }
+          key = `cm:${bl.key}|${side}|${up ? 'up' : ''}`; source = bl.flat; flat = bl.flat;
         } else {
           source = mat?.name || '_defaultMat';
           key = `mat:${source}|${side}`;
         }
         let acc = accs.get(key);
         if (!acc) {
-          acc = { source, role: '', idx: 0, side, shade: 0, pos: [], nor: [], uv: [], index: [], lin: [0, 0, 0], samples: 0, flat };
+          acc = { source, role: '', idx: 0, side, shade: 0, up, pos: [], nor: [], uv: [], index: [], lin: [0, 0, 0], samples: 0, flat };
           accs.set(key, acc);
         }
         const tri = flip ? [a, c, b] : [a, b, c];
@@ -134,6 +152,7 @@ export function buildTemplate(id: string, root: THREE.Object3D, scale: number, c
       const mean = rgbToHex([srgb(acc.lin[0] / acc.samples), srgb(acc.lin[1] / acc.samples), srgb(acc.lin[2] / acc.samples)]);
       const black = acc.flat === '#000000';
       acc.role = swatchRole(black ? mean : acc.flat);
+      if (acc.up) acc.role = opts.upRole?.[acc.role] ?? acc.role;
       acc.shade = black ? 0 : quantizeShade(lightness(mean) - lightness(acc.flat));
     } else {
       const ref = NATURE_REMAP[acc.source] ?? { role: 'knStone', idx: 0 };
@@ -144,7 +163,7 @@ export function buildTemplate(id: string, root: THREE.Object3D, scale: number, c
   // merge blocks that ended up with the same look (role, idx, shade, side)
   const merged = new Map<string, Acc>();
   for (const acc of accs.values()) {
-    const k = `${acc.role}#${acc.idx}|${acc.shade}|${acc.side}`;
+    const k = `${acc.role}#${acc.idx}|${acc.shade}|${acc.side}|${acc.up}`;
     const m = merged.get(k);
     if (!m) { merged.set(k, acc); continue; }
     const off = m.pos.length / 3;
@@ -172,7 +191,9 @@ export function buildTemplate(id: string, root: THREE.Object3D, scale: number, c
     box.union(geometry.boundingBox!);
     const n = acc.index.length / 3;
     tris += n;
-    parts.push({ geometry, tris: n, info: { source: acc.source, role: acc.role, idx: acc.idx, shade: acc.shade, paint: false, side: acc.side } });
+    const info: KenneyPartInfo = { source: acc.source, role: acc.role, idx: acc.idx, shade: acc.shade, paint: false, side: acc.side };
+    if (acc.up) info.up = true;
+    parts.push({ geometry, tris: n, info });
   }
   if (opts.paint) {
     let best: KenneyPart | null = null;

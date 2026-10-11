@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { applyClay } from '../../materials';
 import type { PaletteId } from '../../types';
-import { isPaletteRole, kenneyColor, shadeHex } from './colors';
+import { BUILDING_UP_ROLE, isPaletteRole, kenneyColor, shadeHex } from './colors';
 import { buildTemplate, type ColormapPixels, type KenneyPartInfo, type KenneyTemplate } from './template';
 
 export type KenneyKit =
@@ -116,7 +116,10 @@ function loadOne(id: KenneyId): Promise<void> {
         if (!(kit in KENNEY_SCALE)) throw new Error(`unknown kit "${kit}"`);
         loader ??= new GLTFLoader();
         const [gltf, cm] = await Promise.all([loader.loadAsync(kenneyUrl(id)), kit === 'nature-kit' ? null : loadColormap(kit)]);
-        templates.set(id, buildTemplate(id, gltf.scene, KENNEY_SCALE[kit], cm, { paint: kit === 'car-kit' || kit === 'watercraft-pack' }));
+        const building = kit === 'city-kit-suburban' || kit === 'city-kit-commercial' || kit === 'city-kit-industrial';
+        templates.set(id, buildTemplate(id, gltf.scene, KENNEY_SCALE[kit], cm, {
+          paint: kit === 'car-kit' || kit === 'watercraft-pack', splitUp: building, upRole: building ? BUILDING_UP_ROLE : undefined,
+        }));
         disposeGltf(gltf.scene);
       } catch (err) {
         console.warn(`[kenney] could not load ${id}:`, err);

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { bakeGeometry } from '../../kit/bake';
 import { PALETTES } from '../../palettes';
 import {
-  chroma, hexToRgb, isPaletteRole, kenneyColor, KENNEY_ROLES, lightness, NATURE_REMAP, quantizeShade, shadeHex, SWATCH_ROLE, swatchRole,
+  BUILDING_UP_ROLE, chroma, hexToRgb, isPaletteRole, kenneyColor, KENNEY_ROLES, lightness, NATURE_REMAP, quantizeShade, shadeHex, SWATCH_ROLE, swatchRole,
 } from './colors';
 import {
   _setKenneyTemplate, declareKenney, KENNEY_BOATS, KENNEY_CARS, KENNEY_KITS, KENNEY_SCALE, KENNEY_SERVICE, kenneyIdsFor, kenneyMaterial,
@@ -200,6 +200,24 @@ describe('buildTemplate', () => {
     expect(white.info.side).toBe(THREE.DoubleSide);
     expect(white.info.shade).toBeLessThan(0); // sampled from the darker gradient half
     expect(white.info.source).toContain('#ffffff');
+  });
+  it('building kits: up-facing faces split off (info.up) and dark flat roofs take the warm roof role', () => {
+    const cm = colormap({ '2,2': '#4f5260', '1,1': '#ffffff' });
+    const roof = new THREE.BufferGeometry();
+    const uvR = gradUv(2, 2);
+    roof.setAttribute('position', new THREE.Float32BufferAttribute([-1, 1, 1, 1, 1, 1, 1, 1, -1, -1, 1, -1], 3));
+    roof.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+    roof.setAttribute('uv', new THREE.Float32BufferAttribute([...uvR, ...uvR, ...uvR, ...uvR], 2));
+    roof.setIndex([0, 1, 2, 0, 2, 3]);
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(roof, named('colormap')), new THREE.Mesh(quad(-1, 1, 0, 1, gradUv(2, 2)), named('colormap')), new THREE.Mesh(quad(-1, 1, 0, 1, gradUv(1, 1)), named('colormap')));
+    const t = buildTemplate('city-kit-commercial/test', root, 1, cm, { splitUp: true, upRole: BUILDING_UP_ROLE });
+    const byRole = Object.fromEntries(t.parts.map((p) => [p.info.role, p.info]));
+    expect(Object.keys(byRole).sort()).toEqual(['knRoofFlat', 'knSlate', 'knWhite']);
+    expect(byRole.knRoofFlat!.up).toBe(true);
+    expect(byRole.knSlate!.up).toBeUndefined();
+    // without splitUp, the same faces stay one dark part
+    expect(buildTemplate('car-kit/test', root, 1, cm).parts.map((p) => p.info.role).sort()).toEqual(['knSlate', 'knWhite']);
   });
   it('mirrored nodes keep outward winding; paint = the largest saturated part of a vehicle', () => {
     const cm = colormap({ '4,1': '#cf534f', '6,1': '#38383d', '7,1': '#d0e8ff' });

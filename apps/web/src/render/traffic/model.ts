@@ -31,8 +31,10 @@ const CROSS_STOP = 1.2; // front bumper stops this far before the rail centre li
 const TRAIN_BEHIND = 12, TRAIN_AHEAD = 9; // rail arc window around the train's dist that closes a crossing
 const JUNCTION_BUS_R = 3.0;
 const STUCK_S = 90;
-/** Out-lane centre position at which a car's rear has cleared the junction box (lanes start 0.8 u past it). */
-const CLEAR_BOX = -0.7;
+/** Out-lane centre position at which a car's rear has cleared the junction box (lanes start 0.5 u past it). */
+const CLEAR_BOX = -0.4;
+/** A car first in line that has waited this long for a full exit lane picks another way if one has room. */
+const REPLAN_S = 12;
 const GROW_S = 3;
 const SHRINK_DIST = 1.4;
 const DIE_S = 2.5;
@@ -231,6 +233,7 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
       let x = o.turn === 'straight' ? 1.2 : o.turn === 'right' ? 1 : 0.8;
       if (o.to.exit) x *= c.surge ? 4 : over ? 3 : 0.3;
       if (stoppedBusOn(o.to)) x *= 0.05;
+      if (laneHead(o.to, c) < 2) x *= 0.25; // congestion-aware: avoid full exit lanes
       if (c.surge) x *= awayFromStadium(o.to) ? 1.6 : 0.6;
       return x;
     });
@@ -313,6 +316,10 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
         if (graph.nodes.get(l.to)!.junction && c.reserved !== c.next) {
           const stop = rest - c.halfLen - 0.05;
           const first = !cars.some((o) => o !== c && !o.conn && o.lane === l && o.s > c.s);
+          if (first && c.waitSince !== null && lastT - c.waitSince > REPLAN_S && !roomFor(c, c.next)) {
+            const alt = (graph.out.get(l.id) ?? []).filter((o) => o !== c.next && roomFor(c, o));
+            if (alt.length) c.next = alt[Math.floor(rand() * alt.length)]!;
+          }
           if (first && stop <= 1.5 && canReserve(c, c.next)) reserve(c, c.next);
           else {
             free = Math.min(free, Math.max(0, stop));

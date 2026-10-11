@@ -33,6 +33,8 @@ export const KENNEY_ROLES: RoleColors = {
   knGrey: ['#737A88', '#6E6A64', '#5B6573'],
   knGreyLight: ['#9CA2AE', '#9A958C', '#8F98A3'],
   knSilver: ['#C3C8D0', '#B9B4AA', '#BFC5CD'],
+  /** Flat roofs of Kenney buildings (their dark slate tops), warm like our downtown roofs. */
+  knRoofFlat: ['#C9B9A3', '#B5A993', '#BDB4A5'],
   // nature kit materials
   knGrass: ['#6CBE84', '#8FAB78', '#9DAE62'],
   knFall: [['#F2C14E', '#EE9A4E', '#E9785A'], ['#D9A441', '#C98B4A', '#B5553C'], ['#E07A2E', '#C9452E', '#E9B03B']],
@@ -78,6 +80,9 @@ export const SWATCH_ROLE: Record<string, string> = {
   '#38383d': 'knDark', '#3a3c3f': 'knDark', '#4f5260': 'knSlate', '#515566': 'knSlate',
   '#666b80': 'knGrey', '#737e9b': 'knGrey', '#868ba1': 'knGreyLight', '#8e95b3': 'knGreyLight', '#a0a8c9': 'knSilver',
 };
+
+/** Building kits: up-facing faces of these roles take another role (dark slate flat roofs → warm roofs). */
+export const BUILDING_UP_ROLE: Readonly<Record<string, string>> = { knSlate: 'knRoofFlat', knDark: 'knRoofFlat' };
 
 /** Saturated swatch families that can be a vehicle's paint. */
 export const PAINT_ROLES = new Set(['knRed', 'knOrange', 'knYellow', 'knGreen', 'knBlue', 'knIndigo', 'knPurple', 'knPink', 'knPeach']);

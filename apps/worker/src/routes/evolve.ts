@@ -13,6 +13,8 @@ import { requireAdmin } from './admin';
 
 /** OpenRouter model used when Luminal times out / 429s / 5xxs (spec §8.2), or alone when only OpenRouter is configured. */
 export const FALLBACK_MODEL = 'deepseek/deepseek-v4-pro';
+/** Designer calls can leave the stream silent for a minute or more; a blank line (readers skip it) keeps proxies from idling out. */
+const HEARTBEAT_MS = 15_000;
 
 /** Default designer: Luminal (LUMINAL_MODEL) with one fallback to OpenRouter deepseek-v4-pro; null without any key. */
 export function defaultDesigner(env: AppEnv, fetchImpl: typeof fetch): Designer | null {
@@ -118,6 +120,9 @@ export function evolveRoutes(deps: AppDeps): Hono<AppContext> {
       log.push(e);
       send(e);
     };
+    const heartbeat = setInterval(() => {
+      if (open) writer.write(enc.encode('\n')).catch(() => { open = false; });
+    }, HEARTBEAT_MS);
 
     const task = (async () => {
       try {
@@ -130,6 +135,7 @@ export function evolveRoutes(deps: AppDeps): Hono<AppContext> {
         emit({ type: 'decision', promoted: null, reason: `${message}. The champion is unchanged.` });
         await failRunningRound(db, claim.id, nowIso()).run().catch((e: unknown) => console.error('could not release the round lock:', errText(e)));
       } finally {
+        clearInterval(heartbeat);
         await log.flush();
         writer.close().catch(() => {});
       }

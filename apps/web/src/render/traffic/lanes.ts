@@ -12,7 +12,7 @@ import type { Polyline, TownMap, Vec2 } from '@headway/sim';
 /** Lane centre distance from the road centreline (road width 2.4 → two 1.2 u lanes). */
 export const LANE_OFFSET = 0.6;
 /** Lanes stop this far (along the road) short of a junction centre; turns run inside that box. */
-export const JUNCTION_TRIM = 2.0;
+export const JUNCTION_TRIM = 1.7;
 export const ROAD_HALF_WIDTH = 1.2;
 /** Two movements whose paths come closer than this cannot share a junction. */
 const CONFLICT_DIST = 1.1;

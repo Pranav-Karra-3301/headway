@@ -62,7 +62,7 @@ const areas: GroundArea[] = [];
 const TX = Math.min(XL + 3.27, S_NORTH.x - 2.4 - 2.0 - 1.78);
 const EAST_Z = D_EAST.z + 0.1 + 1.75, PARK_Z = D_PARK.z - 0.05 - 1.75;
 put('res.tower', TX, EAST_Z, E, { floors: 5, accent: 1, wall: 0 });   // Eastview Towers
-put('res.tower', TX, PARK_Z, E, { floors: 6, accent: 2, wall: 1 });   // Parkside Towers
+put('res.tower', TX, PARK_Z, E, { floors: 5, accent: 2, wall: 1 });   // Parkside Towers (5 floors keep the Downtown stop in view)
 // Promenade: one paved forecourt along Station Rd holding both queues; a birch and a lamp between the two stops.
 const PX0 = TX + 1.88, PX1 = XS - 1.9;
 areas.push({ kind: 'plaza', polygon: rect(PX0, ZM + 1.9, PX1, ZS - 1.9) });
@@ -75,8 +75,9 @@ put('st.bikeRack', PX0 + 2.3, ZM + 2.25, S);
 // Pocket green between the towers on the Park Ave axis; Park Ave carries on as a path to the promenade.
 const G0 = EAST_Z + 1.75, G1 = PARK_Z - 1.75; // green spans z between the towers
 areas.push({ kind: 'lawn', polygon: rect(XL + 1.9, G0 + 0.2, PX0 - 0.2, G1 - 0.2) });
-paths.push({ points: [v(XL + 1.85, ZP), v(PX0 + 0.3, ZP)], width: 0.8, kind: 'footpath' });
-put('veg.flowerbed', TX, G0 + 0.6, S);
+paths.push({ points: [v(XL + 1.9, ZP), v(PX0 + 0.3, ZP)], width: 0.8, kind: 'footpath' });
+put('veg.flowerbed', TX - 0.5, G0 + 0.6, S);
+tree('birch', TX + 1.0, G0 + 0.75, 1.4);
 tree('birch', TX - 0.7, G1 - 0.85, 2.1);
 put('st.bench', TX + 0.85, ZP + 0.95, N);
 
@@ -87,6 +88,8 @@ put('res.house', D_GARDEN.x, GARDEN_Z, S, { porch: 'right', style: 'front' }); /
 const gz0 = COURT_Z + 1.95, gz1 = GARDEN_Z - 1.4;
 areas.push({ kind: 'garden', polygon: rect(XS + 2.0, gz0, RX - 1.5, gz1) });
 tree('maple', D_COURT.x + 0.3, (gz0 + gz1) / 2, 1.3);
+tree('birch', D_COURT.x + 0.4, D_COURT.z - 1.0, 0.5);       // between the station and the tower
+tree('birch', XS + 2.0, GARDEN_Z - 0.2, 2.8);                // beside the cottage
 put('st.lamp', XS + 1.55, D_COURT.z - 0.7, E);
 put('st.lamp', XS + 1.55, (gz0 + gz1) / 2, E);
 put('st.lamp', XS + 1.55, ZS - 1.55, E);
@@ -132,7 +135,7 @@ const TB = XS + 0.9;
 put('res.townhouses', TB, ZF + 1.25, N);
 put('st.fence', TB - 0.5, RZ - 1.5, S, { length: 5, style: 'picket' });
 areas.push({ kind: 'garden', polygon: rect(TB - 2.9, ZB + 0.2, TB + 1.9, RZ - 1.7) });
-tree('birch', TB - 2.0, ZB + 0.85, 1.0);
+tree('birch', TB - 2.0, ZB + 0.7, 1.0);
 put('veg.bush', TB + 0.2, ZB + 0.9, 0);
 tree('birch', TB + 3.9, ZF + 0.8, 2.2);
 // Street furniture along South Rd's south side.
