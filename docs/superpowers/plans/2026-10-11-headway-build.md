@@ -166,6 +166,8 @@ export const SCENERY: SceneryItem[];
 
 ### T1a: engine core + PolicyController
 
+> **Early-engine lock protocol (coordinator, 15:30):** T1a/T1b/T1c were started early in a separate "engine" workflow. If `packages/sim/src/engine/.owner-early`, `packages/sim/src/passengers/.owner-early` or `packages/sim/src/metrics/.owner-early` exists when you start, that module is owned by the early agent: **do not edit anything in that directory**; report "deferred to early engine workflow" and stop. If the lock is gone and the module is no longer a stub, your job is only to verify it against the real `TOWN`, fix gaps you find in your own module, and finish.
+
 **Owns:** `packages/sim/src/engine/**`, `packages/sim/src/controllers/policy.ts`, `packages/sim/test/{engine,golden,determinism,intents}.test.ts`, `packages/sim/test/fakes.ts`.
 **Consumes:** contracts, internal (`TripPlanner`, `Collector`), `TOWN`, `SCENARIOS`, `withConfig`, `stream`, geometry, `deadheadPath`, `validatePolicy`, `explain`, `FEATURES`, `generatePassengers`, `createTripPlanner`, `createCollector` (T1b/T1c fill these in parallel — use `test/fakes.ts` until they land, then run against the real ones).
 **Behaviour:** spec §5.1–5.6 exactly: tick order, dwell model, holds and budgets, terminals and layover cap, reassign + deadhead, train loop with `setTrainDeparture` and pre-drawn delays, decision-point resolution order (replay → human intent → controller), async pending, intents, `Replay` capture, feature computation per §6 whitelist (same numbers the HUD shows), `Observation`, `SimSnapshot` (people: walking/waiting with queue slots; riders omitted; arrived kept 3 s), `PassengerInfo.reason` ("Waiting for Route 2 — next bus in ~3 min" style), `RunResult` via the collector. `PolicyController.decide`: first matching applicable rule by priority, else defaults; explanation via `explain`; `ruleId` = rule id or `'default'`.
@@ -340,6 +342,8 @@ export function createFileStore(dir: string): EvolveStore;
 ---
 
 ## Wave 1 integration (coordinator + 1 integration agent)
+
+> If any `packages/sim/src/{engine,passengers,metrics}/.owner-early` lock exists, the early engine workflow is still running: integrate everything else (web, worker, evolve, renderer) against the engine's signatures, do not edit those three directories, and list what remains for the coordinator.
 
 - [ ] `pnpm -r typecheck` and `pnpm test` green across the workspace; fix cross-track seams (only via the owners' files; contracts unchanged).
 - [ ] §12 sanity gates on train: `ref` beats `g0` by ≥ 5 % J; g0 stadium_exit completion ≥ 85 %; g0 has ≥ 1 service gap > 10 min and ≥ 10 missed connections; stadium_exit run < 150 ms. Tune `SCENARIOS` totals / `DEFAULT_CONFIG` if not (report changes).
