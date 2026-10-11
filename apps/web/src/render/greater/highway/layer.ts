@@ -32,7 +32,7 @@ const R = (n: string) => `city-kit-roads/${n}` as KenneyId;
 const N = (n: string) => `nature-kit/${n}` as KenneyId;
 const PINES = [N('tree_pineDefaultA'), N('tree_pineRoundA'), N('tree_pineRoundE'), N('tree_pineTallC_detailed')];
 const TREES = [N('tree_default'), N('tree_oak'), N('tree_detailed')];
-const BUSHES = [N('plant_bushLarge'), N('tree_fat'), N('plant_bushLarge')];
+const BUSHES = [N('tree_fat'), N('tree_default'), N('tree_fat')];
 const ROCKS = [N('rock_largeA'), N('rock_largeD'), N('rock_smallTopB'), N('rock_largeC')];
 const TILES = { cross: R('road-crossroad'), tee: R('road-intersection'), straight: R('road-straight') };
 const PROPS = { light: R('light-curved-double'), gantry: R('sign-highway-detailed'), gantryWide: R('sign-highway-wide'), pillar: R('bridge-pillar-wide'), signal: R('traffic-light') };
@@ -300,7 +300,7 @@ function placeProp(X: Acc, p: Prop, plan: HighwayPlan): void {
       const list = p.kind === 'pine' ? PINES : p.kind === 'tree' ? TREES : p.kind === 'bush' ? BUSHES : ROCKS;
       const id = pick(list, p.v);
       const y = p.kind === 'rock' || p.kind === 'pine' ? groundAt(plan, p.x, p.z) - 0.05 : groundAt(plan, p.x, p.z);
-      const s = p.kind === 'rock' ? p.s * 0.75 : p.kind === 'bush' ? (id.endsWith('tree_fat') ? p.s * 0.42 : p.s * 1.7) : p.s;
+      const s = p.kind === 'rock' ? p.s * 0.75 : p.kind === 'bush' ? (id.endsWith('tree_fat') ? p.s * 0.45 : p.s * 0.38) : p.s;
       const remap = (i: KenneyPartInfo): ColorKey | null => (i.role === 'knDirt' || i.role === 'knDirtDark' || i.role === 'knWhite' ? 'rock' : i.role === 'knGrass' ? 'hillMeadow' : null);
       if (kenneyInto(X, id, mat4(p.x, y, p.z, p.rot, s), remap)) return;
       fallbackPlant(X, p, y);
@@ -470,7 +470,6 @@ function buildHill(X: Acc, plan: HighwayPlan): void {
       // two triangles, each coloured by its slope + height (low-poly facets)
       for (const [p, q, r] of [[a, b, c], [a, c, d]] as Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]>) {
         const hy = (p.y + q.y + r.y) / 3;
-        if (p.y < 0.01 && q.y < 0.01 && r.y < 0.01) continue;
         const n = new THREE.Vector3().subVectors(q, p).cross(new THREE.Vector3().subVectors(r, p)).normalize();
         const jitter = hash01(Math.round(p.x * 7), Math.round(p.z * 7));
         const key: ColorKey = n.y < 0.42 ? 'hillRock' : hy > 3.4 + jitter * 0.9 ? 'hillForest' : hy > 1.2 + jitter ? 'hillMeadow' : 'hillGrass';
