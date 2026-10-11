@@ -1,0 +1,42 @@
+/* v13 route legend: one row per route — swatch, name, bus icons × N, waiting; Play adds "move a bus here". */
+.hud-legend.hud-lg { width: auto; min-width: 248px; gap: 2px; padding: 8px; }
+.hud-lg-row { display: flex; align-items: center; gap: 4px; }
+.hud-lg .hud-route { flex: 1; gap: 10px; padding: 8px 10px; min-height: 40px; }
+.hud-lg-sw {
+  width: 12px; height: 12px; flex: none; border-radius: 4px; background: var(--rc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rc) 22%, transparent);
+}
+.hud-lg .hud-route-name {
+  font-family: var(--font-ui, "General Sans", system-ui, sans-serif);
+  font-size: 14px; font-weight: 600; white-space: nowrap; margin-right: auto; padding-right: 8px;
+}
+.hud-lg-buses { display: inline-flex; align-items: center; gap: 4px; color: color-mix(in srgb, var(--rc) 70%, var(--hud-ink)); }
+.hud-lg-icons { display: inline-flex; gap: 1px; }
+.hud-lg-n, .hud-lg-q { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hud-lg-q {
+  display: inline-flex; align-items: center; gap: 3px; min-width: 40px; justify-content: flex-end;
+  color: var(--hud-muted);
+}
+.hud-lg-q[data-hot] { color: var(--bad, #e5484d); }
+.hud-lg-move {
+  position: relative; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px;
+  height: 32px; padding: 0 9px; border-radius: 10px;
+  background: color-mix(in srgb, var(--rc) 16%, transparent);
+  color: color-mix(in srgb, var(--rc) 65%, var(--hud-ink));
+  font-weight: 800; font-size: 14px; cursor: pointer;
+  transition: background-color 160ms ease, transform 140ms var(--hud-ease, ease);
+}
+.hud-lg-move:hover:not(:disabled) { background: color-mix(in srgb, var(--rc) 28%, transparent); }
+.hud-lg-move:active:not(:disabled) { transform: scale(0.95); }
+.hud-lg-move:disabled { opacity: 0.35; cursor: not-allowed; }
+.hud-lg-pending {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--rc); color: #fff; font-size: 10px; font-weight: 800;
+  box-shadow: 0 0 0 2px var(--hud-paper, #fffbf2);
+  animation: hud-lg-pulse 1.4s ease-in-out infinite;
+}
+@keyframes hud-lg-pulse { 50% { transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .hud-lg-pending { animation: none; } }

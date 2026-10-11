@@ -50,3 +50,23 @@ export function fmtTime(iso: string | null | undefined): string {
   const m = /T(\d{2}:\d{2})/.exec(iso);
   return m ? m[1]! : iso;
 }
+
+/** Designer emphasis → plain words ("allocation" → "Fleet move"). */
+const EMPHASIS_LABEL: Record<string, string> = {
+  spacing: 'Spacing fix', allocation: 'Fleet move', transfers: 'Train link', baseline: 'Starting rules',
+};
+export function emphasisLabel(e: string | null | undefined): string {
+  if (!e) return '';
+  return EMPHASIS_LABEL[e] ?? e.charAt(0).toUpperCase() + e.slice(1);
+}
+
+/** A rule-change summary → one short plain-English line (keyword based; falls back to the emphasis label). */
+export function plainChange(summary: string, emphasis: string | null | undefined, isStart = false): string {
+  if (isStart) return 'Hand-written start: buses wait for even gaps';
+  const s = summary.toLowerCase();
+  if (/reassign|move (one|a|\d+) bus|fleet|reallocat/.test(s)) return 'Moves a bus from a quiet route to the busiest';
+  if (/immediately|dispatch .*early|leave early|queue is large|crowd/.test(s)) return 'Buses leave early when a crowd is waiting';
+  if (/train|transfer|dwell|connection/.test(s)) return 'Holds buses for arriving train riders';
+  if (/hold|headway|spacing|bunch/.test(s)) return 'Keeps buses evenly spaced';
+  return emphasisLabel(emphasis) || 'Rule tweak';
+}

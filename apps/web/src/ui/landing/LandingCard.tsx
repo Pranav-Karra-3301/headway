@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Generation } from '@headway/sim';
 import type { Mode } from '../../state/store';
 import { DESIGNER_MODEL, PITCH, championLine, type ChampionInfo } from '../about/facts';
+import { Steps } from './Steps';
 
 export interface LandingCardProps {
   onChoose(mode: Mode): void;
@@ -50,22 +51,19 @@ function Arrow() {
   );
 }
 
-interface ModeCard { mode: Mode; tone: 'r1' | 'r2' | 'r3'; kicker: string; title: string; body: string; cta: string; icon: ReactNode }
+interface ModeCard { mode: Mode; tone: 'r1' | 'r2' | 'r3'; kicker: string; title: string; cta: string; icon: ReactNode }
 
 const CARDS: ModeCard[] = [
   {
     mode: 'watch', tone: 'r1', kicker: 'Watch', title: 'Watch the AI', icon: <BusIcon />,
-    body: 'The current champion rulebook runs the town live. Click any bus to read the rule behind its last move.',
     cta: 'Start watching',
   },
   {
     mode: 'play', tone: 'r2', kicker: 'Play', title: 'Beat the AI', icon: <StopwatchIcon />,
-    body: 'Take the controls on the same stadium crowd the AI faces: hold, dispatch, reassign, time the train. Then compare scores.',
     cta: 'Play dispatcher',
   },
   {
     mode: 'lab', tone: 'r3', kicker: 'Lab', title: 'See how it learned', icon: <FlaskIcon />,
-    body: 'Every generation since the baseline: what the AI designers proposed, what survived testing, and what it cost.',
     cta: 'Open the Lab',
   },
 ];
@@ -77,7 +75,6 @@ export function LandingCard({ onChoose, onAbout, champion, generations }: Landin
   return (
     <div className="hwl-stage">
       <p className="hwl-eyebrow" style={step(0)}>
-        <span className="hwl-dots" aria-hidden="true"><i /><i /><i /></span>
         A transit-dispatch game
       </p>
       <h1 className="hwl-wordmark" id="hwl-title" style={step(1)}>HEADWAY</h1>
@@ -88,13 +85,14 @@ export function LandingCard({ onChoose, onAbout, champion, generations }: Landin
           Now dispatching: <b>{line}</b>
         </p>
       )}
+      <div className="hwl-steps" style={step(4)}><Steps /></div>
       <div className="hwl-cards">
         {CARDS.map((c, i) => (
           <button
             key={c.mode}
             type="button"
             className={`hwl-card hwl-card--${c.tone}`}
-            style={step(4 + i)}
+            style={step(5 + i)}
             data-mode={c.mode}
             onClick={() => onChoose(c.mode)}
           >
@@ -104,12 +102,11 @@ export function LandingCard({ onChoose, onAbout, champion, generations }: Landin
               {c.mode === 'watch' && <kbd className="hwl-kbd">Enter</kbd>}
             </span>
             <span className="hwl-card-title">{c.title}</span>
-            <span className="hwl-card-body">{c.body}</span>
             <span className="hwl-cta">{c.cta}<Arrow /></span>
           </button>
         ))}
       </div>
-      <div className="hwl-foot" style={step(7)}>
+      <div className="hwl-foot" style={step(8)}>
         <p className="hwl-claims">
           <span>Rules written by {DESIGNER_MODEL} on Luminal</span>
           <span>The models are never retrained; the rulebook evolves</span>

@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { Generation } from '@headway/sim';
 import { DESIGNER_MODEL, FALLBACK_MODEL, championLine, type AboutFacts, type ChampionInfo } from './facts';
+import { Steps } from '../landing/Steps';
 
 export interface AboutSheetProps {
   facts: AboutFacts;
@@ -40,11 +41,10 @@ export function AboutSheet({ facts: f, champion, generations, onClose }: AboutSh
       </header>
 
       <div className="hwa-body">
+        <Steps className="hwa-steps" />
         <p className="hwa-lead">
-          Headway is a small transit-dispatch game set in a fictional, State College–inspired college town. What
-          improves over time is the town&apos;s <b>dispatch policy</b>, a short rulebook, not the AI models that write it:
-          the models are never retrained. Watch and Play run that rulebook right here in your browser, with no model
-          calls.
+          What evolves is the <b>dispatch policy</b>, a short rulebook. The models are never retrained. It runs here,
+          with no model calls.
         </p>
         {line && (
           <p className="hwa-status">
@@ -53,6 +53,8 @@ export function AboutSheet({ facts: f, champion, generations, onClose }: AboutSh
           </p>
         )}
 
+        <details className="hwa-more">
+          <summary>The fine print</summary>
         <figure className="hwa-loopbox">
           <figcaption>One evolution round</figcaption>
           <ol className="hwa-loop">
@@ -162,6 +164,8 @@ export function AboutSheet({ facts: f, champion, generations, onClose }: AboutSh
             </li>
           </ul>
         </Section>
+
+        </details>
 
         <footer className="hwa-foot">
           <p className="hwa-built">Built with</p>

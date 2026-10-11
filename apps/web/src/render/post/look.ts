@@ -60,6 +60,8 @@ export class Look {
     this.tiltX = new ShaderPass(tiltShiftShader('x'));
     this.tiltY = new ShaderPass(tiltShiftShader('y'));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(this.width, this.height), 0.0, 0.55, 0.82);
+    // Soft threshold knee (v13): small lights near the threshold ease in instead of popping on/off frame to frame.
+    (this.bloom.highPassUniforms as Record<string, THREE.IUniform>)['smoothWidth']!.value = 0.35;
     this.grade = new ShaderPass(gradeShader());
     this.output = new OutputPass();
     this.smaa = new SMAAPass();
@@ -76,6 +78,7 @@ export class Look {
     if (pr > 1) this.gtao.setSize(this.width, this.height);
     for (const p of [this.tiltX, this.tiltY]) p.uniforms.uTexel!.value.set(1 / (this.width * pr), 1 / (this.height * pr));
     this.grade.uniforms.uAspect!.value = this.width / this.height;
+    (this.grade.uniforms.uTexelGrain!.value as THREE.Vector2).set(1 / (this.width * pr), 1 / (this.height * pr));
   }
 
   /** 0 = day … 1 = dusk: bloom strength, grade warmth/lift/vignette. */

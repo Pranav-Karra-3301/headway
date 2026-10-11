@@ -27,20 +27,22 @@ function setup(over: { selected?: string | null; events?: typeof EVOLVE_EVENTS; 
   };
 }
 
-const render = () => text(renderToString(<LabView lab={lab} local={local} />));
+const render = (admin = false) => text(renderToString(<LabView lab={lab} local={local} admin={admin} />));
 
 describe('LabView (server render with fixtures)', () => {
   beforeEach(() => setup());
 
-  it('renders explainer, champion summary, chart, collapsed round timeline, diff and sealed panel in order', () => {
+  it('renders headline, generation path, chart, collapsed round timeline, diff and sealed panel in order', () => {
     const t = render();
-    const order = ['three AI designers on Luminal', 'Champion', 'Objective J by round', 'Rounds', 'Rule diff g3 → g4', 'Sealed test'];
+    const order = ['total passenger time', 'on unseen crowds', 'g0', 'g4', 'AI designers propose', 'Total passenger time by round', 'Rounds', 'Rule diff g3 → g4', 'Sealed test'];
     let at = -1;
     for (const s of order) { const i = t.indexOf(s, at + 1); expect(i, s).toBeGreaterThan(at); at = i; }
-    expect(t).toContain('Unseen validation');
-    expect(t).toContain('Hand-written ref');
+    expect(t).toContain('only real gains survive');
+    expect(t).toMatch(/beats the hand-written plan|hand-written plan [−+]/);
+    expect(t).not.toMatch(/Objective J|\bJ train\b|Admin token/);
     expect(t).toContain('Replay on stadium exit');
-    expect(t).toContain('Evolve next generation');
+    expect(t).not.toContain('Evolve next generation');
+    expect(render(true)).toContain('Evolve next generation');
     expect(t).toContain('never shown to agents');
     expect(t).toContain('sample data');
     for (const r of ROUNDS) expect(t).toContain(`Round ${r.number}`);
@@ -53,7 +55,7 @@ describe('LabView (server render with fixtures)', () => {
     const champRound = ROUNDS.find((r) => r.championAfter === 'g4')!;
     setup({ focusRoundId: champRound.id });
     const t = render();
-    for (const p of champRound.proposals) expect(t).toContain(p.emphasis);
+    for (const l of ['Spacing fix', 'Fleet move', 'Train link']) expect(t).toContain(l);
     expect(t).toContain('Promoted');
   });
 
@@ -87,6 +89,14 @@ describe('LabView (server render with fixtures)', () => {
     const t = render();
     expect(t).toContain('No rounds are published yet');
     expect(t).toContain('Rule diff g1 → g2');
+  });
+
+  it('headline numbers come from the loaded generations', () => {
+    const g0 = GENERATIONS[0]!; const champ = GENERATIONS[GENERATIONS.length - 1]!;
+    const pct = (a: number, b: number) => ((a / b - 1) * 100).toFixed(1).replace('-', '−');
+    const t = render();
+    expect(t).toContain(`${pct(champ.train.J, g0.train.J)}% total passenger time`);
+    expect(t).toContain(`${pct(champ.val.J, g0.val.J)}% on unseen crowds`);
   });
 
   it('renders the live feed lanes from streamed events', () => {

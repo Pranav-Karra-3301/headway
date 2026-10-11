@@ -41,21 +41,29 @@ function focusProposal(p: Proposal) {
   useLab.setState((s) => ({ focusProposalId: s.focusProposalId === p.id ? null : p.id }));
 }
 
+function pickGeneration(g: Generation) {
+  useApp.getState().setLab({ selectedGenerationId: g.id });
+  useLab.setState({ focusRoundId: null, focusProposalId: null, liveOpen: false });
+}
+
+/** Evolving needs an admin token, so the button only appears with `?admin=1`. */
+const isAdmin = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === '1';
+
 export function LabMode() {
   useEffect(() => { ensureLabData(); }, []);
   const lab = useApp((s) => s.lab);
   const local = useLab();
-  return <LabView lab={lab} local={local} />;
+  const admin = useMemo(isAdmin, []);
+  return <LabView lab={lab} local={local} admin={admin} />;
 }
 
 /** Pure view over the shared Lab state and the Lab-local UI state (server-renderable for tests). */
-export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
+export function LabView({ lab, local, admin = false }: { lab: LabState; local: LabLocal; admin?: boolean }) {
   const gens = useMemo(() => byNumber(lab.generations), [lab.generations]);
   const rounds = useMemo(() => byNumber(lab.rounds), [lab.rounds]);
   const feed = useMemo(() => reduceFeed(lab.evolveEvents), [lab.evolveEvents]);
   const champion = gens[gens.length - 1] ?? null;
-  const g0 = gens[0] ?? null;
-  const selected = gens.find((g) => g.id === lab.selectedGenerationId) ?? champion;
+    const selected = gens.find((g) => g.id === lab.selectedGenerationId) ?? champion;
   const parent = selected?.parentId ? gens.find((g) => g.id === selected.parentId) ?? null : null;
 
   const liveActive = lab.evolving || lab.evolveEvents.length > 0;
@@ -86,9 +94,6 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
         <header className="lab-head">
           <div className="lab-head__title">
             <h2 className="lab-title">Lab</h2>
-            <p className="lab-lede">
-              Each round, three AI designers on Luminal propose rule changes; the simulator keeps only what measurably helps.
-            </p>
           </div>
           <div className="lab-head__right">
             {local.source === 'sample' && (
@@ -99,25 +104,26 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
                 Live round{feed.round !== null ? ` ${feed.round}` : ''}
               </button>
             )}
-            <EvolveButton evolving={lab.evolving} round={feed.round} />
+            {admin && <EvolveButton evolving={lab.evolving} round={feed.round} />}
           </div>
         </header>
 
         {gens.length === 0 ? (
           <div className="lab-card lab-empty-state">
             {local.status === 'ready'
-              ? <p>No generations are published yet. Run <code>pnpm evolve --rounds 3 --publish</code> or press “Evolve next generation”.</p>
+              ? <p>No generations are published yet.</p>
               : <p><span className="lab-spin lab-spin--ink" aria-hidden="true" /> Loading the lab…</p>}
           </div>
         ) : (
           <div className="lab-stack">
             {champion && (
-              <ChampionCard gen={champion} g0={g0} refPct={chart.ref} onReplay={() => replay(champion.policy, champion.id)} />
+              <ChampionCard gen={champion} gens={gens} refPct={chart.ref} selectedId={lab.selectedGenerationId}
+                onPick={pickGeneration} onReplay={() => replay(champion.policy, champion.id)} />
             )}
 
             <section className="lab-card lab-chartcard">
               <header className="lab-card__head">
-                <h3 className="lab-h3">Objective J by round<span className="lab-h3__sub">vs the g0 baseline · lower is better</span></h3>
+                <h3 className="lab-h3">Total passenger time by round<span className="lab-h3__sub">vs the start · lower is better</span></h3>
               </header>
               <JChart data={chart} selectedStep={selectedStep?.step ?? null} onPick={pickStep}
                 emphasisOf={(id) => emphasis.get(id) ?? null} />
@@ -127,17 +133,20 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
               <LiveRound feed={feed} events={lab.evolveEvents} evolving={lab.evolving} onClose={() => useLab.setState({ liveOpen: false })} />
             )}
 
-            <RoundTimeline rounds={rounds} generations={gens} openRoundId={local.focusRoundId} focusProposalId={local.focusProposalId}
-              onToggle={toggleRound} onFocus={focusProposal} onReplay={(p) => p.policy && replay(p.policy, p.id)} />
+            <details className="lab-card lab-more" open={!!local.focusRoundId || !!local.focusProposalId || !!lab.selectedGenerationId || undefined}>
+              <summary className="lab-more__sum">Every round &amp; rule change<span className="lab-h3__sub">{rounds.length} rounds</span></summary>
+              <RoundTimeline rounds={rounds} generations={gens} openRoundId={local.focusRoundId} focusProposalId={local.focusProposalId}
+                onToggle={toggleRound} onFocus={focusProposal} onReplay={(p) => p.policy && replay(p.policy, p.id)} />
 
-            {fp ? (
-              !fp.valid || !fp.policy
-                ? <ErrorsView title={`${fp.id} · validation errors`} errors={fp.errors} />
-                : <DiffView title={`Rule diff ${fpBase?.id ?? 'champion'} → ${fp.id}`} diff={fpBase ? diffPolicies(fpBase.policy, fp.policy) : null} policy={fp.policy} />
-            ) : selected ? (
-              <DiffView title={parent ? `Rule diff ${parent.id} → ${selected.id}` : `Rules in ${selected.id}`}
-                diff={parent ? diffPolicies(parent.policy, selected.policy) : null} policy={selected.policy} />
-            ) : null}
+              {fp ? (
+                !fp.valid || !fp.policy
+                  ? <ErrorsView title={`${fp.id} · validation errors`} errors={fp.errors} />
+                  : <DiffView title={`Rule diff ${fpBase?.id ?? 'champion'} → ${fp.id}`} diff={fpBase ? diffPolicies(fpBase.policy, fp.policy) : null} policy={fp.policy} />
+              ) : selected ? (
+                <DiffView title={parent ? `Rule diff ${parent.id} → ${selected.id}` : `Rules in ${selected.id}`}
+                  diff={parent ? diffPolicies(parent.policy, selected.policy) : null} policy={selected.policy} />
+              ) : null}
+            </details>
 
             <SealedCard rows={local.sealed} championId={champion?.id ?? null} />
           </div>

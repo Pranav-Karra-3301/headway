@@ -90,7 +90,7 @@ varying float vFace;
 varying vec3 vCol;
 void main() {
 	float a = pow( vFace, 1.7 ) * pow( 1.0 - vAlong, 1.25 ) * smoothstep( 0.0, 0.08, vAlong );
-	a *= 0.9 + 0.1 * sin( uFxTime * 2.3 + vAlong * 9.0 );
+	// steady light (v13): no time shimmer, so floodlights never flicker
 	gl_FragColor = vec4( vCol * uI, a );
 	${FRAG_TAIL}
 }
@@ -158,6 +158,8 @@ export function createPools(items: readonly GlowItem[]): GlowSet {
   const set = instanced(geo, additive(POOL_VS, POOL_FS), items, 'fx:pools',
     (m, it) => m.compose(p.set(it.p.x, it.p.y, it.p.z), q.setFromAxisAngle(up, it.yaw ?? 0), s.set(it.sx ?? it.size, 1, it.sz ?? it.size)));
   set.mesh.renderOrder = 3;
+  // Pull the pools toward the camera in depth so they never z-fight kerbs / pitch surfaces (dusk shimmer, v13).
+  Object.assign(set.material, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   return set;
 }
 

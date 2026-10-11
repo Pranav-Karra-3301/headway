@@ -26,7 +26,6 @@ export function Wordmark() {
   return (
     <button type="button" className="hw-wordmark" onClick={() => setMode('watch')} aria-label="Headway — back to Watch">
       HEADWAY
-      <span className="hw-wordmark__dots" aria-hidden="true"><i /><i /><i /></span>
     </button>
   );
 }

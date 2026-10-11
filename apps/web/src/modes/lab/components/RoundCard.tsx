@@ -2,7 +2,7 @@
 import type { CSSProperties } from 'react';
 import type { Generation, Proposal, Round } from '@headway/sim';
 import { splitVerdict } from '../feed';
-import { fmtSignedPct, fmtTime, modelLabel, providerLabel } from '../format';
+import { emphasisLabel, fmtSignedPct, fmtTime, modelLabel, providerLabel } from '../format';
 import { DESIGNER_LETTER, pctVs, proposalOutcome, roundOutcome, shortOutcome } from '../model';
 import { IconPlay } from './icons';
 
@@ -39,7 +39,7 @@ export function ProposalCard({ p, round, generations, focused, onFocus, onReplay
         <span className="lab-avatar" data-emphasis={p.emphasis}>{DESIGNER_LETTER[p.designer] ?? '?'}</span>
         <div className="lab-prop__who">
           <div className="lab-prop__row">
-            <span className="lab-prop__emph">{p.emphasis}</span>
+            <span className="lab-prop__emph">{emphasisLabel(p.emphasis)}</span>
             <span className="lab-badge" data-outcome={out.kind} title={out.label}>{shortOutcome(out)}</span>
           </div>
           <span className="lab-prop__model" title={p.model}>{modelLabel(p.model)}{fallback ? ' · fallback' : ''}</span>

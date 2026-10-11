@@ -1,0 +1,128 @@
+/* Owner: U1. Watch bottom panel: "Who's dispatching?" + same-crowd comparison strip. */
+.hw-watch.hw-watch--cmp {
+  gap: var(--sp-3);
+  width: min(640px, calc(100vw - 2 * var(--hw-gap)));
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+}
+
+.hw-watch__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.hw-watch__h {
+  margin: 0 auto 0 0;
+  font-family: var(--font-title);
+  font-size: var(--fs-lg);
+  font-weight: 400;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.hw-watch__crowd {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-2xs);
+  color: var(--ink-3);
+}
+
+.hw-watch__pill {
+  padding: 3px 10px;
+  border-radius: var(--r-pill);
+  background: var(--wash);
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+
+/* Two columns: metric label | three equal columns that sit right under the three segments. */
+.hw-cmp {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  row-gap: 7px;
+  column-gap: var(--sp-3);
+  align-items: center;
+}
+
+.hw-cmp .hw-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.hw-cmp .hw-seg > button {
+  padding: 0 6px;
+}
+
+.hw-cmp__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.hw-cmp__label svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.hw-cmp__cells {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 0 3px;
+}
+
+.hw-cmp__cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.hw-cmp__track {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--wash);
+  overflow: hidden;
+}
+
+.hw-cmp__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink-4);
+  transition: width var(--dur-slow) var(--ease-out), background-color var(--dur-med) var(--ease-out);
+}
+
+.hw-cmp__val {
+  flex: none;
+  min-width: 44px;
+  text-align: right;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.hw-cmp__cell[data-on="true"] .hw-cmp__fill { background: var(--accent); }
+.hw-cmp__cell[data-on="true"] .hw-cmp__val { color: var(--ink); font-weight: 600; }
+
+.hw-cmp__caption {
+  grid-column: 2;
+  font-size: var(--fs-2xs);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.hw-cmp__pending {
+  grid-column: 2;
+  height: 6px;
+  margin: 8px 13px;
+  border-radius: var(--r-pill);
+  background: var(--wash);
+}

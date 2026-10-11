@@ -339,3 +339,24 @@
   .hwa-close:active,
   .hwa-trigger:active { transform: none; }
 }
+
+/* v13: visual steps first; the long explainer folds away. */
+.hwa-steps { margin: 4px 0 18px; }
+.hwa-more { margin-top: 18px; border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); padding-top: 14px; }
+.hwa-more > summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 7%, transparent);
+  font-family: var(--font-ui, "General Sans", system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 700;
+}
+.hwa-more > summary::-webkit-details-marker { display: none; }
+.hwa-more > summary::after { content: "+"; font-weight: 700; opacity: 0.6; }
+.hwa-more[open] > summary::after { content: "–"; }
+.hwa-more[open] > summary { margin-bottom: 16px; }

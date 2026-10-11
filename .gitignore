@@ -9,3 +9,7 @@ dist/
 .DS_Store
 apps/web/public/fonts/*.ttf
 apps/web/public/fonts/*.otf
+video/**/*.mp4
+video/**/*.wav
+video/**/*.mp3
+video/renders/

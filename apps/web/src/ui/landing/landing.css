@@ -362,3 +362,9 @@
   .hwl-card:active,
   .hwl[data-leaving] .hwl-stage { transform: none; }
 }
+
+/* v13: three visual steps between the pitch and the mode cards. */
+.hwl-steps { width: 100%; max-width: 760px; margin-top: 32px; }
+.hwl-steps .hw-step { background: color-mix(in srgb, var(--hwl-paper) 88%, transparent); box-shadow: 0 6px 18px rgba(31, 42, 68, 0.08); }
+.hwl-steps .hw-step__text { color: var(--hwl-ink); }
+.hwl-cards { margin-top: 28px; }

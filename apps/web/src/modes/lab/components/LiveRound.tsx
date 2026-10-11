@@ -3,7 +3,7 @@ import type { CSSProperties } from 'react';
 import type { EvolveEvent } from '@headway/sim';
 import type { FeedState, Lane } from '../feed';
 import { feedLine } from '../feed';
-import { fmtSignedPct, modelLabel } from '../format';
+import { emphasisLabel, fmtSignedPct, modelLabel } from '../format';
 import { DESIGNER_LETTER } from '../model';
 import { IconCheck, IconX } from './icons';
 
@@ -40,7 +40,7 @@ function LaneCard({ l, index }: { l: Lane; index: number }) {
         <span className="lab-avatar" data-emphasis={l.emphasis ?? undefined}>{DESIGNER_LETTER[l.designer]}</span>
         <div className="lab-prop__who">
           <div className="lab-prop__row">
-            <span className="lab-prop__emph">{l.emphasis ?? 'waiting'}</span>
+            <span className="lab-prop__emph">{l.emphasis ? emphasisLabel(l.emphasis) : 'waiting'}</span>
             {l.status === 'promoted' && <span className="lab-badge" data-outcome="promoted"><IconCheck /> promoted</span>}
             {l.status === 'invalid' && <span className="lab-badge" data-outcome="invalid"><IconX /> invalid</span>}
             {l.deltaTrainPct !== null && l.status !== 'promoted' && (

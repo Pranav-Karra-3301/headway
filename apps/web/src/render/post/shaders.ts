@@ -53,6 +53,8 @@ export function gradeShader() {
       uVignette: { value: 0.22 },
       uGrain: { value: 0.018 },
       uTime: { value: 0 },
+      /** Grain cell size in uv (set from the render size so the grain is pixel-locked). */
+      uTexelGrain: { value: new THREE.Vector2(1 / 1024, 1 / 1024) },
       uAspect: { value: 1.6 },
       /** Split-tone multipliers: shadows → uShadowTint, highlights → uHighlightTint. */
       uShadowTint: { value: new THREE.Color(0.985, 0.995, 1.025) },
@@ -63,6 +65,7 @@ export function gradeShader() {
 uniform sampler2D tDiffuse;
 uniform vec3 uLift, uGain, uShadowTint, uHighlightTint;
 uniform float uSaturation, uWarmth, uVignette, uGrain, uTime, uAspect;
+uniform vec2 uTexelGrain;
 varying vec2 vUv;
 float hash( vec2 p ) { p = fract( p * vec2( 123.34, 456.21 ) ); p += dot( p, p + 45.32 ); return fract( p.x * p.y ); }
 void main() {
@@ -76,8 +79,9 @@ void main() {
   vec2 q = ( vUv - 0.5 ) * vec2( uAspect, 1.0 );
   float v = smoothstep( 0.55, 1.35, length( q ) );
   col *= 1.0 - uVignette * v;
-  float n = hash( vUv * 1024.0 + fract( uTime * 7.31 ) * 61.0 ) - 0.5;
-  col += n * uGrain * ( 0.35 + l );
+  // static paper grain (v13): no per-frame reseed and capped on bright pixels, so lamps / windows glow steady
+  float n = hash( floor( vUv / uTexelGrain ) ) - 0.5;
+  col += n * uGrain * ( 0.35 + min( l, 0.65 ) );
   gl_FragColor = vec4( max( col, 0.0 ), c.a );
 }
 `,

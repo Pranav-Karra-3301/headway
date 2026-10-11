@@ -6,7 +6,7 @@ import type { ChartData, ChartStep } from '../model';
 import { fmtPaxH, fmtSignedPct } from '../format';
 
 const W = 720;
-const H = 250;
+const H = 180;
 const PAD = { l: 46, r: 98, t: 18, b: 14 };
 const EMPH: Emphasis[] = ['transfers', 'spacing', 'allocation'];
 
@@ -40,7 +40,7 @@ export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) 
 
   return (
     <div className="lab-chart">
-      <svg className="lab-chart__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Objective J by round, relative to the g0 baseline; lower is better">
+      <svg className="lab-chart__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Total passenger time by round, relative to the start; lower is better">
         <defs>
           <linearGradient id="lab-area" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0" stopColor="var(--lab-accent)" stopOpacity="0.16" />
@@ -55,12 +55,12 @@ export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) 
         ))}
         <g className="lab-chart__ref lab-chart__ref--g0">
           <line x1={PAD.l} x2={W - PAD.r + 4} y1={y(0)} y2={y(0)} />
-          <text x={W - PAD.r + 10} y={y(0)} dy="0.34em">g0 baseline</text>
+          <text x={W - PAD.r + 10} y={y(0)} dy="0.34em">start</text>
         </g>
         {data.ref !== null && (
           <g className="lab-chart__ref lab-chart__ref--ref">
             <line x1={PAD.l} x2={W - PAD.r + 4} y1={y(data.ref)} y2={y(data.ref)} />
-            <text x={W - PAD.r + 10} y={y(data.ref)} dy="0.34em">ref {tickLabel(Math.round(data.ref * 10) / 10)}</text>
+            <text x={W - PAD.r + 10} y={y(data.ref)} dy="0.34em">hand-written {tickLabel(Math.round(data.ref * 10) / 10)}</text>
           </g>
         )}
         {sel && <line className="lab-chart__guide" x1={x(sel.step)} x2={x(sel.step)} y1={PAD.t - 6} y2={H - PAD.b} />}
@@ -76,7 +76,7 @@ export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) 
               style={{ '--d': `${c.step * 40 + 300}ms` } as CSSProperties}>
               <circle cx={cx} cy={cy} r={4.2} />
               {c.clipped && <path d={`M${cx - 4},${cy + 9}l4,-4l4,4`} className="lab-chart__clip" />}
-              <title>{`${c.proposalId}${e ? ` (${e})` : ''}: J_train ${fmtSignedPct(c.pct)} vs g0`}</title>
+              <title>{`${c.proposalId}${e ? ` (${e})` : ''}: ${fmtSignedPct(c.pct)} passenger time vs start`}</title>
             </g>
           );
         })}
@@ -103,12 +103,12 @@ export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) 
         ))}
       </div>
       <ul className="lab-legend" aria-hidden="true">
-        <li><i className="lab-legend__train" />J train</li>
-        <li><i className="lab-legend__val" />J val</li>
-        <li><i className="lab-legend__ref" />ref (hand-written)</li>
+        <li><i className="lab-legend__train" />Training</li>
+        <li><i className="lab-legend__val" />Unseen crowds</li>
+        <li><i className="lab-legend__ref" />Hand-written plan</li>
         <li className="lab-legend__cands">
           {EMPH.map((e) => <i key={e} className="lab-legend__cand" data-emphasis={e} />)}
-          proposals
+          AI ideas
         </li>
       </ul>
     </div>

@@ -1,7 +1,8 @@
-// Owner: E2. Nittany Lake: the bay on the south + east sides of the board, as one RenderLayer in 3 draw calls —
+// Owner: E2. Nittany Lake: the bay on the south + east sides of the board, as one RenderLayer in 4 draw calls —
 //   water:surface — the lake (stylised shader: depth tint, lapping foam, wave lines, glints, dusk reflections);
 //   water:statics — beach, causeways, lighthouse point, marina boardwalk, huts, rocks, grass, lamps (baked, KitMaterial);
-//   water:boats   — moored + sailing boats, buoys, floats and a duck family (one mesh, posed in the vertex shader).
+//   water:boats   — moored + sailing boats, buoys, floats and a duck family (one mesh, posed in the vertex shader);
+//   water:beacon  — the lighthouse's sweeping beams + lantern halo (additive, day and dusk; beacon.ts).
 // Pure layout lives in plan.ts (tested); the shore field (field.ts) feeds the shader. Day ↔ dusk eases on its own from
 // the frame's light (and never lags the shared stage dusk), so the layer also works outside the Stage.
 import * as THREE from 'three';
@@ -13,6 +14,7 @@ import type { LightMode, PaletteId } from '../../types';
 import type { WorldLayout } from '../layout';
 import { preloadKenney } from '../../assets/kenney';
 import { createTerrainField } from '../terrain/field';
+import { createBeacon } from './beacon';
 import { buildBoats, boatSize, WATER_KENNEY_IDS, type BoatUniforms } from './boats';
 import { WATER_COLORS } from './colors';
 import { buildShoreField, type FieldOptions } from './field';
@@ -83,6 +85,10 @@ export function createWaterLayer(map: TownMap, layout: WorldLayout, opts: WaterO
   const object = new THREE.Group();
   object.name = 'water';
   object.add(surface.mesh, staticMesh, boats.mesh);
+  // v13: the lighthouse lamp sweeps day and dusk (subtle by day, glowing at dusk).
+  const lamp = plan.lights.find((l) => l.kind === 'beacon');
+  const beacon = lamp ? createBeacon(lamp.x, lamp.y - 0.2, lamp.z) : null;
+  if (beacon) object.add(beacon.mesh);
 
   const u = surface.uniforms;
   u.uLightCount.value = Math.min(MAX_LIGHTS, plan.lights.length);
@@ -119,6 +125,7 @@ export function createWaterLayer(map: TownMap, layout: WorldLayout, opts: WaterO
     dusk.value = Math.max(e, shared.uDusk.value);
     u.uDusk.value = dusk.value;
     u.uTime.value = t;
+    beacon?.update(t, dusk.value);
 
     const tide = TIDE_A * Math.sin(t * 0.52) + 0.012 * Math.sin(t * 1.37 + 0.6);
     surface.mesh.position.y = WATER_Y + tide;
@@ -163,7 +170,7 @@ export function createWaterLayer(map: TownMap, layout: WorldLayout, opts: WaterO
     },
     dispose() {
       disposed = true;
-      for (const m of [surface.mesh, staticMesh, boats.mesh]) {
+      for (const m of [surface.mesh, staticMesh, boats.mesh, ...(beacon ? [beacon.mesh] : [])]) {
         m.geometry.dispose();
         (m.material as THREE.Material).dispose();
       }

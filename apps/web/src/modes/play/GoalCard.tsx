@@ -1,16 +1,10 @@
-// Owner: T3c. The goal card shown before a Play run: the goal, the closing time, the fleet, the four controls, fair play.
+// Owner: T3c (v13: U2). The goal card shown before a Play run: three visual steps, then three tiny facts.
 import { useApp } from '../../state/store';
 import { clock } from './logic';
 import { playScenario, start, tourDone } from './game';
 import { usePlay } from './playStore';
-import { BusIcon, ClockIcon, PlayIcon, ScaleIcon, TrainIcon, playFacts } from './ui';
-
-const CONTROLS: Array<{ k: string; name: string; hint: string }> = [
-  { k: 'D', name: 'Dispatch', hint: 'Send a bus waiting at its terminal now' },
-  { k: 'H', name: 'Hold 30 s', hint: 'Make a bus wait at a stop (Shift: 60 s)' },
-  { k: 'R', name: 'Reassign', hint: 'Move a bus to another route at its terminal' },
-  { k: 'T', name: 'Time the train', hint: 'Keep it 30 s longer (Shift: depart now)' },
-];
+import { Steps } from '../../ui/landing/Steps';
+import { BusIcon, ClockIcon, PlayIcon, ScaleIcon, playFacts } from './ui';
 
 export function GoalCard() {
   const seed = useApp((s) => s.play.seed);
@@ -29,49 +23,25 @@ export function GoalCard() {
           <span className="pl-seed hw-num">crowd #{seed || scenario.seed}</span>
         </div>
         <h1 id="pl-goal-title" className="pl-goal__title">
-          Get the stadium crowd home.
-          <span>Beat the AI dispatcher.</span>
+          Get the crowd home.
+          <span>Beat the AI.</span>
         </h1>
 
-        <div className="pl-facts">
-          <div className="pl-fact">
-            <span className="pl-fact__icon"><ClockIcon /></span>
-            <span className="hw-label">Stadium closes</span>
-            <span className="pl-fact__big hw-num">{closing}</span>
-            <span className="pl-fact__sub">{facts.crowd.toLocaleString('en-US')} people head home</span>
-          </div>
-          <div className="pl-fact">
-            <span className="pl-fact__icon"><BusIcon /></span>
-            <span className="hw-label">Your fleet</span>
-            <span className="pl-fact__big hw-num">6 buses</span>
-            <span className="pl-fact__sub">2 per route, plus 1 train on the rail loop</span>
-          </div>
-          <div className="pl-fact">
-            <span className="pl-fact__icon"><ScaleIcon /></span>
-            <span className="hw-label">Fair fight</span>
-            <span className="pl-fact__big hw-num">Same crowd</span>
-            <span className="pl-fact__sub">Do nothing and you score the baseline</span>
-          </div>
-        </div>
+        <Steps className="pl-steps" />
 
-        <div className="pl-controls">
-          {CONTROLS.map((c) => (
-            <div key={c.k} className="pl-control">
-              <span className="pl-kbd">{c.k}</span>
-              <span className="pl-control__text"><b>{c.name}</b><span>{c.hint}</span></span>
-            </div>
-          ))}
+        <div className="pl-chips">
+          <span className="pl-chip" title={`${facts.crowd.toLocaleString('en-US')} people head home`}>
+            <ClockIcon /><span className="hw-num">{closing}</span>
+          </span>
+          <span className="pl-chip" title="2 per route, plus 1 train on the rail loop"><BusIcon /><span className="hw-num">× 6</span></span>
+          <span className="pl-chip" title="Do nothing and you score the baseline"><ScaleIcon />Same crowd as the AI</span>
         </div>
-
-        <p className="pl-fair">
-          <TrainIcon /> Click a bus (map or chip), then an action. Finish when you are done. Keys are optional.
-        </p>
 
         <div className="pl-goal__actions">
           <span className="pl-goal__status" data-state={ai.status}>
-            {ai.status === 'done' ? 'The AI has run this crowd. Your pace against it shows live.'
-              : ai.status === 'error' ? 'The AI comparison is unavailable right now. You can still play.'
-              : 'The AI dispatcher is running this crowd in the background…'}
+            {ai.status === 'done' ? 'AI score ready'
+              : ai.status === 'error' ? 'AI score unavailable'
+              : 'AI is playing this crowd…'}
             {simKind === 'stub' ? ' (preview sim)' : ''}
           </span>
           {seen && <button type="button" className="hw-btn hw-btn--ghost" onClick={() => start({ tour: true })}>Show me how</button>}
