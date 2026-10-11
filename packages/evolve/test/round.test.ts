@@ -33,7 +33,8 @@ const valIds = (calls: Array<{ id: string; split: string }>) => calls.filter((c)
 describe('runRound', () => {
   it('runs a full round: designers, scoring, promotion, records and events', async () => {
     const { store, llm, ev, events, deps } = setup({
-      table: { 'r1-a': { train: 950, val: 490 }, 'r1-b': { train: 980, val: 480 }, 'r1-c': { train: 1010, val: 500 } },
+      table: { 'r1-a': { train: 950, val: 490 }, 'r1-b': { train: 980, val: 480 }, 'r1-c': { train: 1010, val: 500 },
+        'probe-rm-anti-bunch': { train: 960, val: 1 } },
     });
     const { round, generation: gen } = await runRound(deps);
 
@@ -104,6 +105,16 @@ describe('runRound', () => {
     const v = at((e) => e.type === 'eval' && e.split === 'val' && e.proposalId === 'r1-a' && e.done === 4 && e.total === 4);
     expect(v).toBeGreaterThan(Math.max(...scored));
     expect(v).toBeLessThan(events.length - 1);
+
+    // sensitivity probes: one-step champion variants on training only, logged before the designers start
+    const probeCalls = ev.calls.filter((c) => c.id.startsWith('probe-'));
+    expect(probeCalls.length).toBeGreaterThanOrEqual(POLICY.rules.length);
+    expect(probeCalls.every((c) => c.split === 'train')).toBe(true);
+    const probeEvents = events.flatMap((e, i) => (e.type === 'eval' && e.proposalId.startsWith('probe: ') ? [i] : []));
+    expect(probeEvents).toHaveLength(probeCalls.length);
+    expect(Math.max(...probeEvents)).toBeLessThan(Math.min(...requested));
+    expect(llm.calls[0]!.user).toContain('## Probes (training ΔJ vs champion');
+    expect(llm.calls[0]!.user).toMatch(/## Probes [^\n]*\n- remove rule anti-bunch → −4\.0%\n/);
 
     // persistence: running first, final round last
     expect(store.rounds[0]).toMatchObject({ id: 'R1', status: 'running', finishedAt: null, proposals: [] });

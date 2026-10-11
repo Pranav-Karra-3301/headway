@@ -89,6 +89,34 @@ describe('buildDigest', () => {
     expect(t.get('stop_stadium_gate')!.from).toBeGreaterThan(t.get('stop_apts_south')!.from);
   });
 
+  it('lists the best 8 probes, best first, after the route table', () => {
+    const probes = Array.from({ length: 12 }, (_, i) => ({ label: `probe ${i}`, deltaPct: 6 - i }));
+    probes.push({ label: 'remove rule even-headway', deltaPct: -5 });
+    const d = buildDigest({ champion: { policy: POLICY, results }, baseline: score(3_600_000), reference: score(3_240_000), history, probes });
+    const sec = d.slice(d.indexOf('## Probes'), d.indexOf('## Top findings'));
+    expect(sec).toMatch(/^## Probes \(training ΔJ vs champion; negative = better/);
+    const lines = sec.trim().split('\n').slice(1);
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toBe('- probe 11 → −5.0%');
+    expect(lines[1]).toBe('- remove rule even-headway → −5.0%');
+    expect(sec).not.toContain('probe 0 ');
+    expect(d.indexOf('## Routes')).toBeLessThan(d.indexOf('## Probes'));
+    expect(digest).not.toContain('## Probes'); // no probes, no section
+    expect(d).not.toContain('promotion gate');
+    const flat = buildDigest({ champion: { policy: POLICY, results }, baseline: score(1), reference: score(1), history: [], probes: [{ label: 'x', deltaPct: -0.4 }] });
+    expect(flat).toContain('No one-step probe reaches the −1.0% promotion gate.');
+  });
+
+  it('shows up to 12 proposals across older rounds, without repeating ΔJ inside the verdict', () => {
+    const many = Array.from({ length: 5 }, (_, r) => ['a', 'b', 'c'].map((l) => proposal({
+      id: `r${r + 1}-${l}`, roundId: `R${r + 1}`, deltaTrainPct: 2.9, narrative: 'ΔJ +2.9% on training. Rejected: worse on training (ΔJ +2.9%).' }))).flat();
+    const d = buildDigest({ champion: { policy: POLICY, results }, baseline: score(1), reference: score(1), history: many });
+    expect(d).toContain('## Recent proposals (last 4 rounds, oldest first');
+    expect(d).not.toContain('r1-c');
+    expect(d).toContain('r2-a');
+    expect(d).toContain('r5-c [transfers] ΔJ_train +2.9% · Rejected: worse on training. ·');
+  });
+
   it('stays within 6,000 characters for huge inputs', () => {
     const many: FailureFinding[] = Array.from({ length: 300 }, (_, i) =>
       gap(10_000 - i, 600 + i, `Stop ${i} went ${i} min without a bus, which is a very long sentence padded for length ${'x'.repeat(60)}.`));
@@ -96,6 +124,7 @@ describe('buildDigest', () => {
       champion: { policy: POLICY, results: Array.from({ length: 8 }, (_, s) => runResult({ seed: s, findings: many.map((f) => ({ ...f, stopId: 'stop_downtown' as const, routeId: (['r1', 'r2', 'r3'] as const)[s % 3] })) })) },
       baseline: score(1), reference: score(1),
       history: Array.from({ length: 40 }, (_, i) => proposal({ id: `r${i}-a`, summary: 'S'.repeat(200), narrative: 'N'.repeat(400) })),
+      probes: Array.from({ length: 20 }, (_, i) => ({ label: `remove rule ${'x'.repeat(30)}-${i}`, deltaPct: i - 5 })),
     });
     expect(big.length).toBeLessThanOrEqual(6000);
     expect(big).toMatch(/Stop 0 went/);

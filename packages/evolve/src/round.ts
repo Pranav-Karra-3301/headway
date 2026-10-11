@@ -5,7 +5,7 @@ import { G0, REF, validatePolicy } from '@headway/sim';
 import type { Emphasis, EvolveEvent, FailureFinding, Generation, Policy, Proposal, Round, RunResult, SplitScore } from '@headway/sim';
 import { topFindings, worstGap } from './aggregate';
 import { buildDigest, signedPct } from './digest';
-import { policyBody } from './evaluate';
+import { policyBody, runProbes, type ProbeResult } from './evaluate';
 import { extractJson } from './extract';
 import type { LlmClient, LlmRequest } from './llm';
 import { proposalNarrative } from './narrative';
@@ -31,7 +31,7 @@ const LETTERS = ['a', 'b', 'c'] as const;
 const DESIGNERS = [0, 1, 2] as const;
 const MAX_TOKENS = 8000;
 const TIMEOUT_MS = 90_000;
-const HISTORY_PROPOSALS = 6;       // the last 2 rounds × 3 designers
+const HISTORY_PROPOSALS = 12;      // the last 4 rounds × 3 designers
 const MIN_GAIN_PCT = 1;            // J_train at least 1% better (tunable)
 const MAX_COMPLETION_DROP = 1;     // percentage points
 const GAP_FLOOR_S = 900;           // worst gap ≤ max(champion's worst, 900 s)
@@ -206,9 +206,13 @@ export async function runRound(deps: RoundDeps): Promise<{ round: Round; generat
     return finish([], null, true, `Round failed: ${message}.`);
   }
   const history = await deps.store.history(HISTORY_PROPOSALS).catch((): Proposal[] => []);
+  // sensitivity probes: one-step variants of the champion, training split only (logged as 'eval' events)
+  const probes: ProbeResult[] = await runProbes(deps.evaluate, champion.policy, champTrain.score.J, (r, runs) =>
+    emit({ type: 'eval', proposalId: `probe: ${r.label} → ΔJ ${signedPct(r.deltaPct)}`, split: 'train', done: runs, total: runs }),
+  ).catch((): ProbeResult[] => []);
   const ctx: Ctx = {
     deps, n, champion, emit, system: designerSystemPrompt(), temps: deps.temperatures ?? TEMPERATURES,
-    digest: buildDigest({ champion: { policy: champion.policy, results: champTrain.results }, baseline, reference, history }),
+    digest: buildDigest({ champion: { policy: champion.policy, results: champTrain.results }, baseline, reference, history, probes }),
     championBody: policyBody(champion.policy),
   };
 

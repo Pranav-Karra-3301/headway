@@ -72,6 +72,10 @@ ${trained.map((d) => scenarioLine(d, seedsOf(d.id))).join('\n')}`;
 
 const GUIDANCE = `Guidance (facts about this town; follow them):
 - Make at most ${MAX_CHANGES} focused changes. One well-aimed change beats several speculative ones.
+- The digest's "Probes" section is measured, not guessed: each line is the champion with ONE change (a rule removed, guarded or re-thresholded, a bus moved, a default swapped), re-simulated on the training runs. Prefer changes the probes support; validation runs still decide promotion.
+- Promotion needs at least 1% on training, so copying a probe that is less than 1.0% better gets rejected. Probes cannot measure a NEW rule: when no probe reaches −1.0%, add one well-guarded new rule instead.
+- "Left behind" means the bus was full when it left: holding a full bus longer cannot pick those riders up; only more capacity there (allocation, a reassign, faster cycles) can.
+- Read "Recent proposals" before you design: do not resubmit an idea that was already rejected unless you change what made it fail.
 - If you change params.allocation, take buses only from the least-pressured route in the digest's "Pressure ranking" line, and keep every route at >= 1 bus.
 - Central is the r1/r2 terminal and a rail station: train riders transfer there to r2, the only route to apts_north and apts_south, so starving r2 strands them (missed connections cost a whole headway).
 - There is no bus_at_stop decision at Central (it is a terminal): a bus there only raises bus_at_terminal, which has no train features. A bus_at_stop rule with is_station == 1 fires only for r1 at university_stn and r3 at stadium_stn; it never holds r2.

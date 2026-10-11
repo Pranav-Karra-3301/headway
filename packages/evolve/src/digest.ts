@@ -5,15 +5,19 @@ import type { Policy, Proposal, RouteId, RunResult, ScenarioDef, SplitScore, Sto
 import { aggregateResults, findingLabel, groupFindings } from './aggregate';
 
 export const DIGEST_MAX_CHARS = 6000;
+const PROMOTION_GAIN_PCT = 1;
 const VERDICT_MARKERS = ['Promoted to ', 'Rejected: ', 'Not promoted: '];
 
-interface Limits { findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number; sharedStops: boolean }
+interface Limits { findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number; sharedStops: boolean; probes: number }
 const LIMITS: Limits[] = [
-  { findings: 8, stops: 8, proposals: 6, summaryChars: 160, errorChars: 160, sharedStops: true },
-  { findings: 6, stops: 6, proposals: 4, summaryChars: 90, errorChars: 100, sharedStops: true },
-  { findings: 4, stops: 4, proposals: 3, summaryChars: 70, errorChars: 70, sharedStops: true },
-  { findings: 3, stops: 0, proposals: 2, summaryChars: 60, errorChars: 60, sharedStops: false },
+  { findings: 8, stops: 8, proposals: 12, summaryChars: 130, errorChars: 140, sharedStops: true, probes: 8 },
+  { findings: 6, stops: 6, proposals: 9, summaryChars: 100, errorChars: 100, sharedStops: true, probes: 8 },
+  { findings: 4, stops: 4, proposals: 6, summaryChars: 70, errorChars: 70, sharedStops: true, probes: 8 },
+  { findings: 3, stops: 0, proposals: 2, summaryChars: 60, errorChars: 60, sharedStops: false, probes: 6 },
 ];
+
+/** A measured one-step variant of the champion (see `runProbes` in evaluate.ts). */
+export interface DigestProbe { label: string; deltaPct: number }
 
 const hours = (s: number) => (s / 3600).toFixed(1);
 const mins = (s: number) => (s / 60).toFixed(1);
@@ -215,30 +219,44 @@ function routesSection(policy: Policy, results: RunResult[], lim: Limits): strin
   ];
 }
 
+function probesSection(probes: DigestProbe[] | undefined, n: number): string[] {
+  if (!probes?.length) return [];
+  const best = [...probes].sort((a, b) => a.deltaPct - b.deltaPct).slice(0, n);
+  return [
+    `## Probes (training ΔJ vs champion; negative = better; ${best.length} best of ${probes.length} one-step variants)`,
+    ...best.map((p) => `- ${p.label} → ${signedPct(p.deltaPct)}`),
+    ...(best[0]!.deltaPct > -PROMOTION_GAIN_PCT ? [`No one-step probe reaches the −${PROMOTION_GAIN_PCT.toFixed(1)}% promotion gate.`] : []),
+  ];
+}
+
 const roundNo = (p: Proposal) => Number(/\d+/.exec(p.roundId)?.[0] ?? 0);
 
 function historySection(history: Proposal[], lim: Limits): string[] {
   const sorted = [...history].sort((x, y) => roundNo(x) - roundNo(y) || x.id.localeCompare(y.id));
-  const roundIds = [...new Set(sorted.map((p) => p.roundId))].slice(-2);
-  const recent = sorted.filter((p) => roundIds.includes(p.roundId)).slice(-lim.proposals);
+  const recent = sorted.slice(-lim.proposals);
   if (!recent.length) return ['## Recent proposals', '(none yet: this is the first round)'];
+  const lastTwo = [...new Set(sorted.map((p) => p.roundId))].slice(-2);
   return [
-    '## Recent proposals (last 2 rounds; validation details are withheld)',
+    `## Recent proposals (last ${new Set(recent.map((p) => p.roundId)).size} rounds, oldest first; validation details are withheld)`,
     ...recent.map((p) => {
       const delta = p.deltaTrainPct === null ? '' : ` ΔJ_train ${signedPct(p.deltaTrainPct)}`;
-      const verdict = clip(proposalVerdict(p), lim.errorChars);
-      return `- ${p.id} [${p.emphasis}]${delta}${verdict ? ` · ${verdict}` : ''} · "${clip(p.summary, lim.summaryChars)}"`;
+      const verdict = clip(proposalVerdict(p).replace(/ \(ΔJ [^)]*\)/, ''), lim.errorChars);
+      const chars = lastTwo.includes(p.roundId) ? lim.summaryChars : Math.min(lim.summaryChars, 80);
+      return `- ${p.id} [${p.emphasis}]${delta}${verdict ? ` · ${verdict}` : ''} · "${clip(p.summary, chars)}"`;
     }),
   ];
 }
 
-export function buildDigest(a: { champion: { policy: Policy; results: RunResult[] }; baseline: SplitScore; reference: SplitScore; history: Proposal[] }): string {
+export function buildDigest(a: {
+  champion: { policy: Policy; results: RunResult[] }; baseline: SplitScore; reference: SplitScore; history: Proposal[]; probes?: DigestProbe[];
+}): string {
   const { policy, results } = a.champion;
   let text = '';
   for (const lim of LIMITS) {
     text = [
       scoresSection(policy, results, a.baseline, a.reference),
       routesSection(policy, results, lim),
+      probesSection(a.probes, lim.probes),
       findingsSection(results, lim.findings),
       stopsSection(results, lim.stops),
       ruleFiresSection(policy, results),

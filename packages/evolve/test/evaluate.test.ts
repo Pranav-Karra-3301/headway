@@ -1,8 +1,8 @@
 import { DEFAULT_CONFIG, G0, REF, SEEDS } from '@headway/sim';
 import type { Policy, ScenarioInstance } from '@headway/sim';
 import { describe, expect, it } from 'vitest';
-import { baselineGeneration, createEvaluator, evaluatePolicy, evolveInstances, policyBody, type EvaluatorCache, type RunOne } from '../src/evaluate';
-import { gap, metrics, missed, runResult } from './fixtures';
+import { baselineGeneration, championProbes, createEvaluator, evaluatePolicy, evolveInstances, policyBody, runProbes, type EvaluatorCache, type RunOne } from '../src/evaluate';
+import { fakeEvaluate, gap, metrics, missed, runResult } from './fixtures';
 
 const STADIUM_1001: ScenarioInstance = { scenarioId: 'stadium_exit', seed: 1001, split: 'train' };
 const withId = (p: Policy, id: string): Policy => ({ ...p, meta: { ...p.meta, id, summary: `copy ${id}` } });
@@ -141,5 +141,53 @@ describe('baselineGeneration', () => {
     expect(g0.val.runs).toBe(4);
     expect(g0.findings.length).toBeLessThanOrEqual(8);
     expect(g0.findings[0]!.impactS).toBe(900);
+  });
+});
+
+describe('championProbes / runProbes', () => {
+  it('builds rule ablations, every legal one-bus move and one default swap per decision kind', () => {
+    const probes = championProbes(G0);
+    expect(probes.map((p) => p.id)).toEqual([
+      'rm-even-headway', 'mv-r1-r2', 'mv-r1-r3', 'mv-r2-r1', 'mv-r2-r3', 'mv-r3-r1', 'mv-r3-r2',
+      'def-bus_at_stop', 'def-bus_at_terminal', 'def-train_at_station',
+      'guard-even-headway-20', 'guard-even-headway-40', 'guard-even-headway-80',
+      'thr-even-headway-0-0.5', 'thr-even-headway-0-1.5',
+    ]);
+    const guard = probes.find((p) => p.id === 'guard-even-headway-40')!;
+    expect(guard.label).toBe('rule even-headway skipped while route_queue >= 40');
+    expect(guard.policy.rules[0]!.when).toEqual([{ f: 'headway_ratio', op: '<', v: 1 }, { f: 'route_queue', op: '<', v: 40 }]);
+    expect(probes.find((p) => p.id === 'thr-even-headway-0-0.5')!.label).toBe('rule even-headway: headway_ratio < 1 → 0.5');
+    expect(championProbes(REF).length).toBeLessThanOrEqual(40);
+    const mv = probes.find((p) => p.id === 'mv-r1-r3')!;
+    expect(mv.label).toBe('move 1 bus r1→r3 (2/2/2 → 1/2/3)');
+    expect(mv.policy.params.allocation).toEqual({ r1: 1, r2: 2, r3: 3 });
+    expect(probes.find((p) => p.id === 'rm-even-headway')!.policy.rules).toEqual([]);
+    expect(probes.find((p) => p.id === 'def-bus_at_terminal')!.policy.defaults.bus_at_terminal).toEqual({ type: 'hold', until: 'target_headway' });
+    expect(probes.find((p) => p.id === 'def-train_at_station')!.policy.defaults.train_at_station).toEqual({ type: 'setTrainDeparture', dwellS: 30 });
+    expect(G0.rules).toHaveLength(1); // the champion is not mutated
+    // a route already at 1 bus never donates
+    const ids = championProbes(REF).map((p) => p.id);
+    expect(ids.filter((id) => id.startsWith('mv-r1-'))).toEqual([]);
+    expect(ids).toContain('mv-r3-r1');
+    expect(ids.filter((id) => id.startsWith('rm-'))).toHaveLength(REF.rules.length);
+  });
+
+  it('scores probes on the training split only, best first', async () => {
+    const ev = fakeEvaluate({ 'probe-rm-even-headway': { train: 950, val: 1 }, 'probe-mv-r1-r3': { train: 1008, val: 1 }, default: { train: 1000, val: 1 } });
+    const seen: string[] = [];
+    const out = await runProbes(ev.evaluate, G0, 1000, (r, runs) => seen.push(`${r.id}:${runs}`));
+    expect(ev.calls.every((c) => c.split === 'train')).toBe(true);
+    expect(ev.calls).toHaveLength(15);
+    expect(seen).toHaveLength(15);
+    expect(out[0]).toMatchObject({ id: 'rm-even-headway', label: 'remove rule even-headway', deltaPct: -5 });
+    expect(out.at(-1)).toMatchObject({ id: 'mv-r1-r3', deltaPct: 0.8 });
+  });
+
+  it('skips probes that fail to evaluate', async () => {
+    const ev = fakeEvaluate({ default: { train: 990, val: 1 } });
+    const evaluate: typeof ev.evaluate = async (p, split) => { if (p.meta.id === 'probe-mv-r1-r2') throw new Error('boom'); return ev.evaluate(p, split); };
+    const out = await runProbes(evaluate, G0, 1000);
+    expect(out).toHaveLength(14);
+    expect(out.map((r) => r.id)).not.toContain('mv-r1-r2');
   });
 });
