@@ -11,6 +11,7 @@ import { addInstanceFade, KitMaterial } from '../materials';
 import { colorOf, PALETTES } from '../palettes';
 import type { DetailMode, PaletteId, Pick } from '../types';
 import { LANE_OFFSET, ROAD } from '../town/network';
+import { spaceBuses, type BusSlot } from './busSpacing';
 import { stopFrame, approach, crowdWalkAt, lerpDist, PLATFORM_QUEUE, queueSlot, queueVisible, STOP_QUEUE, type QueueSlotOptions } from './interp';
 
 export interface DynamicFrame {
@@ -251,12 +252,21 @@ export function createDynamicLayer(map: TownMap, opts: { palette: PaletteId; det
     vehicleById.clear();
     const seenBus = new Set<string>();
     let trainSeen = false;
+    const busSlots: BusSlot[] = [];
+    for (const v of next.vehicles) {
+      if (v.kind === 'train') continue;
+      const path = pathOf(v);
+      if (!path || path.points.length < 2) continue;
+      const pv = prevById.get(v.id);
+      busSlots.push({ id: v.id, path, dist: pv && pathKey(pv) === pathKey(v) ? lerpDist(pv.dist, v.dist, alpha, path.length, path.closed) : v.dist });
+    }
+    const spaced = spaceBuses(busSlots, BUS.length, LANE_OFFSET); // bunched buses queue on screen instead of overlapping
     for (const v of next.vehicles) {
       vehicleById.set(v.id, v);
       const path = pathOf(v);
       if (!path || path.points.length === 0) continue;
       const pv = prevById.get(v.id);
-      const dist = pv && pathKey(pv) === pathKey(v) ? lerpDist(pv.dist, v.dist, alpha, path.length, path.closed) : v.dist;
+      const dist = spaced.get(v.id) ?? (pv && pathKey(pv) === pathKey(v) ? lerpDist(pv.dist, v.dist, alpha, path.length, path.closed) : v.dist);
       if (v.kind === 'train') {
         trainSeen = true;
         const sel = selected?.kind === 'train' && selected.id === v.id;

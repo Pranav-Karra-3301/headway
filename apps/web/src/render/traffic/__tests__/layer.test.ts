@@ -36,7 +36,7 @@ describe('vehiclePoses', () => {
     expect(buses).toHaveLength(1);
     const c = pointAt(r1.path, 21);
     const off = Math.hypot(buses[0]!.x - c.x, buses[0]!.z - c.z);
-    expect(off).toBeCloseTo(0.55, 2);
+    expect(off).toBeCloseTo(0.6, 2);
     const right = { x: Math.sin(c.heading), z: Math.cos(c.heading) };
     expect((buses[0]!.x - c.x) * right.x + (buses[0]!.z - c.z) * right.z).toBeGreaterThan(0.5);
     expect(buses[0]!.stopped).toBe(true);

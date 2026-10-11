@@ -32,6 +32,13 @@ const GAP_BUS = 0.5; // bumper gap behind a bus
 const CROSS_STOP = 1.2; // front bumper stops this far before the rail centre line
 const TRAIN_BEHIND = 12, TRAIN_AHEAD = 9; // rail arc window around the train's dist that closes a crossing
 const JUNCTION_BUS_R = 3.0;
+/** A moving bus this far (centre) short of a junction, heading into it, already blocks the box for new cars. */
+const JUNCTION_BUS_AHEAD = 6.5;
+/** Body half-widths for the car ↔ bus overlap check (kit/vehicles BUS.width 1.25; cars ≈ 0.8 wide). */
+const BUS_HALF_W = 0.625;
+const CAR_HALF_W = 0.4;
+/** A car this close in front of a moving bus (bumper to bumper) gives way: it pulls off (shrinks away). */
+const BUS_NOSE = 0.8;
 const STUCK_S = 90;
 /** Out-lane centre position at which a car's rear has cleared the junction box (lanes start 0.5 u past it). */
 const CLEAR_BOX = -0.4;
@@ -113,7 +120,8 @@ export interface TrafficCar {
 }
 
 export interface BusOnLane { id: string; s: number; halfLen: number; stopped: boolean }
-export interface BusMap { lanes: Map<string, BusOnLane[]>; blockedNodes: Set<string> }
+/** blockedNodes: a bus in the box; approaching: junction → ids of moving buses about to enter it. */
+export interface BusMap { lanes: Map<string, BusOnLane[]>; blockedNodes: Set<string>; approaching: Map<string, string[]> }
 
 export interface TrafficModel {
   readonly graph: LaneGraph;
@@ -130,10 +138,17 @@ export interface TrafficModel {
 export function mapBuses(graph: LaneGraph, buses: readonly BusPose[]): BusMap {
   const lanes = new Map<string, BusOnLane[]>();
   const blockedNodes = new Set<string>();
+  const approaching = new Map<string, string[]>();
   for (const b of buses) {
     const p = { x: b.x, z: b.z };
     for (const n of graph.nodes.values()) {
-      if (n.junction && Math.hypot(n.p.x - b.x, n.p.z - b.z) < JUNCTION_BUS_R) blockedNodes.add(n.id);
+      if (!n.junction) continue;
+      const vx = n.p.x - b.x, vz = n.p.z - b.z;
+      if (Math.hypot(vx, vz) < JUNCTION_BUS_R) { blockedNodes.add(n.id); continue; }
+      const along = vx * b.dx + vz * b.dz;
+      if (!b.stopped && along > 0 && along < JUNCTION_BUS_AHEAD && Math.abs(vx * b.dz - vz * b.dx) < 1.6) {
+        (approaching.get(n.id) ?? approaching.set(n.id, []).get(n.id)!).push(b.id);
+      }
     }
     let best: { lane: Lane; s: number; d: number } | null = null;
     for (const lane of graph.lanes) {
@@ -153,7 +168,7 @@ export function mapBuses(graph: LaneGraph, buses: readonly BusPose[]): BusMap {
       list.push({ id: b.id, s: best.s, halfLen: b.halfLen, stopped: b.stopped });
     }
   }
-  return { lanes, blockedNodes };
+  return { lanes, blockedNodes, approaching };
 }
 
 /** Arc position of p along a lane, extrapolated past the lane ends (into junction boxes). */
@@ -195,7 +210,7 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
   let spawnCooldown = 0;
   let surgeCooldown = 0;
   let lastT = 0;
-  let buses: BusMap = { lanes: new Map(), blockedNodes: new Set() };
+  let buses: BusMap = { lanes: new Map(), blockedNodes: new Set(), approaching: new Map() };
   let busPoses: readonly BusPose[] = [];
   let trainDist: number | null = null;
 
@@ -281,6 +296,9 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
    *  that has waited longer and could go (FIFO, so nobody starves). Following the same movement is fine. */
   function canReserve(c: TrafficCar, conn: Connector): boolean {
     if (buses.blockedNodes.has(conn.node)) return false;
+    // a bus about to enter: only the cars following it in its lane may go in with it
+    const behind = buses.lanes.get(conn.from.id) ?? [];
+    for (const id of buses.approaching.get(conn.node) ?? []) if (!behind.some((b) => b.id === id)) return false;
     for (const o of active.get(conn.node) ?? []) {
       const oc = o.reserved;
       if (o !== c && oc && oc !== conn && oc.conflicts.has(conn.id)) return false;
@@ -425,6 +443,23 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
     return true;
   }
 
+  /** The car's body overlaps a drawn bus, or sits right in front of a moving one (the sim's buses never brake). */
+  function underBus(c: TrafficCar): boolean {
+    const hx = Math.cos(c.heading), hz = -Math.sin(c.heading);
+    for (const b of busPoses) {
+      const rx = c.x - b.x, rz = c.z - b.z;
+      const reach = b.halfLen + c.halfLen + BUS_NOSE + 0.5;
+      if (rx * rx + rz * rz > reach * reach) continue;
+      const along = rx * b.dx + rz * b.dz, lat = Math.abs(rx * b.dz - rz * b.dx);
+      const cos = Math.abs(hx * b.dx + hz * b.dz), sin = Math.sqrt(Math.max(0, 1 - cos * cos));
+      const extAlong = cos * c.halfLen + sin * CAR_HALF_W, extLat = sin * c.halfLen + cos * CAR_HALF_W;
+      if (lat >= BUS_HALF_W + extLat - 0.05) continue;
+      const front = b.halfLen + extAlong + (b.stopped ? 0.05 : BUS_NOSE);
+      if (along < front && along > -(b.halfLen + extAlong + 0.05)) return true;
+    }
+    return false;
+  }
+
   function validSpot(l: Lane, s: number, halfLen: number): boolean {
     if (s < 0 || s > l.len) return false;
     if (graph.nodes.get(l.to)!.junction && s > l.len - halfLen - 0.1) return false;
@@ -535,6 +570,7 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
         c.stuck = c.v < 0.02 ? c.stuck + dt : 0;
         if (c.stuck > STUCK_S) c.dying = DIE_S; // keeps its reservation until removed
         pose(c);
+        if (c.dying <= 0 && c.scale > 0.05 && underBus(c)) c.dying = DIE_S * Math.min(1, c.scale); // never drawn through a bus
       }
       spawn(t);
     } else {

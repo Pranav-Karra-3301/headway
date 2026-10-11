@@ -25,6 +25,7 @@ import { KitMaterial } from '../materials';
 import { DEFAULT_PALETTE, PALETTES } from '../palettes';
 import type { PaletteId } from '../types';
 import { buildLaneGraph } from './lanes';
+import { spaceBuses, type BusSlot } from '../dynamic/busSpacing';
 import { KIT_VARIANTS, MAX_CARS, createTrafficModel, type BusPose, type CarVariantSpec, type TrafficModel } from './model';
 
 export { LANE_OFFSET, buildLaneGraph } from './lanes';
@@ -34,7 +35,7 @@ export type { BusPose, TrafficCar, TrafficEnv, TrafficModel } from './model';
 /** Road surface top (matches render/town: ROAD.top). The composer may move `layer.object` if roads change height. */
 export const ROAD_TOP = 0.04;
 /** Buses are drawn this far right of the route centreline (render/town LANE_OFFSET). */
-const BUS_LANE = 0.55;
+const BUS_LANE = 0.6;
 /** Kenney cars used for traffic (one InstancedMesh each), in order of preference. */
 export const TRAFFIC_KENNEY: KenneyId[] = ['car-kit/sedan', 'car-kit/suv', 'car-kit/van', 'car-kit/hatchback-sports', 'car-kit/taxi'];
 const FADE = 0.6;
@@ -84,6 +85,7 @@ const pathKey = (v: VehicleView) => (v.path.kind === 'deadhead' ? `d:${v.path.fr
 export function vehiclePoses(map: TownMap, prev: SimSnapshot, next: SimSnapshot, alpha: number): { buses: BusPose[]; trainDist: number | null } {
   const before = new Map(prev.vehicles.map((v) => [v.id, v] as const));
   const buses: BusPose[] = [];
+  const slots: (BusSlot & { stopped: boolean })[] = [];
   let trainDist: number | null = null;
   for (const v of next.vehicles) {
     const path = pathOf(map, v);
@@ -91,11 +93,14 @@ export function vehiclePoses(map: TownMap, prev: SimSnapshot, next: SimSnapshot,
     const pv = before.get(v.id);
     const dist = pv && pathKey(pv) === pathKey(v) ? lerpDist(pv.dist, v.dist, alpha, path.length, path.closed) : v.dist;
     if (v.kind === 'train') { trainDist = dist; continue; }
-    const p = pointAt(path, dist);
+    slots.push({ id: v.id, path, dist, stopped: v.state === 'dwelling' || v.state === 'holding' || v.state === 'layover' });
+  }
+  const spaced = spaceBuses(slots, BUS.length, BUS_LANE);
+  for (const { id, path, dist: raw, stopped } of slots) {
+    const p = pointAt(path, spaced.get(id) ?? raw);
     const dx = Math.cos(p.heading), dz = -Math.sin(p.heading);
     buses.push({
-      id: v.id, x: p.x - dz * BUS_LANE, z: p.z + dx * BUS_LANE, dx, dz, halfLen: BUS.length / 2,
-      stopped: v.state === 'dwelling' || v.state === 'holding' || v.state === 'layover',
+      id, x: p.x - dz * BUS_LANE, z: p.z + dx * BUS_LANE, dx, dz, halfLen: BUS.length / 2, stopped,
     });
   }
   return { buses, trainDist };

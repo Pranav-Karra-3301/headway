@@ -9,7 +9,7 @@ import { TRACK } from '../kit/transit';
 
 /** Road surface half-width and top height; buses drive in the right-hand lane LANE_OFFSET from the centreline. */
 export const ROAD = { half: 1.2, top: 0.04 } as const;
-export const LANE_OFFSET = 0.55;
+export const LANE_OFFSET = 0.6; // bus half-width 0.625: opposing buses just clear each other
 
 type Profile = ReadonlyArray<readonly [lateral: number, y: number]>;
 

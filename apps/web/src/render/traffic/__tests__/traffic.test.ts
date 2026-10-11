@@ -265,8 +265,8 @@ describe('traffic model', () => {
     });
     const main = polyline(pts, false);
     const busAt = (t: number): BusPose => {
-      const p = pointAt(main, (t * 0.3) % main.length);
-      return { id: 'b1', x: p.x, z: p.z, dx: Math.cos(p.heading), dz: -Math.sin(p.heading), halfLen: 1.65, stopped: false };
+      const p = pointAt(main, (t * 0.3) % main.length); // drawn in its lane, like vehiclePoses
+      return { id: 'b1', x: p.x + Math.sin(p.heading) * 0.6, z: p.z + Math.cos(p.heading) * 0.6, dx: Math.cos(p.heading), dz: -Math.sin(p.heading), halfLen: 1.65, stopped: false };
     };
     const m = createTrafficModel(graph, { seed: 5, carCount: 24 });
     const tail = new Map<number, number>();
@@ -278,7 +278,7 @@ describe('traffic model', () => {
         worst = Math.max(worst, v);
       }
     });
-    expect(worst).toBeLessThan(30); // ~44 s without the turn-off
+    expect(worst).toBeLessThan(34); // ~44 s without the turn-off; seeds 1–8 give 21–31 s (cars also yield to buses at junctions)
   });
 
   it('stops before a level crossing while the train is on it', () => {
