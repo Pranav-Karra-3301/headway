@@ -634,3 +634,16 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 | P3 renderer bits | `apps/web/src/render/dynamic/**` (+ a `render/town/depot.ts` static lot) | depot lot with parked reserve buses, deploying buses drive out, 3-car train, clickable route lines (`pick` returns `{kind:'route', id}`), hover highlight |
 | P4 evolve + DSL | `packages/evolve/src/**`, `packages/sim/src/policy/{features,schema}.ts` docs only via P1 | DSL doc + prompts + probes cover `depot_check`/`deploy`; dry campaign on simVersion 3 |
 | P5 playtest + UX QA (after P1–P3) | `scripts/playtest/**`, small fixes anywhere in Play/HUD | scripted players (novice / sensible / expert) through intents: doing nothing = g0, sensible beats g0 3–12 %, expert can beat the champion sometimes; a click-path audit (every action ≤ 2 clicks, no dead ends, no console errors) with screenshots of each step; fixes |
+
+---
+
+## v13 final UX pass (user, 19:25) — run right after the submission polish workflow
+
+User: too much text; make it visual; the player's job is unclear; baseline vs reference vs champion — "what exactly is changing? I can't see the improvement"; Next Crowd and the bottom panel are unclear; the Lab is too much (objective J, round 10, spacing/allocation/transfers jargon); "what does Evolve do / what is the admin token"; route bus counts unclear and no way to change them in Play; remove the three dots after the title; legend bottom-left, controls bottom.
+
+1. Wordmark: remove the three coloured dots.
+2. Layout: route legend bottom-left (route colour, name, **bus icons × N**, waiting count); all controls in one bottom panel; nothing else floating except the top bar and the inspector.
+3. Watch bottom panel: title **"Who's dispatching?"** with a segmented control **Baseline · Hand-written · AI champion**; under it a **comparison strip for this exact crowd** (computed headlessly with runSync — ~10 ms each — for all three): three short horizontal bars each for *average wait*, *people who gave up*, *% home*, the selected one highlighted, caption "Same crowd · different dispatcher". **"Next crowd" → "New crowd"** with hint "Same town, new random riders".
+4. Play: each route in the legend gets **"Move a bus here"** (reassign intent for a bus on the route with the most buses, preferring one at/near its terminal; pending badge until applied). Whole flow click-only.
+5. Onboarding / About: replace text with 3 visual steps using simple palette SVG icons (person, stop, bus, train, clock): "People wait at stops" · "You send buses and time the train" · "Score: total minutes people spend getting home — lower wins". ≤ 12 words per step. About panel: a small diagram, ≤ 40 words.
+6. Lab: headline **−6.0% (training) / −5.3% (unseen)** big, then g0 → g1 → g2 chips each with its one-line change in plain words; chart small; rounds collapsed; humanise jargon (J → "total passenger time", spacing/allocation/transfers → "Spacing fix / Fleet move / Train link"); **hide "Evolve next generation" unless `?admin=1`**.
