@@ -54,15 +54,24 @@ button:disabled {
 }
 
 /* ---------- type ---------- */
-.hw-display,
-.gb {
-  font-family: var(--font-display);
+h1,
+h2,
+.hw-title,
+.hw-display {
+  font-family: var(--font-title);
   font-weight: 400;
   letter-spacing: 0.01em;
 }
 
+.gb {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
 .hw-label {
   font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -71,6 +80,7 @@ button:disabled {
 
 .hw-num {
   font-family: var(--font-display);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }
@@ -130,6 +140,7 @@ button:disabled {
   background: var(--wash);
   color: var(--ink);
   font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-sm);
   white-space: nowrap;
 }
@@ -151,6 +162,7 @@ button:disabled {
   background: var(--wash);
   color: var(--ink);
   font-family: var(--font-display);
+  font-weight: 600;
   font-size: var(--fs-md);
   white-space: nowrap;
 }

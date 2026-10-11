@@ -1,5 +1,29 @@
 /* Design tokens (T3a). Palette colours are rewritten at runtime from render/palettes.ts (styles/theme.ts). */
 @font-face {
+  font-family: "General Sans";
+  src: local("General Sans Regular"), local("GeneralSans-Regular"), url("/fonts/GeneralSans-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "General Sans";
+  src: local("General Sans Medium"), local("GeneralSans-Medium"), url("/fonts/GeneralSans-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "General Sans";
+  src: local("General Sans Semibold"), local("GeneralSans-Semibold"), url("/fonts/GeneralSans-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "General Sans";
+  src: local("General Sans Bold"), local("GeneralSans-Bold"), url("/fonts/GeneralSans-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
   font-family: "Gumball Rounded";
   src: local("GumballRounded"), local("Gumball Rounded"), url("/fonts/GumballRounded.ttf") format("truetype");
   font-display: block;
@@ -35,8 +59,10 @@
   --bad-soft: color-mix(in srgb, var(--bad) 14%, var(--paper));
 
   /* type */
-  --font-display: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif;
-  --font-ui: "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif;
+  /* Gumball only for headings and titles; General Sans for everything people read */
+  --font-title: "Gumball Rounded", "General Sans", system-ui, sans-serif;
+  --font-display: "General Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "General Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --fs-2xs: 11px;
   --fs-xs: 12px;
   --fs-sm: 13px;
