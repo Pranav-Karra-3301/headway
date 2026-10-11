@@ -64,9 +64,8 @@ export interface ScenarioInstance { scenarioId: string; seed: number; split: Spl
 // ---------- config & passengers ----------
 export interface SimConfig {
   simVersion: string;
-  bus: { count: number; capacity: number; speed: number; boardS: number; alightS: number; minDwellS: number;
-         /** v3: reserve buses parked in the depot, deployable by human or AI (default 2). */ reserve?: number };
-  train: { /** v3: linked cars (default 3); capacity is the whole train. */ cars?: number; capacity: number; speed: number; minDwellS: number; maxDwellS: number; defaultDwellS: number;
+  bus: { count: number; capacity: number; speed: number; boardS: number; alightS: number; minDwellS: number };
+  train: { capacity: number; speed: number; minDwellS: number; maxDwellS: number; defaultDwellS: number;
            boardS: number; alightS: number; carSpacing: number };
   walk: { meanSpeed: number; sdSpeed: number; minSpeed: number; maxSpeed: number; detourFactor: number; accessRadius: number };
   limits: { maxHoldS: number; maxHoldPerLoopS: number; maxLayoverS: number; minBusesPerRoute: number };
@@ -88,16 +87,15 @@ export type Leg =
 export interface Itinerary { legs: Leg[]; expectedCostS: number; transfers: number }
 
 // ---------- decisions ----------
-export type VehicleState = 'layover' | 'moving' | 'dwelling' | 'holding' | 'deadhead' | 'depot';
-export type DecisionKind = 'bus_at_stop' | 'bus_at_terminal' | 'train_at_station' | 'depot_check';
+export type VehicleState = 'layover' | 'moving' | 'dwelling' | 'holding' | 'deadhead';
+export type DecisionKind = 'bus_at_stop' | 'bus_at_terminal' | 'train_at_station';
 export type Action =
   | { type: 'continue' }                              // bus_at_stop: leave now (the implicit default)
   | { type: 'dispatch' }                              // bus_at_terminal: start the next loop now
   | { type: 'hold'; seconds: number }                 // stop: 5..maxHoldS · terminal: 10..120
   | { type: 'hold'; until: 'target_headway' }         // seconds = clamp(target_headway_s - headway_ahead_s)
   | { type: 'reassign'; to: RouteId | 'busiest' }     // terminal only; deadheads to the new terminal
-  | { type: 'setTrainDeparture'; dwellS: number }     // train_at_station: 30..120 after arrival
-  | { type: 'deploy'; to: RouteId | 'busiest' };      // depot_check (v3): send one reserve bus to a route
+  | { type: 'setTrainDeparture'; dwellS: number };    // train_at_station: 30..120 after arrival
 export type FeatureVector = Record<string, number>;
 export interface DecisionPoint {
   id: number; t: number; kind: DecisionKind; vehicleId: string;
@@ -111,8 +109,7 @@ export type Intent =                                  // human dispatcher input 
   | { type: 'dispatch'; vehicleId: string }
   | { type: 'hold'; vehicleId: string; seconds: number }
   | { type: 'reassign'; vehicleId: string; to: RouteId }
-  | { type: 'setTrainDeparture'; dwellS: number }
-  | { type: 'deploy'; to: RouteId };                  // v3: send one reserve bus from the depot
+  | { type: 'setTrainDeparture'; dwellS: number };
 
 // ---------- observation (identical for human and AI; no future information) ----------
 export interface RunningMetrics { spawned: number; completed: number; waitingNow: number; ridingNow: number;
@@ -130,8 +127,6 @@ export interface Observation {
     lastDepartureT: Partial<Record<RouteId, number>> }>;
   routes: Array<{ id: RouteId; buses: string[]; targetHeadwayS: number; queue: number }>;
   running: RunningMetrics;
-  /** v3: reserve buses parked in the depot and those driving out to a route. */
-  depot?: { reserves: string[]; deploying: string[] };
 }
 
 // ---------- controllers ----------
@@ -192,8 +187,7 @@ export interface Policy {
   params: { allocation: Record<RouteId, number>; maxHoldS: number; trainDefaultDwellS: number;
             targetHeadwayS?: Partial<Record<RouteId, number>> };
   rules: Rule[];
-  /** Policies written before v3 have no depot_check default: treat a missing entry as { type: 'continue' } (never deploy). */
-  defaults: Partial<Record<DecisionKind, Action>> & Record<Exclude<DecisionKind, 'depot_check'>, Action>;
+  defaults: Record<DecisionKind, Action>;
   advisor?: { provider: 'jev'; enabled: boolean; askWhen: Condition[]; holdOptionsS: number[]; instructions: string };
 }
 
