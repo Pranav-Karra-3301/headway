@@ -543,3 +543,10 @@ Kenney models load through `src/render/assets/kenney` (K0): `await preloadKenney
 | **train:** K2 evaluates `train-kit` passenger sets; if a 2-car unit with clear front/rear looks better, export `KENNEY_TRAIN = { front, rear }` and T2.2/the integration uses it | |
 
 Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (buildings, street furniture overrides: `st.*`, `res.house`, `res.townhouses`, optional `res.tower`/`res.garden`, props). The registry's family order makes Kenney overrides win. Core-town streets: if `TOWN.roads` centrelines sit on the 4 u greater-town grid, G5 / the grand integration renders them with the same Kenney road tiles (S1 then keeps only sidewalks where tiles lack them, plazas, footpaths, lawns and parking).
+
+---
+
+## v8 notes (16:35): engine landed; sim tuning; art bible
+
+- **Engine done** (early-engine workflow): real engine + passengers + metrics, 193 sim tests green, 10–17 ms per run, Play fairness exact (doing nothing = g0). Gaps found: train↔bus transfers almost never happen (1 / 5,348 stadium riders) because the rail ran Stadium → University → Central; REF beats g0 by only 1.7 %. A tuning agent is **reversing the rail to Stadium → Central → University** and retuning demand/behaviour (owns town.ts rail order, scenarios.ts, config.ts, builtin.ts, sim tests; report in `docs/research/sim-tuning.md`). Anything that shows fan counts or the rail order in copy (prompts, UI, demo script) must read them from `SCENARIOS` / `TOWN`, never hard-code "1,200".
+- **Art bible ready:** `docs/research/iso-art-direction.md` (30-item scoring checklist). Binding for the grand integration and the art loop: ortho camera 35.264° elevation, 45° azimuth from the south-east, no free rotation by default; fit the transit network into the HUD-safe rectangle; tall buildings only on the north/west sides of stops (University Station's building currently hides 7 of 8 platform slots — fix); **gameplay owns saturation** (route, stop, train and queue colours) — tone down teal/mustard roofs and the red canopy where they compete; mountains at the back, water at the front; post effects never blur gameplay.
