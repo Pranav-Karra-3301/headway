@@ -428,3 +428,14 @@ Each district track: region consistent with `TOWN.neighborhoods`; keep 2 u clear
 
 ### T2.2 change (supersedes its v2 row where they differ)
 T2.2 composes: base `SCENERY` (Task M) only where no district provides items (districts in order campus, downtown, apartments, stadium, outskirts), every `DISTRICTS` item through `createRegistry()` with a **clay-material KitContext adapter** backed by T2.1's materials/palettes (the same roles; unknown roles from `registry.roles`), static meshes merged per material and `instanced` assets drawn as InstancedMeshes (vegetation with the shared sway tweak), plus `createStreetscapeLayer`, `createTrafficLayer`, `createTownFxLayer`. T2.2 does not author art.
+
+---
+
+## Art notes from coordinator review (apply in T2.2 / T2.4 / the art-direction loop)
+
+- **kit-v2 (15:35):** big step up — lower/longer buses, 9 building types, 5 trees, 3 cars, soft shadows, tilt-shift. Fix next:
+  - Windows read as heavy navy holes: use a lighter slate-blue glass (`window` ≈ #4A6380) with thin white frames/sills (`trim`), and a faint sky reflection gradient in the clay shader; dusk keeps them emissive.
+  - Tilt-shift is a touch strong at full-board zoom: keep the focus band wide at the default game camera and fade the effect out when zoomed out past the board.
+  - Slightly more contrast/saturation in the grade at full-board zoom (colours wash out when small).
+  - The kit's stadium is the weakest piece (inner ring reads as water, a pole stands in the field): superseded by A4's `lm.stadium` — make sure the composer uses A4's.
+  - Roads are plain strips: streetscape (S1) adds sidewalks/curbs/crosswalks; keep the dashed centre line subtle.
