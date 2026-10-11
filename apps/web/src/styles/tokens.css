@@ -1,0 +1,108 @@
+/* Design tokens (T3a). Palette colours are rewritten at runtime from render/palettes.ts (styles/theme.ts). */
+@font-face {
+  font-family: "Gumball Rounded";
+  src: local("GumballRounded"), local("Gumball Rounded"), url("/fonts/GumballRounded.ttf") format("truetype");
+  font-display: block;
+}
+
+:root {
+  /* palette (Wooden Toy defaults) */
+  --bg: #ddefe5;
+  --bg-day: #ddefe5;
+  --ink: #1f2a44;
+  --paper: #fffbf2;
+  --accent: #2e5bda;
+  --route-r1: #1fa99a;
+  --route-r2: #f0a830;
+  --route-r3: #8a6bd8;
+
+  /* derived ink tints */
+  --ink-2: color-mix(in srgb, var(--ink) 74%, transparent);
+  --ink-3: color-mix(in srgb, var(--ink) 52%, transparent);
+  --ink-4: color-mix(in srgb, var(--ink) 30%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 6%, transparent);
+  --wash-2: color-mix(in srgb, var(--ink) 11%, transparent);
+  --line: color-mix(in srgb, var(--ink) 10%, transparent);
+  --glass: color-mix(in srgb, var(--paper) 90%, transparent);
+  --on-accent: #ffffff;
+
+  /* status (queue severity: ok < 180 s ≤ warn < 420 s ≤ bad) */
+  --ok: #22a06b;
+  --warn: #e9a23b;
+  --bad: #e5484d;
+  --ok-soft: color-mix(in srgb, var(--ok) 16%, var(--paper));
+  --warn-soft: color-mix(in srgb, var(--warn) 18%, var(--paper));
+  --bad-soft: color-mix(in srgb, var(--bad) 14%, var(--paper));
+
+  /* type */
+  --font-display: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif;
+  --font-ui: "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif;
+  --fs-2xs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 24px;
+  --fs-2xl: 32px;
+
+  /* spacing (4 px grid) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* radii */
+  --r-xs: 8px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* depth (soft, warm-neutral shadows like the kit sheet) */
+  --shadow-1: 0 1px 2px rgb(20 30 50 / 0.08), 0 2px 6px rgb(20 30 50 / 0.06);
+  --shadow-2: 0 2px 6px rgb(20 30 50 / 0.07), 0 10px 30px rgb(20 30 50 / 0.12);
+  --shadow-3: 0 6px 16px rgb(20 30 50 / 0.1), 0 24px 60px rgb(20 30 50 / 0.18);
+  --highlight: inset 0 1px 0 rgb(255 255 255 / 0.65);
+
+  /* motion */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --dur-press: 140ms;
+  --dur-fast: 150ms;
+  --dur-med: 200ms;
+  --dur-slow: 250ms;
+  --shift: 8px; /* enter/exit travel distance; 0 under reduced motion */
+
+  /* layout (for components positioning themselves over the town) */
+  --hw-gap: 14px;
+  --hw-bar-h: 52px;
+  --hw-top: calc(var(--hw-gap) * 2 + var(--hw-bar-h)); /* bottom edge of the top bar + gap */
+
+  /* stacking */
+  --z-stage: 0;
+  --z-markers: 10;
+  --z-hud: 20;
+  --z-mode: 30;
+  --z-toasts: 40;
+  --z-modal: 50;
+}
+
+:root[data-light="dusk"] {
+  --glass: color-mix(in srgb, var(--paper) 94%, transparent);
+  --shadow-2: 0 2px 6px rgb(5 8 20 / 0.2), 0 10px 30px rgb(5 8 20 / 0.32);
+  --shadow-3: 0 6px 16px rgb(5 8 20 / 0.24), 0 24px 60px rgb(5 8 20 / 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --shift: 0px;
+    --dur-med: 150ms;
+    --dur-slow: 150ms;
+    --ease-spring: var(--ease-out);
+  }
+}

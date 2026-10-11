@@ -382,3 +382,45 @@ A dedicated look-dev workflow: an "art director" agent screenshots Watch (day + 
 |---|---|---|
 | T8 eval CLIs | `packages/evolve/src/cli/{eval-sealed,export-web,sweep,verify-leaderboard}.ts`, `packages/evolve/test/cli-*.test.ts` | `sweep` (policies × scenarios × seeds → metrics table, for tuning), `export-web` (data/ → `apps/web/public/data/{champion,generations}.json`), `eval-sealed` (seeds from `SEALED_TEST_SEEDS` in `.env`, generating 3 random seeds into `.env` if absent; evaluates champion/g0/ref; POSTs to `/api/admin/sealed-eval`), `verify-leaderboard`. Run via `pnpm --filter @headway/evolve exec tsx src/cli/<name>.ts`. |
 | T9 smoke | `scripts/smoke/**` | dependency-free smoke harness (Node 26 + Chrome DevTools Protocol over the global WebSocket): launches headless Chrome, visits `/`, `/play`, `/lab` on a given base URL, fails on console errors or a blank canvas (pixel sample), waits for `window.__headway.ready`, checks sim time advances, saves screenshots to `.superpowers/wip/smoke/`. `node scripts/smoke/run.mjs --url <base>`. |
+
+---
+
+## v3 town art (user: "the buildings, trees, paths — everything needs a lot of work; use more agents")
+
+**Architecture (seams written by the coordinator, all under `apps/web/src/render/`):**
+- `assets/types.ts` — `PlacedAsset`, `AssetDef { kind, family, footprint, height, build(k, params), instanced?, sway? }`, `KitContext` (`mat(role, idx)`, `rbox`, `cyl`, `sphere`, `cone`, `detail`, `rand`), `RoleColors`.
+- `assets/catalog.ts` — **the shared catalog** of every kind with footprint (w × d at rot 0, front faces +z) and height. Families implement exactly these kinds; districts place only these kinds. Unknown/unimplemented kinds render as pink placeholder boxes.
+- `assets/registry.ts` (`AssetRegistry`), `assets/index.ts` (`createRegistry()`), `assets/basicKit.ts` (`createBasicKit` for previews/tests), `assets/validate.ts` (`validatePlacements(map, items)`).
+- `assets/families/{downtown,campus,residential,landmarks,vegetation,street}.ts` — each exports `ROLES` (extra palette roles, colours for palettes a/b/c) and `register(r)`.
+- `districts/types.ts` (`DistrictScenery { id, region, items, paths, areas }`), `districts/{campus,downtown,apartments,stadium,outskirts}.ts`, `districts/index.ts` (`DISTRICTS`).
+- `streetscape/index.ts` — `createStreetscapeLayer(map, districts)`.
+- Preview pages (Vite dev): `/assets-dev.html?family=<id>` (grid of a family) and `/districts-dev.html?d=<id>` (roads/rail strips + one district).
+
+**Quality bar for every art track:** a beautiful, coherent toy diorama in the Wooden Toy palette — rounded primitives only, consistent scale (person ≈ 0.8 u, door ≈ 1.0 u, storey ≈ 1.1 u), soft colour variety from palette roles, tasteful small details marked with `k.detail`, nothing fussy or noisy. Match `.superpowers/wip/kit-sheet.html` and T2.1's `kit-v2` when it is published. Budgets: buildings ≤ 3,000 triangles, landmarks ≤ 8,000, vegetation and street furniture ≤ 600 (they are instanced). Every asset's bounding box stays within its catalog footprint (±10 %) and height (±25 %).
+
+### Asset family tracks (start immediately)
+| Track | Owns | Delivers |
+|---|---|---|
+| A1 downtown | `assets/families/downtown.ts` (+ helper files `assets/families/downtown/**`), tests `src/render/__tests__/assets-downtown.test.ts` | every `dt.*` kind; red-brick college-town main street, varied facades, awnings, signs as shapes |
+| A2 campus | `assets/families/campus.ts`, `assets/families/campus/**`, `__tests__/assets-campus.test.ts` | every `cp.*` kind; Georgian brick + limestone, white trim, porticos, a dome, a spire |
+| A3 residential | `assets/families/residential.ts`, `assets/families/residential/**`, `__tests__/assets-residential.test.ts` | every `res.*` kind; balconies, porches, playground, parking |
+| A4 landmarks | `assets/families/landmarks.ts`, `assets/families/landmarks/**`, `__tests__/assets-landmarks.test.ts` | every `lm.*` kind; the stadium must be a showpiece (tiers, scoreboard, light towers, gates, banners) |
+| A5 vegetation | `assets/families/vegetation.ts`, `assets/families/vegetation/**`, `__tests__/assets-vegetation.test.ts` | every `veg.*` kind, `instanced: true`, crowns `sway: true`; per-instance variety via `k.rand()` |
+| A6 street | `assets/families/street.ts`, `assets/families/street/**`, `__tests__/assets-street.test.ts` | every `st.*` kind, `instanced: true` where possible; lamp heads use role `lamp` (FX makes them glow) |
+
+Each asset track: write the test first (all family kinds registered; `build` with `createBasicKit()` does not throw; bounding box within footprint/height tolerances; triangle budget), implement, then screenshot `/assets-dev.html?family=<id>` and PUBLISH "assets-<id>". Iterate on looks until it is genuinely charming.
+
+### District + streetscape tracks (start after the asset tracks)
+| Track | Owns | Delivers |
+|---|---|---|
+| D1 campus | `districts/campus.ts`, `__tests__/district-campus.test.ts` | the campus: lawn quad with criss-cross footpaths, clock tower as focal point, halls/library/chapel/dorms framing the quad, many trees, benches, lamps, flags |
+| D2 downtown | `districts/downtown.ts`, `__tests__/district-downtown.test.ts` | dense main street with continuous storefront rows, corner buildings, café tables, planters, lamps, bike racks, a small plaza with a fountain |
+| D3 apartments | `districts/apartments.ts`, `__tests__/district-apartments.test.ts` | towers + garden apartments + townhouses, parking lots, playground, hedges, trees |
+| D4 stadium + rail | `districts/stadium.ts`, `__tests__/district-stadium.test.ts` | stadium showpiece with gates and parking, flags, station buildings (`lm.stationCentral` at Central, `lm.stationHalt` at University and Stadium) aligned to platforms, level crossings at every road/rail crossing, rail signals |
+| D5 outskirts | `districts/outskirts.ts`, `__tests__/district-outskirts.test.ts` | everything outside the four neighbourhoods: tree belts along arterials and board edges, a few houses, water tower, fields/gardens as areas, hedges and fences — the town should feel like it continues past the board |
+| S1 streetscape | `streetscape/**`, `__tests__/streetscape.test.ts` | sidewalks + curbs along every road edge, zebra crosswalks at intersections near stops, district `paths` as footpaths, `areas` as lawn/plaza/parking/sports/garden surfaces (parking with painted lines), merged into few draw calls |
+
+Each district track: region consistent with `TOWN.neighborhoods`; keep 2 u clear around stops, platforms and their queue lines (`queueDir`); fronts face streets; generous breathing room; a test asserting `validatePlacements(TOWN, items)` returns no errors. Screenshot `/districts-dev.html?d=<id>` and PUBLISH "district-<id>".
+
+### T2.2 change (supersedes its v2 row where they differ)
+T2.2 composes: base `SCENERY` (Task M) only where no district provides items (districts in order campus, downtown, apartments, stadium, outskirts), every `DISTRICTS` item through `createRegistry()` with a **clay-material KitContext adapter** backed by T2.1's materials/palettes (the same roles; unknown roles from `registry.roles`), static meshes merged per material and `instanced` assets drawn as InstancedMeshes (vegetation with the shared sway tweak), plus `createStreetscapeLayer`, `createTrafficLayer`, `createTownFxLayer`. T2.2 does not author art.

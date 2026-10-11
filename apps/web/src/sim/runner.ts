@@ -2,6 +2,7 @@
 import type { Intent, Sim, SimSnapshot } from '@headway/sim';
 
 export type Speed = 1 | 4 | 8 | 16;
+export const SPEEDS: readonly Speed[] = [1, 4, 8, 16];
 const MAX_STEPS_PER_FRAME = 64;
 
 export class SimRunner {
@@ -12,6 +13,7 @@ export class SimRunner {
   alpha = 1;
   speed: Speed;
   paused = false;
+  /** Owed sim steps (fractional part carries over between frames). */
   private acc = 0;
 
   constructor(create: () => Sim, speed: Speed = 8) {
@@ -38,10 +40,11 @@ export class SimRunner {
     this.prev = this.next;
   }
 
-  /** Advance by real seconds: steps = floor(acc), at most 64 per frame; one snapshot per frame. */
+  /** Advance by real seconds: steps = floor(acc * speed), at most 64 per frame (backlog dropped); one snapshot per frame. */
   frame(dtS: number): void {
     if (this.paused || this.sim.done) { this.alpha = 1; return; }
-    this.acc += Math.min(Math.max(dtS, 0), 0.25) * this.speed;
+    const dt = Number.isFinite(dtS) && dtS > 0 ? dtS : 0;
+    this.acc += dt * this.speed;
     let steps = Math.floor(this.acc);
     if (steps > MAX_STEPS_PER_FRAME) { steps = MAX_STEPS_PER_FRAME; this.acc = steps; }
     if (steps > 0) {

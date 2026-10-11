@@ -100,13 +100,25 @@ export function roleSize(p: Palette, role: Role): number {
   return Array.isArray(v) ? v.length : 1;
 }
 
-/** Roles that light up at dusk (emissive colour + intensity). `onlyIdx` limits the glow to one variant of an array role. */
-export interface Glow { color: string; intensity: number; onlyIdx?: number }
+/** Roles that light up at dusk: emissive colour comes from palette role `from`, scaled by `intensity`.
+ *  `onlyIdx` limits the glow to one variant (window idx 1 = a lit window; idx 0 stays dark). */
+export interface Glow { from: Role; intensity: number; onlyIdx?: number }
 export const GLOW: Partial<Record<Role, Glow>> = {
-  window: { color: '#FFD27A', intensity: 0.9 },
-  lamp: { color: '#FFF3C4', intensity: 1.4 },
-  headlight: { color: '#FFF6D8', intensity: 1.6 },
-  taillight: { color: '#FF5A5A', intensity: 1.2 },
-  display: { color: '#FFD45C', intensity: 0.9 },
-  clock: { color: '#FFF4D6', intensity: 0.5 },
+  window: { from: 'windowGlow', intensity: 1.0, onlyIdx: 1 },
+  lamp: { from: 'lamp', intensity: 1.6 },
+  headlight: { from: 'headlight', intensity: 2.0 },
+  taillight: { from: 'taillight', intensity: 1.4 },
+  display: { from: 'display', intensity: 1.0 },
+  clock: { from: 'clock', intensity: 0.45 },
 };
+
+/** Emissive (dusk) colour + intensity of a role/variant, or null when it never glows. */
+export function glowOf(p: Palette, role: Role, idx = 0): { color: string; intensity: number } | null {
+  const g = GLOW[role];
+  if (!g || (g.onlyIdx !== undefined && g.onlyIdx !== idx)) return null;
+  return { color: colorOf(p, g.from, idx), intensity: g.intensity };
+}
+
+export function paletteOf(p: Palette | PaletteId): Palette {
+  return typeof p === 'string' ? PALETTES[p] : p;
+}

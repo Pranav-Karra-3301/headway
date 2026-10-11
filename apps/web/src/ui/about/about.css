@@ -1,0 +1,336 @@
+/* Owner: T7. About sheet. Palette values arrive as --hwa-* custom properties (paletteVars). */
+.hwa {
+  --hwa-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --hwa-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --hwa-display: var(--font-display, "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif);
+  --hwa-body: var(--font-ui, "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif);
+  --hwa-text: color-mix(in srgb, var(--hwa-ink) 82%, transparent);
+  --hwa-soft: color-mix(in srgb, var(--hwa-ink) 58%, transparent);
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  pointer-events: none;
+  color: var(--hwa-ink);
+  font-family: var(--hwa-body);
+}
+.hwa-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--hwa-ink) 16%, transparent);
+  animation: hwa-fade 220ms ease-out both;
+}
+.hwa[data-light="dusk"] .hwa-scrim { background: rgba(8, 12, 28, 0.36); }
+
+.hwa-sheet {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  width: min(580px, calc(100vw - 28px));
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  overflow: hidden;
+  outline: none;
+  border-radius: 28px;
+  background: var(--hwa-paper);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 6px 0 color-mix(in srgb, var(--hwa-ink) 8%, var(--hwa-lip)),
+    0 34px 80px -24px rgba(31, 42, 68, 0.5),
+    0 8px 24px rgba(31, 42, 68, 0.1);
+  animation: hwa-in 320ms var(--hwa-drawer) both;
+}
+.hwa[data-closing] .hwa-scrim { animation: hwa-fade-out 160ms ease-out forwards; }
+.hwa[data-closing] .hwa-sheet { animation: hwa-out 160ms ease-out forwards; }
+
+/* ---------- header ---------- */
+.hwa-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 14px 28px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--hwa-ink) 7%, transparent);
+}
+.hwa-eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--hwa-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hwa-soft);
+}
+.hwa-title {
+  margin: 0;
+  font-family: var(--hwa-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--hwa-ink);
+}
+.hwa-close {
+  appearance: none;
+  border: 0;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--hwa-ink);
+  background: color-mix(in srgb, var(--hwa-ink) 6%, transparent);
+  transition: transform 140ms var(--hwa-ease), background-color 140ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hwa-close:hover { background: color-mix(in srgb, var(--hwa-ink) 11%, transparent); }
+}
+.hwa-close:active { transform: scale(0.93); }
+.hwa-close:focus-visible,
+.hwa-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--hwa-accent, #2e5bda) 55%, white);
+  outline-offset: 2px;
+}
+
+/* ---------- body ---------- */
+.hwa-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--hwa-ink) 20%, transparent) transparent;
+  padding: 18px 28px 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--hwa-text);
+}
+.hwa-body p { margin: 0 0 10px; text-wrap: pretty; }
+.hwa-body b { color: var(--hwa-ink); font-weight: 700; }
+.hwa-lead {
+  font-size: 17px;
+  line-height: 1.55;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--hwa-ink) 90%, transparent);
+}
+.hwa-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #2fb36d 10%, var(--hwa-paper));
+  font-size: 13.5px;
+}
+.hwa-live {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #2fb36d;
+}
+
+/* the loop */
+.hwa-loopbox {
+  margin: 14px 0 6px;
+  padding: 14px 14px 12px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--hwa-r3) 8%, var(--hwa-paper));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hwa-r3) 18%, transparent) inset;
+}
+.hwa-loopbox figcaption {
+  margin: 0 0 10px 4px;
+  font-family: var(--hwa-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--hwa-r3) 60%, var(--hwa-ink));
+}
+.hwa-loop {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 6px;
+  counter-reset: hwa-step;
+}
+.hwa-loop li {
+  counter-increment: hwa-step;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: var(--hwa-paper);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--hwa-r3) 22%, var(--hwa-lip)), 0 4px 10px rgba(31, 42, 68, 0.06);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--hwa-ink);
+}
+.hwa-loop li::before {
+  content: counter(hwa-step);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--hwa-r3);
+  color: #fff;
+  font-family: var(--hwa-display);
+  font-size: 12px;
+}
+.hwa-loop li:last-child::before { background: #2fb36d; }
+
+/* sections */
+.hwa-sec {
+  --tone: var(--hwa-ink);
+  margin-top: 22px;
+}
+.hwa-sec--r1 { --tone: var(--hwa-r1); }
+.hwa-sec--r2 { --tone: var(--hwa-r2); }
+.hwa-sec--r3 { --tone: var(--hwa-r3); }
+.hwa-sec--accent { --tone: var(--hwa-accent); }
+.hwa-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-family: var(--hwa-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.15;
+  color: var(--hwa-ink);
+}
+.hwa-dot {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 4px;
+  background: var(--tone);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--tone) 65%, var(--hwa-ink));
+}
+.hwa-list {
+  list-style: none;
+  margin: 4px 0 10px;
+  padding: 0;
+}
+.hwa-list li {
+  position: relative;
+  margin: 5px 0;
+  padding-left: 20px;
+}
+.hwa-list li::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--tone);
+}
+.hwa-list--not li::before {
+  background: transparent;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hwa-ink) 40%, transparent) inset;
+  border-radius: 50%;
+}
+
+/* footer */
+.hwa-foot {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1.5px dashed color-mix(in srgb, var(--hwa-ink) 16%, transparent);
+}
+.hwa-built {
+  font-family: var(--hwa-display);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hwa-soft);
+}
+.hwa-chips {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hwa-chips li {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hwa-ink) 6%, transparent);
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--hwa-ink);
+}
+.hwa-hint { font-size: 13px; color: var(--hwa-soft); }
+.hwa kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--hwa-ink) 7%, transparent);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--hwa-ink) 12%, transparent);
+  font-family: var(--hwa-display);
+  font-size: 12px;
+  text-align: center;
+  color: var(--hwa-ink);
+}
+
+/* optional inline trigger (AboutButton) */
+.hwa-trigger {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px 6px 6px;
+  border-radius: 999px;
+  background: var(--paper, #fffbf2);
+  color: var(--ink, #1f2a44);
+  font-family: var(--font-display, "Gumball Rounded", ui-rounded, sans-serif);
+  font-size: 15px;
+  box-shadow: 0 2px 0 rgba(31, 42, 68, 0.1), 0 6px 16px rgba(31, 42, 68, 0.1);
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.hwa-trigger:active { transform: scale(0.96); }
+.hwa-trigger-q {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink, #1f2a44);
+  color: var(--paper, #fffbf2);
+  font-size: 13px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .hwa-sheet { top: 8px; right: 8px; bottom: 8px; width: calc(100vw - 16px); border-radius: 22px; }
+  .hwa-head { padding: 18px 16px 12px 20px; }
+  .hwa-body { padding: 14px 20px 22px; }
+}
+
+@keyframes hwa-in {
+  from { opacity: 0; transform: translateX(28px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hwa-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateX(18px); }
+}
+@keyframes hwa-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hwa-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hwa-sheet { animation-name: hwa-fade; animation-duration: 160ms; }
+  .hwa[data-closing] .hwa-sheet { animation-name: hwa-fade-out; }
+  .hwa-close:active,
+  .hwa-trigger:active { transform: none; }
+}
