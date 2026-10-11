@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · ambient traffic preview</title>
+    <link rel="preload" href="/fonts/GumballRounded.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("/fonts/GumballRounded.ttf") format("truetype"); font-display: block; }
+      :root { --ink: #1F2A44; --paper: #FFFBF2; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: var(--ink);
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .gb { font-family: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif; font-weight: 400; }
+      .brand { position: fixed; top: 20px; left: 26px; pointer-events: none; }
+      .brand h1 { margin: 0; font-size: 44px; line-height: 1; }
+      .brand p { margin: 6px 0 0 2px; font-size: 15px; opacity: .65; }
+      #stats { position: fixed; left: 26px; bottom: 16px; font-size: 14px; opacity: .75; }
+      body.dusk .brand, body.dusk #stats { color: #FFF4E2; }
+      body.clean .brand, body.clean #stats { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="brand"><h1 class="gb">HEADWAY</h1><p class="gb">ambient traffic · stub sim</p></div>
+    <div id="stats" class="gb"></div>
+    <script type="module" src="./preview.ts"></script>
+  </body>
+</html>

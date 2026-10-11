@@ -98,6 +98,22 @@ export function stampRoads(g: Grid, f: Float32Array, map: TownMap, corners: Corn
   }
 }
 
+/** f = min(f, zone) where zone < 0 inside a corner's fillet square (from the curb lines out to the fillet centre). */
+export function stampCornerZones(g: Grid, f: Float32Array, corners: Corner[], h: number, rc: number): void {
+  for (const c of corners) {
+    const [i0, j0, i1, j1] = windowOf(g, Math.min(c.n.x, c.o.x), Math.min(c.n.z, c.o.z), Math.max(c.n.x, c.o.x), Math.max(c.n.z, c.o.z), h + rc + 0.2);
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const rx = g.x0 + i * g.c - c.n.x, rz = g.z0 + j * g.c - c.n.z;
+        const a = rx * c.ni.x + rz * c.ni.z - h, b = rx * c.nj.x + rz * c.nj.z - h;
+        const v = Math.max(a - rc, b - rc, -0.1 - a, -0.1 - b);
+        const k = j * g.nx + i;
+        if (v < f[k]!) f[k] = v;
+      }
+    }
+  }
+}
+
 /** Junction nodes (degree ≥ 3). */
 export function junctions(arms: Map<string, Arm[]>): string[] {
   return [...arms.entries()].filter(([, l]) => l.length >= 3).map(([id]) => id);

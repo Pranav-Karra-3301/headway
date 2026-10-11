@@ -1,7 +1,8 @@
-// Owner: E3. A few slow low-poly clouds drifting high up behind the mountains (never over the board or the water).
-// Each cloud is a cluster of faceted puffs with a flattened belly. Drift runs in the vertex shader along the cloud's
-// band (north band → east, west band → north, i.e. left → right on screen), wrapping inside a span that stays behind
-// the diorama; clouds shrink away near the wrap point instead of popping. `cloudOffset` mirrors the shader exactly.
+// Owner: E3. A few slow low-poly clouds high in the haze band behind the mountains (never over the board or the
+// water, no shadows). Each cloud is a cluster of smooth-shaded puffs with a flattened belly. Drift runs in the vertex
+// shader along the cloud's band (north band → east, west band → north: left → right on screen), wrapping inside a span
+// that stays behind the diorama; clouds shrink away near the wrap point instead of popping. `cloudOffset` mirrors the
+// shader exactly.
 import * as THREE from 'three';
 import type { WorldLayout } from '../layout';
 import { prng, type PropsAttribs } from './ridges';
@@ -29,27 +30,23 @@ export const driftDir = (nx: number, nz: number) => ({ x: -nz, z: nx });
 
 // [band, phase in span, depth beyond the edge, height, size, speed]
 const DEFS: Array<['north' | 'west', number, number, number, number, number]> = [
-  ['north', 0.34, 15, 31, 9, 0.34],
-  ['north', 0.58, 34, 41, 12, 0.26],
-  ['north', 0.8, 10, 27, 7, 0.4],
-  ['west', 0.22, 20, 35, 10, 0.3],
-  ['west', 0.5, 9, 26, 7.5, 0.38],
-  ['west', 0.76, 38, 44, 12, 0.24],
+  ['north', 0.5, 40, 30, 11, 0.3],
+  ['north', 0.78, 36, 25, 8, 0.38],
+  ['west', 0.3, 42, 31, 12, 0.26],
+  ['west', 0.62, 35, 24, 7.5, 0.34],
 ];
 
 export function cloudSpecs(layout: WorldLayout): CloudSpec[] {
   const E = layout.extent;
   return DEFS.map(([band, phase, depth, y, size, speed], i) => {
     const nx = band === 'north' ? 0 : -1, nz = band === 'north' ? -1 : 0;
-    // span along the drift direction: from well past the far corner of the back to past the near corner
-    const spanStart = band === 'north' ? E.minX - 60 : -(E.maxZ + 30);
-    const spanEnd = band === 'north' ? E.maxX + 30 : -(E.minZ - 60);
+    // span along the drift direction: from well past the far end of the back to past the near corner
+    const spanStart = band === 'north' ? E.minX - 70 : -(E.maxZ + 40);
+    const spanEnd = band === 'north' ? E.maxX + 40 : -(E.minZ - 70);
     const span = spanEnd - spanStart;
     const a = spanStart + phase * span;
     const perp = band === 'north' ? E.minZ - depth : E.minX - depth;
-    const x = band === 'north' ? a : perp;
-    const z = band === 'north' ? perp : -a;
-    return { x, y, z, size, nx, nz, spanStart, span, phase, speed, seed: 101 + i * 17 };
+    return { x: band === 'north' ? a : perp, y, z: band === 'north' ? perp : -a, size, nx, nz, spanStart, span, phase, speed, seed: 101 + i * 17 };
   });
 }
 
@@ -64,32 +61,34 @@ export function cloudOffset(c: CloudSpec, t: number): { dx: number; dz: number; 
   return { dx: dir.x * delta, dz: dir.z * delta, grow };
 }
 
-/** Append every cloud's puffs (faceted icosahedra with flattened bellies) as triangles. */
+/** Append every cloud's puffs (smooth icosphere puffs with flattened bellies) as triangles. */
 export function appendClouds(out: PropsAttribs, clouds: CloudSpec[]): void {
-  const ico = new THREE.IcosahedronGeometry(1, 1);
+  const ico = new THREE.IcosahedronGeometry(1, 2);
   const pos = ico.getAttribute('position');
   const v = new THREE.Vector3();
   for (const c of clouds) {
     const rnd = prng(c.seed);
     const dir = driftDir(c.nx, c.nz);
     const puffs = 4 + Math.floor(rnd() * 2);
+    const belly = c.y - c.size * 0.09;
     for (let k = 0; k < puffs; k++) {
-      const f = puffs === 1 ? 0 : k / (puffs - 1) - 0.5; // −0.5 … 0.5 along the cloud
-      const mid = 1 - Math.abs(f) * 1.3;
-      const r = c.size * (0.2 + 0.13 * mid + rnd() * 0.05);
-      const along = f * c.size * 0.78 + (rnd() - 0.5) * c.size * 0.06;
-      const side = (rnd() - 0.5) * c.size * 0.22;
+      const f = k / (puffs - 1) - 0.5; // −0.5 … 0.5 along the cloud
+      const mid = 1 - Math.abs(f) * 1.25;
+      const r = c.size * (0.17 + 0.14 * mid + rnd() * 0.04);
+      const along = f * c.size * 0.8 + (rnd() - 0.5) * c.size * 0.05;
+      const side = (rnd() - 0.5) * c.size * 0.18;
       const cx = c.x + dir.x * along + c.nx * side, cz = c.z + dir.z * along + c.nz * side;
-      const cy = c.y + r * 0.22 * mid;
-      const belly = c.y - c.size * 0.1;
-      const spin = rnd() * Math.PI * 2;
-      const cs = Math.cos(spin), sn = Math.sin(spin);
+      const cy = c.y + r * 0.3 * mid;
       for (let i = 0; i < pos.count; i++) {
-        v.fromBufferAttribute(pos, i);
-        const lx = v.x * cs - v.z * sn, lz = v.x * sn + v.z * cs;
-        const y = Math.max(belly, cy + v.y * r * 0.72);
-        out.position.push(cx + lx * r, y, cz + lz * r);
-        out.info.push(0.14, 1, c.nx, c.nz);
+        v.fromBufferAttribute(pos, i); // unit sphere: the normal is the position
+        const sy = 0.7;
+        const y = cy + v.y * r * sy;
+        const flat = y < belly;
+        out.position.push(cx + v.x * r, flat ? belly : y, cz + v.z * r);
+        // ellipsoid normal (x, y / sy, z); the flattened belly faces down
+        const nx = v.x, ny = flat ? -3 : v.y / sy, nz = v.z, l = Math.hypot(nx, ny, nz) || 1;
+        out.normal.push(nx / l, ny / l, nz / l);
+        out.info.push(3, 0, c.nx, c.nz);
         out.center.push(c.x, c.y, c.z);
         out.drift.push(c.spanStart, c.span, c.phase, c.speed);
         out.mist.push(-1e4, -1e4 + 1);

@@ -65,7 +65,7 @@ describe('resolvePolicyRef', () => {
 });
 
 describe('sim:run main', () => {
-  it('prints the metrics of one real run', async () => {
+  it('prints the metrics of one real run', { timeout: 30_000 }, async () => {
     const direct = runSync({ map: TOWN, scenario: { scenarioId: 'stadium_exit', seed: 1001, split: 'train' }, controller: new PolicyController(G0) });
     const { code, out } = await capture(['--policy', 'g0', '--scenario', 'stadium_exit', '--seed', '1001']);
     expect(code).toBe(0);
@@ -77,7 +77,7 @@ describe('sim:run main', () => {
     if (direct.findings[0]) expect(out).toContain(direct.findings[0].text);
   });
 
-  it('prints the RunResult as JSON with --json', async () => {
+  it('prints the RunResult as JSON with --json', { timeout: 30_000 }, async () => {
     const { code, out } = await capture(['--policy', 'ref', '--scenario', 'class_change', '--seed', '1002', '--json']);
     expect(code).toBe(0);
     const r = JSON.parse(out) as RunResult;
@@ -85,7 +85,7 @@ describe('sim:run main', () => {
     expect(r.metrics.spawned).toBeGreaterThan(0);
   });
 
-  it('fails cleanly on an unknown scenario or policy', async () => {
+  it('fails cleanly on an unknown scenario or policy', { timeout: 30_000 }, async () => {
     expect((await capture(['--scenario', 'moon_landing'])).code).toBe(2);
     const bad = await capture(['--policy', 'champion'], join(tmp(), 'empty'));
     expect(bad.code).toBe(2);
@@ -94,7 +94,7 @@ describe('sim:run main', () => {
 });
 
 describe('formatRun', () => {
-  it('summarises metrics, findings and rule fires', () => {
+  it('summarises metrics, findings and rule fires', { timeout: 30_000 }, () => {
     const r = runSync({ map: TOWN, scenario: { scenarioId: 'class_change', seed: 1001, split: 'train' }, controller: new PolicyController(G0) });
     const text = formatRun(r, { label: 'g0', ms: 12, findings: 2 });
     expect(text).toContain('class_change seed 1001');

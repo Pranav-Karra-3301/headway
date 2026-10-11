@@ -147,6 +147,7 @@ export function outskirtsRegion(map: TownMap): Vec2[] {
 // ---------------------------------------------------------------- the town's constraints
 const CAM_DIRS = [35, 45, 55].map((a) => v(Math.sin((a * Math.PI) / 180), Math.cos((a * Math.PI) / 180)));
 const heightOf = (it: PlacedAsset) => (CATALOG_BY_KIND.get(it.kind)?.h ?? 1) * (it.scale ?? 1);
+const SOFT = new Set(['veg.oak', 'veg.maple', 'veg.pine', 'veg.birch', 'veg.poplar', 'veg.cherry', 'veg.bush']);
 const SMALL = (it: PlacedAsset) => { const f = footprintOf(it); return Math.max(f.w, f.d) <= 1.3; };
 
 interface Opts {
@@ -158,6 +159,8 @@ interface Opts {
   pad?: number;
   /** May touch this district's own footpaths (benches, lamps). */
   onPath?: boolean;
+  /** May stand on this district's own ground areas (contents of a plaza, field, orchard, lawn). */
+  inArea?: boolean;
 }
 
 /** The town as seen by the outskirts placer (exported for dev tooling). */
@@ -178,7 +181,8 @@ export class OutskirtsTown {
   readonly items: PlacedAsset[] = [];
   readonly paths: FootPath[] = [];
   readonly areas: GroundArea[] = [];
-  private readonly ownRects: Rect[] = [];
+  /** Own footprints; vegetation crowns may interpenetrate a little (validatePlacements allows 0.2). */
+  private readonly ownRects: Array<{ r: Rect; soft: boolean }> = [];
   private readonly ringCache = new Map<string, boolean>();
 
   constructor(readonly map: TownMap, others: DistrictScenery[]) {
@@ -284,16 +288,17 @@ export class OutskirtsTown {
   }
   /** Water side (south/east board edges) stays low. */
   waterSide(r: Rect): boolean { return r.z1 > this.b.maxZ - 4.6 || r.x1 > this.b.maxX - 4.6; }
-  freeOfOwn(r: Rect, pad: number, onPath: boolean): boolean {
-    if (this.ownRects.some((o) => overlaps(grow(o, pad), r))) return false;
+  freeOfOwn(r: Rect, pad: number, onPath: boolean, inArea = false, soft = false): boolean {
+    if (this.ownRects.some((o) => overlaps(grow(o.r, soft && o.soft ? -0.08 : pad), r))) return false;
     if (!onPath && this.paths.some((p) => p.points.some((a, i) => i + 1 < p.points.length && segRectDist(a, p.points[i + 1]!, r) < p.width / 2 + 0.08))) return false;
+    if (!inArea && this.areas.some((a) => rectHitsPoly(r, a.polygon))) return false;
     return true;
   }
   fits(it: PlacedAsset, o: Opts = {}): boolean {
     const r = itemRect(it), h = heightOf(it);
     const thin = it.kind === 'st.lamp' || it.kind === 'st.flag';
     if (!this.groundFree(r, o.road ?? (SMALL(it) ? 1.65 : 2.2), o.rail ?? 1.7)) return false;
-    if (!this.freeOfOwn(r, o.pad ?? 0, o.onPath ?? false)) return false;
+    if (!this.freeOfOwn(r, o.pad ?? 0, o.onPath ?? false, o.inArea ?? false, SOFT.has(it.kind))) return false;
     if (!thin && this.waterSide(r) && h > 2.75) return false;
     if (!thin && h > 0.6 && this.hides(r, h)) return false;
     return true;
@@ -305,7 +310,7 @@ export class OutskirtsTown {
     if (it.params && Object.keys(it.params).length) clean.params = it.params;
     if (!this.fits(clean, o)) return false;
     this.items.push(clean);
-    this.ownRects.push(itemRect(clean));
+    this.ownRects.push({ r: itemRect(clean), soft: SOFT.has(clean.kind) });
     return true;
   }
   /** Reserve ground for an area (fields, lawns, plazas): no items of others, roads or rail under it. */
@@ -368,9 +373,10 @@ function waterTowerKnoll(t: OutskirtsTown): void {
     if (!t.groundFree(r, 2.4, 1.5) || !t.freeOfOwn(r, 0, false)) continue;
     if (!t.add({ kind: 'lm.waterTower', x: c.x, z: c.z, rot: S })) continue;
     t.area('lawn', rectAt(c.x, c.z, box - 0.1, box - 0.1), 0.6);
+    const lawn = { inArea: true, rail: 1.3 };
     const h = box / 2, len = box - 0.1;
     const fence = (x: number, z: number, rot: number, length: number) =>
-      t.add({ kind: 'st.fence', x, z, rot, params: { length, style: 'rail' } }, { rail: 1.3 });
+      t.add({ kind: 'st.fence', x, z, rot, params: { length, style: 'rail' } }, lawn);
     fence(c.x, c.z - h, S, len);
     fence(c.x - h, c.z, E, len);
     fence(c.x + h, c.z, E, len);
@@ -387,21 +393,22 @@ function waterTowerKnoll(t: OutskirtsTown): void {
 /** SE corner (closest to the camera, by the marina): a little café plaza with a kiosk, umbrella tables and a flag. */
 function lakesideCafe(t: OutskirtsTown): void {
   const b = t.b;
-  const target = v(b.maxX - 3.9, b.maxZ - 3.2);
-  for (const [dx, dz] of spiral(3, 0.4)) {
+  const target = v(b.maxX - 3.2, b.maxZ - 2.4);
+  for (const [dx, dz] of spiral(3, 0.2)) {
     const c = v(target.x + dx, target.z + dz);
-    const plaza = rectAt(c.x, c.z, 5.6, 4.0);
-    if (!t.groundFree(grow(plaza, 0.2), 2.2, 1.5)) continue;
+    const plaza = rectAt(c.x, c.z, 5.4, 3.9);
+    if (!t.groundFree(grow(plaza, 0.15), 2.2, 1.5)) continue;
     t.area('plaza', plaza, 0.7);
-    t.add({ kind: 'st.kiosk', x: c.x - 1.7, z: c.z - 1.1, rot: S, params: { color: 0 } });
-    t.add({ kind: 'st.tableUmbrella', x: c.x + 0.1, z: c.z - 0.75, params: { color: 1 } });
-    t.add({ kind: 'st.tableUmbrella', x: c.x + 1.75, z: c.z - 0.6, params: { color: 2 } });
-    t.add({ kind: 'st.tableUmbrella', x: c.x + 0.9, z: c.z + 0.9, params: { color: 0 } });
-    t.add({ kind: 'st.flag', x: c.x + 2.55, z: c.z + 1.65, params: { color: 1 } });
-    t.add({ kind: 'veg.planter', x: c.x - 2.35, z: c.z + 1.35 });
-    t.add({ kind: 'veg.planter', x: c.x - 0.75, z: c.z + 1.45 });
-    t.add({ kind: 'st.bin', x: c.x - 2.45, z: c.z + 0.2 });
-    t.add({ kind: 'st.lamp', x: c.x + 2.55, z: c.z - 1.75 }, { onPath: true });
+    const IN = { inArea: true };
+    t.add({ kind: 'st.kiosk', x: c.x - 1.7, z: c.z - 1.1, rot: S, params: { color: 0 } }, IN);
+    t.add({ kind: 'st.tableUmbrella', x: c.x + 0.1, z: c.z - 0.75, params: { color: 1 } }, IN);
+    t.add({ kind: 'st.tableUmbrella', x: c.x + 1.75, z: c.z - 0.6, params: { color: 2 } }, IN);
+    t.add({ kind: 'st.tableUmbrella', x: c.x + 0.9, z: c.z + 0.9, params: { color: 0 } }, IN);
+    t.add({ kind: 'st.flag', x: c.x + 2.55, z: c.z + 1.65, params: { color: 1 } }, IN);
+    t.add({ kind: 'veg.planter', x: c.x - 2.35, z: c.z + 1.35 }, IN);
+    t.add({ kind: 'veg.planter', x: c.x - 0.75, z: c.z + 1.45 }, IN);
+    t.add({ kind: 'st.bin', x: c.x - 2.45, z: c.z + 0.2 }, IN);
+    t.add({ kind: 'st.lamp', x: c.x + 2.55, z: c.z - 1.75 }, { onPath: true, inArea: true });
     return;
   }
 }
@@ -462,11 +469,8 @@ function promenades(t: OutskirtsTown): void {
 function cottages(t: OutskirtsTown, rand: () => number): void {
   const MAX = 16;
   let colour = 0, houses = 0;
-  for (const e of t.map.roads.edges) {
-    const pts = e.path.points;
-    if (pts.length !== 2) continue; // straight streets only
-    const a = pts[0]!, c = pts[1]!, L = dist(a, c);
-    if (L < 6) continue;
+  for (const [a, c] of straights(t)) {
+    const L = dist(a, c);
     const tx = (c.x - a.x) / L, tz = (c.z - a.z) / L, horiz = Math.abs(tx) > 0.5;
     for (const sideSign of [1, -1]) {
       const n = v(-tz * sideSign, tx * sideSign); // from the road toward the lots
@@ -481,8 +485,13 @@ function cottages(t: OutskirtsTown, rand: () => number): void {
           t.add({ kind: 'veg.hedge', x: hp.x, z: hp.z, rot: horiz ? E : S, params: { length: 2.3 } });
         }
         if (group.length) {
-          const s0 = group[0]! - 1.45, s1 = group[group.length - 1]! + 1.45, fp = at((s0 + s1) / 2, off + 1.62);
-          t.add({ kind: 'st.fence', x: fp.x, z: fp.z, rot: horiz ? S : E, params: { length: r3(s1 - s0), style: 'picket' } }, { rail: 1.25 });
+          const g0 = group[0]! - 1.45, g1 = group[group.length - 1]! + 1.45;
+          fence: for (let trim = 0; trim <= 2.4; trim += 0.4) {
+            for (const [s0, s1] of [[g0 + trim, g1], [g0, g1 - trim], [g0 + trim / 2, g1 - trim / 2]] as const) {
+              const fp = at((s0 + s1) / 2, off + 1.62);
+              if (t.add({ kind: 'st.fence', x: fp.x, z: fp.z, rot: horiz ? S : E, params: { length: r3(s1 - s0), style: 'picket' } }, { rail: 1.25 })) break fence;
+            }
+          }
         }
         group = [];
       };
@@ -513,10 +522,9 @@ function cottages(t: OutskirtsTown, rand: () => number): void {
 /** Allotment gardens in the inner bands (between the railway and the ring road) where a patch by a street is free. */
 function allotments(t: OutskirtsTown): void {
   let made = 0;
-  for (const e of t.map.roads.edges) {
-    const pts = e.path.points;
-    if (pts.length !== 2 || made >= 4) continue;
-    const a = pts[0]!, c = pts[1]!, L = dist(a, c), tx = (c.x - a.x) / L, tz = (c.z - a.z) / L, horiz = Math.abs(tx) > 0.5;
+  for (const [a, c] of straights(t)) {
+    if (made >= 4) break;
+    const L = dist(a, c), tx = (c.x - a.x) / L, tz = (c.z - a.z) / L, horiz = Math.abs(tx) > 0.5;
     for (const sgn of [1, -1]) {
       const n = v(-tz * sgn, tx * sgn);
       for (let s = 3; s <= L - 3 && made < 4; s += 0.5) {
@@ -527,7 +535,7 @@ function allotments(t: OutskirtsTown): void {
         if (!t.area('garden', r, 0.3)) continue;
         for (const k of [-1, 1]) {
           const fb = horiz ? v(mid.x + k * 1.15, mid.z) : v(mid.x, mid.z + k * 1.15);
-          t.add({ kind: 'veg.flowerbed', x: fb.x, z: fb.z, rot: horiz ? E : S });
+          t.add({ kind: 'veg.flowerbed', x: fb.x, z: fb.z, rot: horiz ? E : S }, { inArea: true });
         }
         made++;
         s += 7;
@@ -552,7 +560,7 @@ function pocketOrchards(t: OutskirtsTown): void {
         for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) trees.push({ kind: 'veg.cherry', x: c.x - w / 2 + 1.2 + i * 2.0, z: c.z - d / 2 + 1.2 + j * 2.0, scale: 0.92 });
         if (!trees.every((tr) => t.fits(tr))) continue;
         t.area('garden', r, 0.5);
-        trees.forEach((tr) => t.add(tr));
+        trees.forEach((tr) => t.add(tr, { inArea: true }));
         done = true;
         break;
       }
@@ -570,7 +578,7 @@ function farmFields(t: OutskirtsTown, rand: () => number): void {
   const trailX = R.x0 - 1.68;
   const knoll = t.items.find((it) => it.kind === 'lm.waterTower');
   const fields: Array<[number, number]> = [];
-  for (const [z0, z1] of [[-15.5, -6.5], [6.5, 15.5]] as const) {
+  for (const [z0, z1] of [[-16, -9.2], [9.2, 16]] as const) {
     for (const shrink of [0, 1, 2, 3]) {
       const r: Rect = { x0, x1, z0: z0 + shrink, z1: z1 - shrink };
       if (r.z1 - r.z0 < 3.5 || !t.groundFree(r, 2.2, 1.7) || !t.freeOfOwn(r, 0, false)) continue;
@@ -582,7 +590,7 @@ function farmFields(t: OutskirtsTown, rand: () => number): void {
       t.add({ kind: 'veg.hedge', x: (x0 + x1) / 2, z: r.z1 + 0.45, params: { length: hl } });
       t.add({ kind: 'st.fence', x: x1 + 0.13, z: (r.z0 + r.z1) / 2, rot: E, params: { length: r.z1 - r.z0 - 0.4, style: 'rail' } }, { rail: 1.25 });
       // a few bushes along the field edge and a lone tree in the field corner
-      t.add({ kind: 'veg.oak', x: x0 + 1.0, z: r.z0 + 1.1, scale: 0.95 + rand() * 0.15 });
+      t.add({ kind: 'veg.oak', x: x0 + 1.0, z: r.z0 + 1.1, scale: 0.92 + rand() * 0.12 }, { inArea: true });
       break;
     }
   }
@@ -618,52 +626,94 @@ function avenues(t: OutskirtsTown, tree: (kind: string, x: number, z: number, sc
   }
 }
 
-/** Woodland belts in the band between the railway and the board edge: dense pine/oak at the mountain sides with
- *  clumps and clearings, sparse birches, cherries and bushes on the water sides; plus fill in the inner bands. */
+/** Woodland belts that follow the railway and the board edge: rows inset from the board edge (the silhouette
+ *  against the mountains) and offsets of the rail loop (outward through the outer band and corners, inward through
+ *  the inner bands). Dense pine/oak with clumps and clearings at the mountain sides; sparse birches, cherries and
+ *  bushes on the water sides; soft groups between the railway and the ring road. */
 function belts(t: OutskirtsTown, rand: () => number, tree: (kind: string, x: number, z: number, scale?: number) => boolean): void {
   const b = t.b;
-  const BACK: Pick = [['veg.pine', 50], ['veg.oak', 20], ['veg.maple', 14], ['veg.birch', 10], ['veg.poplar', 6]];
-  const FRONT: Pick = [['veg.birch', 34], ['veg.cherry', 30], ['veg.bush', 36]];
-  const INNER: Pick = [['veg.oak', 34], ['veg.maple', 26], ['veg.birch', 20], ['veg.bush', 20]];
-  const step = 1.85;
-  for (let gz = b.minZ + 0.9; gz < b.maxZ - 0.5; gz += step * 0.866) {
-    const row = Math.round((gz - b.minZ) / (step * 0.866));
-    for (let gx = b.minX + 0.9 + (row % 2) * step * 0.5; gx < b.maxX - 0.5; gx += step) {
-      const x = gx + (rand() - 0.5) * 0.7, z = gz + (rand() - 0.5) * 0.6;
-      const p = v(x, z);
+  const BACK: Pick = [['veg.pine', 48], ['veg.oak', 20], ['veg.maple', 14], ['veg.birch', 10], ['veg.poplar', 8]];
+  const FRONT: Pick = [['veg.birch', 30], ['veg.cherry', 30], ['veg.bush', 40]];
+  const INNER: Pick = [['veg.oak', 30], ['veg.maple', 26], ['veg.birch', 18], ['veg.cherry', 8], ['veg.bush', 18]];
+  const rows: Array<{ pts: Vec2[]; kind: 'edge' | 'rail' }> = [
+    { pts: insetLoop(b, 0.95), kind: 'edge' },
+    { pts: insetLoop(b, 2.55), kind: 'edge' },
+    ...[2.65, 4.3, 5.95, 7.6, 9.25, 10.9].map((d) => ({ pts: offsetLoop(t.rail, d), kind: 'rail' as const })),
+    ...[2.6, 4.25].map((d) => ({ pts: offsetLoop(t.rail, -d), kind: 'rail' as const })),
+  ];
+  /** Try the chosen kind, then smaller stand-ins, so narrow strips still fill. */
+  const plant = (kinds: string[], x: number, z: number, scale: number) => {
+    for (const k of kinds) for (const s of [scale, scale * 0.86]) if (tree(k, x, z, k === 'veg.bush' ? Math.max(0.85, s) : s)) return true;
+    return false;
+  };
+  for (const row of rows) {
+    walkLoop(row.pts, 1.6, (p, dir) => {
+      const j = (rand() - 0.5) * 0.5, n = v(-dir.z, dir.x), lat = (rand() - 0.5) * 0.4;
+      const x = p.x + dir.x * j + n.x * lat, z = p.z + dir.z * j + n.z * lat;
+      const q = v(x, z);
       const dn = z - b.minZ, ds = b.maxZ - z, dw = x - b.minX, de = b.maxX - x;
-      const outer = t.outsideRail(p);
-      const back = Math.min(dn, dw) <= Math.min(ds, de);
-      const clump = noise2(x / 6.5 + 11, z / 6.5 + 3);
-      const roll = rand(), kindRoll = rand(), sizeRoll = rand();
-      if (outer) {
+      // mountain side = within reach of the north or west edge (the NE and SW corners are wooded headlands)
+      const back = Math.min(dn, dw) < 6.5 || Math.min(dn, dw) <= Math.min(ds, de);
+      const clump = noise2(x / 6.5 + 11, z / 6.5 + 3), roll = rand(), kindRoll = rand(), size = rand();
+      if (t.outsideRail(q)) {
         if (back) {
-          if (clump < 0.24 || roll > 0.92) continue;
+          if (clump < 0.16 || roll > 0.95) return;
           const kind = pick(() => kindRoll, BACK);
-          const edge = Math.min(dn, dw) < 1.6;
-          tree(kind, x, z, kind === 'veg.pine' ? (edge ? 1.12 : 1.0) + sizeRoll * 0.22 : 0.9 + sizeRoll * 0.2);
+          const atEdge = Math.min(dn, dw) < 1.8;
+          plant([kind, 'veg.pine', 'veg.birch', 'veg.poplar', 'veg.bush'], x, z, kind === 'veg.pine' ? (atEdge ? 1.08 : 0.98) + size * 0.2 : 0.9 + size * 0.18);
         } else {
-          if (clump < 0.5 || roll > 0.45) continue;
+          if (clump < 0.42 || roll > 0.55) return;
           const kind = pick(() => kindRoll, FRONT);
-          tree(kind, x, z, kind === 'veg.bush' ? 0.9 + sizeRoll * 0.3 : 0.82 + sizeRoll * 0.14);
+          plant([kind, 'veg.bush'], x, z, kind === 'veg.bush' ? 0.9 + size * 0.3 : 0.82 + size * 0.14);
         }
-      } else if (!t.insideRing(p)) {
-        // inner band between rail and ring road: soft groups, more open
-        if (clump < 0.42 || roll > 0.55) continue;
+      } else if (!t.insideRing(q)) {
+        if (clump < 0.34 || roll > 0.66) return;
         const kind = pick(() => kindRoll, INNER);
-        tree(kind, x, z, kind === 'veg.bush' ? 0.9 + sizeRoll * 0.3 : 0.85 + sizeRoll * 0.2);
+        plant([kind, 'veg.birch', 'veg.bush'], x, z, kind === 'veg.bush' ? 0.9 + size * 0.3 : 0.86 + size * 0.18);
       }
-    }
+    });
   }
+  // undergrowth: bushes along the town-facing edge of the back woods
+  walkLoop(offsetLoop(t.rail, 2.3), 1.3, (p) => {
+    const dn = p.z - b.minZ, dw = p.x - b.minX, ds = b.maxZ - p.z, de = b.maxX - p.x;
+    if ((Math.min(dn, dw) >= 6.5 && Math.min(dn, dw) > Math.min(ds, de)) || rand() > 0.45) return;
+    tree('veg.bush', p.x, p.z, 0.85 + rand() * 0.3);
+  });
 }
 
 // ---------------------------------------------------------------- helpers
+/** Straight street segments at least 6 u long. */
+function straights(t: OutskirtsTown): Array<[Vec2, Vec2]> {
+  const out: Array<[Vec2, Vec2]> = [];
+  for (const pts of t.roads) for (let i = 0; i + 1 < pts.length; i++) if (dist(pts[i]!, pts[i + 1]!) >= 6) out.push([pts[i]!, pts[i + 1]!]);
+  return out;
+}
 /** Offsets in a growing square spiral (nearest first) up to radius rmax. */
 function spiral(rmax: number, step: number): Array<[number, number]> {
   const out: Array<[number, number]> = [];
   const n = Math.ceil(rmax / step);
   for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) out.push([i * step, j * step]);
   return out.filter(([x, z]) => Math.hypot(x, z) <= rmax + 1e-9).sort((p, q) => Math.hypot(p[0], p[1]) - Math.hypot(q[0], q[1]) || p[0] - q[0] || p[1] - q[1]);
+}
+/** Closed rectangle loop inset from the board edge. */
+function insetLoop(b: TownMap['bounds'], d: number): Vec2[] {
+  return [v(b.minX + d, b.minZ + d), v(b.maxX - d, b.minZ + d), v(b.maxX - d, b.maxZ - d), v(b.minX + d, b.maxZ - d)];
+}
+/** The rail loop offset by d (outward > 0, inward < 0). */
+function offsetLoop(loop: Vec2[], d: number): Vec2[] {
+  const n = loop.length;
+  const normals = loop.map((_, i) => {
+    const a = loop[(i - 1 + n) % n]!, c = loop[(i + 1) % n]!, L = dist(a, c) || 1;
+    return v((c.z - a.z) / L, -(c.x - a.x) / L);
+  });
+  // orient outward
+  const probe = loop[0]!, nn = normals[0]!;
+  const sign = pip(v(probe.x + nn.x * 0.5, probe.z + nn.z * 0.5), loop) ? -1 : 1;
+  return loop.map((p, i) => v(p.x + normals[i]!.x * d * sign, p.z + normals[i]!.z * d * sign));
+}
+/** Visit points every `pitch` around a closed loop (with the local direction). */
+function walkLoop(pts: Vec2[], pitch: number, f: (p: Vec2, dir: Vec2) => void): void {
+  walkEdge([...pts, pts[0]!], pitch, f);
 }
 /** Visit points every `pitch` along a polyline (with the local direction). */
 function walkEdge(pts: Vec2[], pitch: number, f: (p: Vec2, dir: Vec2) => void): void {

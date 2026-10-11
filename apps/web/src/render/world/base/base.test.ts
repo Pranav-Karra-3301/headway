@@ -9,7 +9,7 @@ import type { FrameContext } from '../../layers';
 import { worldLayout } from '../layout';
 import { buildBaseGeometry } from './geometry';
 import { createBaseLayer } from './index';
-import { adaptProfile, BASE, defaultProfile, groundAt, isWater, modeLevel, samplePoints, sampleTops } from './profile';
+import { adaptProfile, BASE, defaultProfile, floorAt, groundAt, isWater, modeLevel, samplePoints, sampleTops } from './profile';
 
 const layout = worldLayout(TOWN);
 const E = layout.extent, B = layout.board;
@@ -35,12 +35,13 @@ describe('default profile', () => {
   it('mountain sides are dry board-level land; lake sides are a deep water column', () => {
     const [north, east, south, west] = sides;
     for (const p of north!.samples) {
-      if (p.x < layout.shore.east) { expect(p.water).toBeNull(); expect(p.ground).toBeCloseTo(BASE.floorY, 6); }
+      if (p.x < layout.shore.east) { expect(p.water).toBeNull(); expect(p.ground).toBeCloseTo(BASE.landY, 6); }
       else if (p.x > layout.shore.east + 1) expect(p.water).toBe(BASE.waterLevel);
     }
     for (const p of [...east!.samples, ...south!.samples]) {
       expect(p.water).toBe(BASE.waterLevel);
-      expect(p.ground).toBeLessThan(BASE.waterLevel - 3);
+      expect(p.ground).toBeLessThan(BASE.waterLevel - 1.5);
+      expect(p.ground).toBeGreaterThan(BASE.bottom + 1);
     }
     for (const p of west!.samples) {
       if (p.z > layout.shore.south + 1) expect(p.water).toBe(BASE.waterLevel);
@@ -49,16 +50,18 @@ describe('default profile', () => {
   });
 
   it('ground: board level on land, a beach sloping to the shore, a lake bed deepening away from it', () => {
-    expect(groundAt(layout, -50, -40)).toBeCloseTo(BASE.floorY, 6);
-    expect(groundAt(layout, 0, 0)).toBeCloseTo(BASE.floorY, 6);
+    expect(groundAt(layout, -50, -40)).toBeCloseTo(BASE.landY, 6);
+    expect(groundAt(layout, 0, 0)).toBeCloseTo(BASE.landY, 6);
     let prev = Infinity;
     for (let z = B.maxZ; z <= E.maxZ; z += 0.5) {
       const y = groundAt(layout, 0, z);
       expect(y).toBeLessThanOrEqual(prev + 1e-9);
       prev = y;
     }
-    expect(groundAt(layout, 0, B.maxZ + 2)).toBeLessThan(BASE.floorY);
+    expect(groundAt(layout, 0, B.maxZ + 2)).toBeLessThan(BASE.landY);
     expect(groundAt(layout, 0, B.maxZ + 2)).toBeGreaterThan(BASE.waterLevel - 0.6);
+    // the safety floor always stays under the expected ground
+    for (const [x, z] of [[-50, -40], [0, B.maxZ + 2], [0, E.maxZ], [E.maxX, -50]] as const) expect(floorAt(layout, x, z)).toBeLessThan(groundAt(layout, x, z) - 0.5);
     expect(groundAt(layout, 0, E.maxZ)).toBeCloseTo(BASE.bedY, 6);
     expect(groundAt(layout, E.maxX, 0)).toBeCloseTo(BASE.bedY, 6);
     expect(isWater(layout, 0, layout.shore.south + 0.1)).toBe(true);
@@ -111,7 +114,7 @@ describe('adaptProfile', () => {
     const mid = north.find((p) => Math.abs(p.x) < 0.5)!;
     expect(mid.ground).toBeCloseTo(8, 6);
     expect(mid.water).toBeNull();
-    for (const p of south) { expect(p.water).toBeCloseTo(-0.5, 6); expect(p.ground).toBeLessThan(-3); }
+    for (const p of south) { expect(p.water).toBeCloseTo(-0.5, 6); expect(p.ground).toBeLessThan(-2); }
     // a lone spike (a rock on the cut) is filtered out
     const spiky = pts.map((_, i) => (i === 40 ? 30 : null));
     const s2 = adaptProfile(sides, spiky, water);
@@ -168,7 +171,7 @@ describe('buildBaseGeometry', () => {
       return m;
     };
     expect(top((p) => Math.abs(p.z - E.maxZ) < 1e-4 && Math.abs(p.x) < 3)).toBeCloseTo(BASE.waterLevel, 4);
-    expect(top((p) => Math.abs(p.z - E.minZ) < 1e-4 && Math.abs(p.x) < 3)).toBeCloseTo(BASE.floorY, 4);
+    expect(top((p) => Math.abs(p.z - E.minZ) < 1e-4 && Math.abs(p.x) < 3)).toBeCloseTo(BASE.landY, 4);
   });
 });
 

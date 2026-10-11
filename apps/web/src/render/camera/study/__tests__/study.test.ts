@@ -10,7 +10,7 @@ import { CURRENT_RIG_VIEW, ISO_ELEV, STUDY_VIEWS, toImage, viewBasis } from '../
 import { containsPoint, firstOccluder, rayBox, type Box } from '../occlusion';
 import { composeStudyTown, placementBoxes, sceneryToPlacement, stationBoxes, studyBoxes } from '../town';
 import { queueSlot, studySamples } from '../samples';
-import { contentRect, fitView, hudBoxes, overlaps, safeRect } from '../fit';
+import { contentRect, fitView, hudBoxes, overlaps, polyHitsRect, safeRect, silhouetteScale } from '../fit';
 import { measureView, rankViews, type StudyInput } from '../measure';
 import { buildHeightField, heightFieldHit } from '../heightfield';
 import * as THREE from 'three';
@@ -148,23 +148,26 @@ describe('study town', () => {
 });
 
 describe('samples', () => {
-  it('grows queue slots along queueDir in parallel rows', () => {
+  it('grows queue slots along queueDir (bible: p + dir·(0.25 + 0.5 i)) in parallel rows', () => {
     const p = { x: 4, z: -2 }, dir = { x: 0, z: 1 };
     const s = Array.from({ length: 12 }, (_, i) => queueSlot(p, dir, i));
-    expect(s[0]!.z).toBeGreaterThan(p.z);
-    expect(s[1]!.z).toBeGreaterThan(s[0]!.z);
-    expect(s[6]!.x).not.toBeCloseTo(4);
+    expect(s[0]!.z).toBeCloseTo(p.z + 0.25);
+    expect(s[3]!.z).toBeCloseTo(p.z + 1.75);
+    expect(s[7]!.x).toBeCloseTo(4);
+    expect(s[8]!.x).not.toBeCloseTo(4);
     for (let i = 0; i < s.length; i++) for (let j = i + 1; j < s.length; j++) expect(Math.hypot(s[i]!.x - s[j]!.x, s[i]!.z - s[j]!.z)).toBeGreaterThan(0.3);
   });
 
   it('samples every stop, platform queue, platform edge, route and the rail outside the tunnel', () => {
     const tunnel = { fromDist: 10, toDist: 28 };
-    const all = studySamples(TOWN, { slots: 12, railTunnel: tunnel });
+    const all = studySamples(TOWN, { railTunnel: tunnel });
     const by = (c: string) => all.filter((s) => s.cls === c);
-    const places = new Set(by('queue').map((s) => s.place));
+    const places = new Set([...by('queue'), ...by('platformQueue')].map((s) => s.place));
     for (const s of TOWN.stops) { expect(places.has(s.id)).toBe(true); expect(by('stop').some((x) => x.place === s.id)).toBe(true); }
     for (const st of TOWN.rail.stations) { expect(places.has(st.id)).toBe(true); expect(by('platform').some((x) => x.place === st.id)).toBe(true); }
-    expect(by('queue')).toHaveLength((TOWN.stops.length + TOWN.rail.stations.length) * 12);
+    expect(by('queue')).toHaveLength(TOWN.stops.length * 8);
+    expect(by('platformQueue')).toHaveLength(TOWN.rail.stations.length * 8);
+    for (const s of by('platformQueue')) expect(s.p.y).toBeCloseTo(0.95);
     for (const r of TOWN.routes) {
       const rs = by('route').filter((s) => s.place === r.id);
       expect(rs.length).toBeGreaterThan(r.path.length / 1.2);
@@ -207,6 +210,22 @@ describe('fit', () => {
     expect(r).toEqual({ x0: -2, y0: -4, x1: 3, y1: 1 });
   });
 
+  it('uses the bible safe rect: 36 px of marker room under the top bar, cut by the inspector and the Play dock', () => {
+    const f = fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 });
+    expect(f.rect).toEqual({ x0: 14, y0: 116, x1: 1426, y1: 886 });
+    expect(f.scale).toBeGreaterThan(14); // the bible's worked example: ≈ 17 px/u at 1440 × 900
+    expect(fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { inspector: true }).rect.x1).toBe(1440 - 360);
+    expect(fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { mode: 'play' }).rect.y1).toBe(900 - 168);
+    const strict = fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { strict: true });
+    for (const b of hudBoxes(1440, 900)) expect(overlaps(strict.rect, b)).toBe(false);
+    // stops and platforms never end up under the legend or the Watch card (test-only corner panels)
+    const basis = viewBasis({ elev: ISO_ELEV, az: 45 });
+    for (const p of [...TOWN.stops.map((s) => s.p), ...TOWN.rail.stations.map((s) => s.platform)]) {
+      const q = f.toScreen(toImage(basis, { x: p.x, y: 0, z: p.z }));
+      for (const b of hudBoxes(1440, 900).filter((x) => x.id === 'legend' || x.id === 'bottom')) expect(q.x > b.x0 && q.x < b.x1 && q.y > b.y0 && q.y < b.y1).toBe(false);
+    }
+  });
+
   it('fits the transit network inside the inner safe rect, smaller when the inspector opens', () => {
     const v = { elev: ISO_ELEV, az: 45 };
     const closed = fitView(v, TOWN, { w: 1600, h: 1000 });
@@ -214,12 +233,24 @@ describe('fit', () => {
     expect(open.scale).toBeLessThan(closed.scale);
     for (const f of [closed, open]) {
       const basis = viewBasis(v);
-      for (const s of [...TOWN.rail.loop.points.map((p) => ({ x: p.x, y: 0, z: p.z })), ...TOWN.stops.map((s) => ({ x: s.p.x, y: 2.6, z: s.p.z }))]) {
+      for (const s of [...TOWN.rail.loop.points.map((p) => ({ x: p.x, y: 0, z: p.z })), ...TOWN.stops.map((s) => ({ x: s.p.x, y: 2.2, z: s.p.z }))]) {
         const q = f.toScreen(toImage(basis, s));
-        expect(q.x).toBeGreaterThanOrEqual(f.inner.x0 - 1e-6); expect(q.x).toBeLessThanOrEqual(f.inner.x1 + 1e-6);
-        expect(q.y).toBeGreaterThanOrEqual(f.inner.y0 - 1e-6); expect(q.y).toBeLessThanOrEqual(f.inner.y1 + 1e-6);
+        // loop vertices may poke ≤ 1 px past the 2 u samples the fit uses
+        expect(q.x).toBeGreaterThanOrEqual(f.inner.x0 - 1); expect(q.x).toBeLessThanOrEqual(f.inner.x1 + 1);
+        expect(q.y).toBeGreaterThanOrEqual(f.inner.y0 - 1); expect(q.y).toBeLessThanOrEqual(f.inner.y1 + 1);
       }
     }
+  });
+});
+
+describe('silhouette fit (aside)', () => {
+  it('tests convex polygons against rects and never does worse than 90 % of the rectangle fit', () => {
+    const tri = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 0, y: 10 }];
+    expect(polyHitsRect(tri, { x0: 1, y0: 1, x1: 2, y1: 2 })).toBe(true);
+    expect(polyHitsRect(tri, { x0: 6, y0: 6, x1: 9, y1: 9 })).toBe(false); // beyond the hypotenuse
+    expect(polyHitsRect(tri, { x0: -5, y0: -5, x1: -1, y1: -1 })).toBe(false);
+    const v = { elev: 30, az: 45 };
+    expect(silhouetteScale(v, TOWN, { w: 1600, h: 1000 })).toBeGreaterThanOrEqual(fitView(v, TOWN, { w: 1600, h: 1000 }).scale * 0.9);
   });
 });
 
@@ -283,7 +314,10 @@ describe('world height field', () => {
     const water = new THREE.Mesh(new THREE.BoxGeometry(40, 0.2, 40), new THREE.MeshStandardMaterial()); water.position.y = -0.3;
     const pines = new THREE.InstancedMesh(new THREE.ConeGeometry(0.5, 3, 6), new THREE.MeshStandardMaterial(), 2); pines.name = 'pines';
     pines.setMatrixAt(0, new THREE.Matrix4().makeTranslation(0, 1.5, 10)); pines.setMatrixAt(1, new THREE.Matrix4().makeTranslation(0, 1.5, -10));
-    g.add(hill, cloud, sky, water, pines);
+    const posed = new THREE.Mesh(new THREE.BoxGeometry(3, 6, 3), new THREE.MeshStandardMaterial()); posed.name = 'posed'; // placed by its vertex shader
+    posed.geometry.setAttribute('aBoat', new THREE.Float32BufferAttribute(new Float32Array(posed.geometry.getAttribute('position').count), 1));
+    posed.position.set(0, 3, -6);
+    g.add(hill, cloud, sky, water, pines, posed);
     return g;
   };
   const hf = buildHeightField(scene(), ext, { cell: 0.5 });
@@ -297,5 +331,6 @@ describe('world height field', () => {
     expect(heightFieldHit(hf, { x: 0.2, y: 0.2, z: 0.2 }, { x: 0, y: 1, z: 0 })).toBeNull(); // the sky quad at the origin is skipped
     expect(heightFieldHit(hf, { x: -10, y: 9, z: 0 }, { x: 0, y: 1, z: 0 })).toBe('cloud'); // but a ray climbing into the cloud is blocked
     expect(heightFieldHit(hf, { x: 5, y: 0.1, z: 5 }, { x: 0, y: 1, z: 0 })).toBeNull(); // water below the board never occludes
+    expect(heightFieldHit(hf, { x: 0, y: 1, z: -6 }, { x: 0, y: 1, z: 0 })).toBeNull(); // shader-posed meshes are skipped
   });
 });

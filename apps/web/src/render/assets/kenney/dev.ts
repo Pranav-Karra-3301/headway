@@ -83,7 +83,7 @@ const extraRows = Math.ceil(knKinds.length / 8);
 const focus = q.get('row');
 const focusRow = focus !== null ? ROWS[Number(focus)] : undefined;
 const view = Number(q.get('view') ?? (focusRow ? 13 : 38 + extraRows * 6));
-const { scene, camera, loop } = devScene(view, focusRow ? iso(Number(q.get('u') ?? 0), focusRow.v) : iso(0, 1 + extraRows * 3));
+const { renderer, scene, camera, loop } = devScene(view, focusRow ? iso(Number(q.get('u') ?? 0), focusRow.v) : iso(0, 1 + extraRows * 3));
 scene.background = new THREE.Color(P.bg);
 document.documentElement.style.background = P.bg;
 
@@ -138,7 +138,17 @@ hud.style.cssText = 'left:14px;top:10px;transform:none;font-size:13px';
 hud.textContent = `Kenney sampler · palette ${pal} (${P.name}) · ${missing ? `${missing} not loaded` : 'all models loaded'}`;
 document.body.append(hud);
 
+// ?still=1 (screenshots): render a few frames, then stop the loop so headless capture stays cheap.
+const still = q.get('still') === '1';
+if (still) {
+  renderer.setPixelRatio(1);
+  scene.traverse((o) => { if ((o as THREE.DirectionalLight).isDirectionalLight) (o as THREE.DirectionalLight).shadow.mapSize.set(2048, 2048); });
+}
+let frames = 0;
 const v = new THREE.Vector3();
-loop(() => { for (const { el, p } of labels) { v.copy(p).project(camera); el.style.left = `${((v.x + 1) / 2) * innerWidth}px`; el.style.top = `${((1 - v.y) / 2) * innerHeight}px`; } });
+loop(() => {
+  for (const { el, p } of labels) { v.copy(p).project(camera); el.style.left = `${((v.x + 1) / 2) * innerWidth}px`; el.style.top = `${((1 - v.y) / 2) * innerHeight}px`; }
+  if (still && ++frames === 4) requestAnimationFrame(() => renderer.setAnimationLoop(null));
+});
 (window as unknown as { __assetsReady: boolean; __kenneyReady: (id: KenneyId) => boolean }).__assetsReady = true;
 (window as unknown as { __kenneyReady: (id: KenneyId) => boolean }).__kenneyReady = kenneyReady;

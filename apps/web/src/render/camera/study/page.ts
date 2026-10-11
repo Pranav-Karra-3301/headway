@@ -82,9 +82,12 @@ const results = rankViews(views.map((v) => measureView(v, input)));
 log(`camera-study: height field ${msWorld.toFixed(0)} ms, ${views.length} views measured in ${(performance.now() - tMeasure).toFixed(0)} ms, ${study.stats.triangles} static tris`);
 const byId = new Map(results.map((r) => [r.view.id, r]));
 const best = results.find((r) => r.view.id !== CURRENT_RIG_VIEW.id)!;
+/** The study's recommendation (and the art bible's rule 1): true iso, azimuth 45°. */
+const RECOMMENDED = viewId(ISO_ELEV, 45);
+const pick = byId.get(RECOMMENDED)!;
 
 // ---------------------------------------------------------------- renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: !q.has('noaa') && !!single, preserveDrawingBuffer: true }); // grid tiles are 2× supersampled instead
 renderer.setPixelRatio(1);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -93,7 +96,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 scene.add(study.root);
 const dusk = light === 'dusk' ? 1 : 0;
-const lights = createLights({ bounds: TOWN.bounds, palette: 'a', dusk, shadowMapSize: 4096 });
+const lights = createLights({ bounds: TOWN.bounds, palette: 'a', dusk, shadowMapSize: single ? 4096 : 2048 });
 lights.fit(TOWN.bounds, 9);
 scene.add(lights.group);
 const backdrop = createBackdrop(scene, { palette: 'a', dusk, bounds: TOWN.bounds });
@@ -150,7 +153,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, r: ViewResult, f: Fit, ox: n
   ctx.setLineDash([]);
   // hidden samples: routes/rail first (small, soft), gameplay samples on top (ringed)
   const b = viewBasis(r.view);
-  const pts = r.hiddenPoints.map((h) => ({ h, s: screenOf(f, toImage(b, h.p)), g: h.cls === 'queue' || h.cls === 'stop' || h.cls === 'platform' }));
+  const pts = r.hiddenPoints.map((h) => ({ h, s: screenOf(f, toImage(b, h.p)), g: h.cls !== 'route' && h.cls !== 'rail' }));
   for (const { s, g } of pts) if (!g) { ctx.fillStyle = 'rgba(229,72,77,0.6)'; ctx.beginPath(); ctx.arc(s.x, s.y, 1.9 / k, 0, Math.PI * 2); ctx.fill(); }
   for (const { s, g } of pts) if (g) {
     ctx.fillStyle = HIDDEN; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2 / k;
@@ -168,15 +171,16 @@ function caption(r: ViewResult): string {
 function tableHtml(rs: ViewResult[]): string {
   const rows = rs.map((r, i) => {
     const rig = r.view.id === CURRENT_RIG_VIEW.id;
-    const cls = r === best ? 'best' : rig ? 'rig' : '';
-    return `<tr class="${cls}"><td class="v">${i + 1}. ${r.view.label}${r === best ? ' <b class="tag">top</b>' : ''}</td>` +
-      `<td>${pct(r.hidden.queue.frac)}</td><td>${pct(r.hidden.stop.frac)}</td><td>${pct(r.hidden.platform.frac)}</td><td>${pct(r.hidden.route.frac)}</td><td>${pct(r.hidden.rail.frac)}</td>` +
-      `<td>${r.fit.scale.toFixed(1)}</td><td>${r.screen.groundPx.toFixed(1)}</td><td>${r.screen.personPx.toFixed(1)}</td><td>${r.screen.networkPct.toFixed(0)}%</td>` +
+    const cls = r === pick ? 'best' : rig ? 'rig' : '';
+    const tags = (r === pick ? ' <b class="tag">pick</b>' : '') + (r === best && r !== pick ? ' <b class="tag ghost">top score</b>' : '');
+    return `<tr class="${cls}"><td class="v">${i + 1}. ${r.view.label}${tags}</td>` +
+      `<td>${pct(r.hidden.queue.frac)}</td><td>${pct(r.hidden.platformQueue.frac)}</td><td>${pct(r.hidden.stop.frac)}</td><td>${pct(r.hidden.platform.frac)}</td><td>${pct(r.hidden.route.frac)}</td><td>${pct(r.hidden.rail.frac)}</td><td>${pct(r.behindVehicle.frac)}</td>` +
+      `<td>${r.fit.scale.toFixed(1)}</td><td>${r.screen.personPx.toFixed(1)}</td><td>${r.screen.networkPct.toFixed(0)}%</td>` +
       `<td>${r.screen.queueSpacingMinPx.toFixed(1)}</td><td>${r.screen.markersInvolved}/${r.perPlace.length}</td><td>${r.fit.inspectorScale.toFixed(1)}</td><td>${(r.fit.alt['1280×720'] ?? 0).toFixed(1)}</td>` +
       `<td>${pct(visibilityOf(r))}</td><td class="s">${r.score.toFixed(1)}</td></tr>`;
   }).join('');
-  return `<table><thead><tr><th>view (ranked)</th><th>queue slots<br>hidden</th><th>stops</th><th>platform<br>edges</th><th>bus<br>routes</th><th>rail</th>` +
-    `<th>px / u</th><th>ground<br>px / u</th><th>person<br>px</th><th>network<br>% screen</th><th>queue gap<br>px</th><th>marker<br>clashes</th><th>px / u<br>inspector</th><th>px / u<br>1280×720</th><th>visible<br>(weighted)</th><th>score</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table><thead><tr><th>view (ranked by score)</th><th>stop<br>queues</th><th>platform<br>queues</th><th>stops</th><th>platform<br>edges</th><th>bus<br>routes</th><th>rail</th><th>behind a<br>dwelling bus/train</th>` +
+    `<th>px / u</th><th>person<br>px</th><th>network<br>% screen</th><th>queue gap<br>px</th><th>marker<br>clashes</th><th>px / u<br>inspector</th><th>px / u<br>1280×720</th><th>visible<br>(weighted)</th><th>score</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 const GRID: Array<[string, string]> = [
@@ -190,7 +194,7 @@ async function runGrid(): Promise<void> {
   document.body.classList.add('grid');
   const root = document.getElementById('app')!;
   const cols = 3, tileW = Math.floor((Math.min(innerWidth, 1600) - 48 - 2 * 12) / cols), tileH = Math.round((tileW * VH) / VW);
-  root.innerHTML = `<header><h1>Camera study</h1><p>Default framing of the real town (base scenery + districts on disk, catalog-sized occluders, stub-sim queues at t = ${Math.round(snap.t)} s) fitted into the HUD-safe area of a ${VW}×${VH} screen. <span class="key"><i class="dot"></i> hidden queue slot / stop / platform edge</span> <span class="key"><i class="dot small"></i> hidden route / rail</span> <span class="key"><i class="dash"></i> HUD-safe rect</span></p></header>` +
+  root.innerHTML = `<header><h1>Camera study</h1><p>Default Overview framing (bible §1.4 HUD-safe rect, 4 % pad) of the real town on a ${VW}×${VH} screen: ${town.sources.districtItems} district items + ${town.sources.baseItems} base-scenery items as catalog-sized occluder boxes, the world layer as a height field, stub-sim queues at t = ${Math.round(snap.t)} s; x-ray off. <span class="key"><i class="dot"></i> hidden queue slot / stop / platform edge</span> <span class="key"><i class="dot small"></i> hidden route / rail</span> <span class="key"><i class="dash"></i> HUD-safe rect</span></p></header>` +
     `<canvas id="grid"></canvas><section id="table"></section><section id="notes"></section>`;
   const canvas = document.getElementById('grid') as HTMLCanvasElement;
   const gap = 12, capH = 46;
@@ -211,7 +215,7 @@ async function runGrid(): Promise<void> {
     ctx.drawImage(src, x, y, tileW, tileH);
     if (overlay) drawOverlay(ctx, r, f, x, y, tileW / VW);
     ctx.restore();
-    ctx.strokeStyle = r === best ? '#F2C14E' : 'rgba(31,42,68,0.12)'; ctx.lineWidth = r === best ? 4 : 1.5;
+    ctx.strokeStyle = r === pick ? '#F2C14E' : 'rgba(31,42,68,0.12)'; ctx.lineWidth = r === pick ? 4 : 1.5;
     roundRect(ctx, x, y, tileW, tileH, 14); ctx.stroke();
     // caption
     ctx.fillStyle = INK; ctx.font = '19px GumballRounded, system-ui'; ctx.textBaseline = 'top';
@@ -219,27 +223,32 @@ async function runGrid(): Promise<void> {
     if (group) { ctx.font = '12px GumballRounded, system-ui'; ctx.fillStyle = 'rgba(31,42,68,0.55)'; const w = ctx.measureText(group).width; ctx.fillText(group, x + tileW - w - 4, y + tileH + 11); }
     ctx.font = '600 12.5px "Avenir Next Rounded Std", Nunito, system-ui'; ctx.fillStyle = 'rgba(31,42,68,0.8)';
     ctx.fillText(caption(r), x + 4, y + tileH + 29);
-    if (r === best) {
+    if (r === pick) {
       ctx.font = '19px GumballRounded, system-ui';
       const lx = x + 4 + ctx.measureText(r.view.label ?? r.view.id).width + 10;
-      ctx.fillStyle = '#F2C14E'; roundRect(ctx, lx, y + tileH + 6, 92, 22, 11); ctx.fill();
-      ctx.fillStyle = INK; ctx.font = '13px GumballRounded, system-ui'; ctx.fillText('top score', lx + 16, y + tileH + 10);
+      ctx.fillStyle = '#F2C14E'; roundRect(ctx, lx, y + tileH + 6, 112, 22, 11); ctx.fill();
+      ctx.fillStyle = INK; ctx.font = '13px GumballRounded, system-ui'; ctx.fillText('recommended', lx + 12, y + tileH + 10);
     }
   }
   document.getElementById('table')!.innerHTML = tableHtml(results);
   const iso45 = byId.get(viewId(ISO_ELEV, 45))!, e30 = byId.get(viewId(30, 45))!, e45 = byId.get(viewId(45, 45))!, rig = byId.get(CURRENT_RIG_VIEW.id)!;
-  document.getElementById('notes')!.innerHTML = notesHtml(best, { iso45, e30, e45, rig });
+  document.getElementById('notes')!.innerHTML = notesHtml(pick, { iso45, e30, e45, rig });
   setMsg('');
 }
 
 function notesHtml(top: ViewResult, v: { iso45: ViewResult; e30: ViewResult; e45: ViewResult; rig: ViewResult }): string {
   const worst = [...top.perPlace].sort((a, b) => b.queueHidden + b.spotHidden - (a.queueHidden + a.spotHidden)).filter((p) => p.queueHidden + p.spotHidden > 0).slice(0, 4);
-  const places = worst.map((p) => `<li><b>${p.name}</b> — ${p.queueHidden}/${p.queueN} queue slots, ${p.spotHidden}/${p.spotN} ${p.kind === 'stop' ? 'stop' : 'edge'} samples hidden by ${p.by.map((b) => `<code>${b}</code>`).join(', ')}</li>`).join('');
-  return `<div class="card"><h2>Reading it</h2><ul>` +
-    `<li>Ground hidden behind a building of height h: <b>1.73 h</b> at 30°, <b>1.41 h</b> at 35.26°, <b>1.0 h</b> at 45°.</li>` +
-    `<li>In the HUD-safe rect, 30° and 35.26° fit at the same width (${v.e30.fit.scale.toFixed(1)} vs ${v.iso45.fit.scale.toFixed(1)} px/u) — so 35.26° shows more ground (${v.iso45.screen.networkPct.toFixed(0)}% vs ${v.e30.screen.networkPct.toFixed(0)}% of the screen) with less hidden; 45° turns height-limited (${v.e45.fit.scale.toFixed(1)} px/u, people ${v.e45.screen.personPx.toFixed(0)} px tall).</li>` +
-    `<li>Today’s rig (32°) hides ${pct(v.rig.hidden.queue.frac)} of queue slots and ${pct(v.rig.hidden.route.frac)} of route samples vs ${pct(v.iso45.hidden.queue.frac)} / ${pct(v.iso45.hidden.route.frac)} at 35.26°.</li>` +
-    `</ul></div><div class="card"><h2>Still hidden at the pick (${top.view.label}) — x-ray / layout</h2><ul>${places || '<li>nothing</li>'}</ul></div>`;
+  const places = worst.map((p) => `<li><b>${p.name}</b> — ${p.queueHidden}/${p.queueN} queue slots, ${p.spotHidden}/${p.spotN} ${p.kind === 'stop' ? 'stop' : 'edge'} samples, by ${p.by.map((b) => `<code>${b}</code>`).join(', ')}</li>`).join('');
+  const occ = new Map<string, number>();
+  for (const h of top.hiddenPoints) if (h.cls === 'route') occ.set(h.by, (occ.get(h.by) ?? 0) + 1);
+  const routeTop = [...occ.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `<code>${k}</code> ${n}`).join(', ');
+  const px = (r: ViewResult) => `${r.fit.scale.toFixed(1)} px/u, people ${r.screen.personPx.toFixed(0)} px`;
+  return `<div class="card"><h2>Why 35.26° · az 45°</h2><ul>` +
+    `<li>A building of height h hides ground <b>1.22 h</b> deep at 30°, <b>1.0 h</b> at 35.26°, <b>0.71 h</b> at 45° (per axis). Measured: stop queues ${pct(v.e30.hidden.queue.frac)} → ${pct(v.iso45.hidden.queue.frac)} → ${pct(v.e45.hidden.queue.frac)}, routes ${pct(v.e30.hidden.route.frac)} → ${pct(v.iso45.hidden.route.frac)} → ${pct(v.e45.hidden.route.frac)}.</li>` +
+    `<li>Size at Overview: 30° ${px(v.e30)} · 35.26° ${px(v.iso45)} · 45° ${px(v.e45)} — 45° drops people under the bible’s 10 px floor; 30° buys ~10 % size for double the hidden queues.</li>` +
+    `<li>az 45° keeps E–W and N–S streets equally legible (35°/55° skew one family) and is what the districts were composed for; today’s 32° rig hides ${pct(v.rig.hidden.queue.frac)} of stop queues vs ${pct(v.iso45.hidden.queue.frac)}.</li>` +
+    `</ul></div><div class="card"><h2>Still hidden at 35.26° · az 45° (fix in layout, then x-ray)</h2><ul>${places || '<li>no stop, queue or platform hidden</li>'}` +
+    `<li>Routes are hidden mostly by ${routeTop || '—'} — tall camera-side buildings (bible §2.2).</li></ul></div>`;
 }
 
 async function runSingle(view: ViewSpec): Promise<void> {

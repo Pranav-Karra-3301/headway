@@ -20,6 +20,22 @@ function size(f: FailureFinding): string {
   }
 }
 
+/** The same size as a number, to check that "(now …)" / "(was …)" moves in the direction of the change. */
+function magnitude(f: FailureFinding): number {
+  switch (f.kind) {
+    case 'service_gap': return f.gapS;
+    case 'missed_transfer': return f.count;
+    case 'bunching': return f.events;
+    case 'overload': return f.leftBehind;
+    case 'unused_capacity': return 1 - f.meanLoad;
+    case 'long_hold': return f.holdS;
+  }
+}
+
+/** Groups are ranked by impact summed over runs, while the sentence shows the strongest single instance; when that
+ *  instance moved the other way (fewer riders, but in more runs), quote the summed change instead. */
+const paxMin = (deltaS: number) => `${deltaS < 0 ? '−' : '+'}${Math.round(Math.abs(deltaS) / 60)} pax-min over the training runs`;
+
 const noDot = (s: string) => s.trim().replace(/[.\s]+$/, '');
 
 export function proposalNarrative(candidate: RunResult[], champion: RunResult[], deltaTrainPct: number): string {
@@ -38,12 +54,14 @@ export function proposalNarrative(candidate: RunResult[], champion: RunResult[],
   if (!gains.length && !costs.length) return `${head} No finding changed noticeably.`;
 
   const parts = [head];
-  for (const { c, p } of gains) {
+  for (const { delta, c, p } of gains) {
     // p always exists for a gain (impact went down from something)
-    parts.push(c ? `Eased: ${noDot(findingLabel(p!.top))} (now ${size(c.top)}).` : `Fixed: ${noDot(findingLabel(p!.top))}.`);
+    if (!c) parts.push(`Fixed: ${noDot(findingLabel(p!.top))}.`);
+    else parts.push(`Eased: ${noDot(findingLabel(p!.top))} (${magnitude(c.top) < magnitude(p!.top) ? `now ${size(c.top)}` : paxMin(delta)}).`);
   }
-  for (const { c, p } of costs) {
-    parts.push(p ? `Worse: ${noDot(findingLabel(c!.top))} (was ${size(p.top)}).` : `New: ${noDot(findingLabel(c!.top))}.`);
+  for (const { delta, c, p } of costs) {
+    if (!p) parts.push(`New: ${noDot(findingLabel(c!.top))}.`);
+    else parts.push(`Worse: ${noDot(findingLabel(c!.top))} (${magnitude(c!.top) > magnitude(p.top) ? `was ${size(p.top)}` : paxMin(delta)}).`);
   }
   return parts.join(' ');
 }

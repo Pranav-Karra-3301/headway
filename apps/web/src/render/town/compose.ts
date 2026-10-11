@@ -9,8 +9,12 @@ import type { SceneryItem } from '../scenery';
 export interface ComposedScenery {
   base: SceneryItem[];
   items: PlacedAsset[];
-  /** Stations drawn without the kit's own station building. */
+  /** Stations drawn without the kit's own station building (a district building stands beside the platform, or a
+   *  district owns the station's area). */
   platformOnly: Set<StationId>;
+  /** Stations inside an active district's region: the district dresses them, so the kit clock goes too (FX only
+   *  drives hands for base stations outside district regions, see fx/anchors keptScenery). */
+  owned: Set<StationId>;
 }
 
 /** A district station building closer than this to a station's model origin replaces the kit building. */
@@ -37,10 +41,12 @@ export function composeScenery(scenery: readonly SceneryItem[], districts: reado
   const items = active.flatMap((d) => d.items);
   const base = scenery.filter((it) => it.kind === 'station' || !active.some((d) => inRegion(d.region, it)));
   const platformOnly = new Set<StationId>();
+  const owned = new Set<StationId>();
   for (const it of scenery) {
     if (it.kind !== 'station' || !it.stationId) continue;
+    if (active.some((d) => inRegion(d.region, it))) { owned.add(it.stationId); platformOnly.add(it.stationId); }
     const near = items.some((a) => a.kind.startsWith('lm.station') && Math.hypot(a.x - it.x, a.z - it.z) < STATION_BUILDING_NEAR);
     if (near) platformOnly.add(it.stationId);
   }
-  return { base, items, platformOnly };
+  return { base, items, platformOnly, owned };
 }

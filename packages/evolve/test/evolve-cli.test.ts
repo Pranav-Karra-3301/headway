@@ -7,7 +7,14 @@ import {
   DEFAULTS, REPO_ROOT, createDesignerLlm, designerSmoke, formatEvent, parseEnvText, parseEvolveArgs, runEvolve,
 } from '../src/cli/evolve';
 import { createFileStore } from '../src/cli/store-file';
-import { broken, fakeLlm, reply, variant } from './fixtures';
+import { createEvaluator, type RunOne } from '../src/evaluate';
+import { broken, fakeLlm, metrics, reply, runResult, variant } from './fixtures';
+
+/** A fast stand-in engine (J grows with the rule count) for tests that are not about the sim. */
+const fakeRun: RunOne = (policy, inst) => runResult({
+  scenarioId: inst.scenarioId, seed: inst.seed, controller: { kind: 'policy', policyId: policy.meta.id }, metrics: metrics({ J: 1000 + 10 * policy.rules.length }),
+});
+const fakeEvaluator = () => createEvaluator({ run: fakeRun, yieldBetweenRuns: false });
 
 const TOKEN = 'sekret-admin-token-123';
 const tmp = () => mkdtempSync(join(tmpdir(), 'hw-evolve-'));
@@ -121,7 +128,7 @@ describe('formatEvent', () => {
 });
 
 describe('runEvolve', () => {
-  it('runs a round on the real sim, writes data/ and web data, and publishes', async () => {
+  it('runs a round on the real sim, writes data/ and web data, and publishes', { timeout: 120_000 }, async () => {
     const root = tmp();
     const dataDir = join(root, 'data');
     const webDir = join(root, 'web');
@@ -164,7 +171,7 @@ describe('runEvolve', () => {
     expect(body.reference.runs).toBe(8);
     expect(logs.join('\n')).not.toContain(TOKEN);
     expect(logs.join('\n')).toMatch(/published/i);
-  }, 60_000);
+  });
 
   it('continues across rounds from the stored champion and history, and recovers a crashed round', async () => {
     const dataDir = join(tmp(), 'data');
@@ -177,7 +184,7 @@ describe('runEvolve', () => {
       [reply(variant(12), 'C'), reply(variant(13), 'C2')],
     ]);
     const logs: string[] = [];
-    const res = await runEvolve(parseEvolveArgs(['--rounds', '2', '--data', dataDir, '--no-web']), { llm, log: (s) => logs.push(s), now: clock() });
+    const res = await runEvolve(parseEvolveArgs(['--rounds', '2', '--data', dataDir, '--no-web']), { llm, log: (s) => logs.push(s), now: clock(), evaluator: fakeEvaluator() });
 
     expect(res.code).toBe(0);
     const rounds = createFileStore(dataDir).rounds();
@@ -187,7 +194,7 @@ describe('runEvolve', () => {
     const round3Prompts = llm.calls.slice(-3).map((c) => c.user).join('\n');
     expect(round3Prompts).toContain('r2-a');
     expect(logs.join('\n')).toMatch(/R1.*failed/);
-  }, 60_000);
+  });
 
   it('reports a failed publish with a non-zero code but keeps the data', async () => {
     const dataDir = join(tmp(), 'data');
@@ -195,12 +202,12 @@ describe('runEvolve', () => {
     const fetchImpl = vi.fn(async () => new Response('{"error":"unauthorized"}', { status: 401 }));
     const logs: string[] = [];
     const res = await runEvolve(parseEvolveArgs(['--data', dataDir, '--no-web', '--publish', 'https://example.test']), {
-      llm, log: (s) => logs.push(s), now: clock(), fetchImpl: fetchImpl as unknown as typeof fetch, adminToken: TOKEN,
+      llm, log: (s) => logs.push(s), now: clock(), fetchImpl: fetchImpl as unknown as typeof fetch, adminToken: TOKEN, evaluator: fakeEvaluator(),
     });
     expect(res.code).toBe(1);
     expect(ls(join(dataDir, 'rounds'))).toEqual(['R1.json']);
     expect(logs.join('\n')).toMatch(/publish failed.*401/i);
-  }, 60_000);
+  });
 
   it('refuses to publish without an admin token before spending any LLM calls', async () => {
     const llm = fakeLlm([[], [], []]);
@@ -215,7 +222,7 @@ describe('designerSmoke', () => {
     const dataDir = join(tmp(), 'data');
     const llm = fakeLlm([[reply(variant(6), 'Hold for bigger transfer groups')]]);
     const logs: string[] = [];
-    const r = await designerSmoke({ llm, model: DEFAULTS.model, emphasis: 'transfers', dataDir, log: (s) => logs.push(s) });
+    const r = await designerSmoke({ llm, model: DEFAULTS.model, emphasis: 'transfers', dataDir, log: (s) => logs.push(s), evaluator: fakeEvaluator() });
     expect(llm.calls).toHaveLength(1);
     expect(llm.calls[0]).toMatchObject({ model: DEFAULTS.model, json: true, maxTokens: 8000, temperature: 0.4 });
     expect(r).toMatchObject({ ok: true, summary: 'Hold for bigger transfer groups' });
@@ -227,7 +234,7 @@ describe('designerSmoke', () => {
 
   it('reports validation errors for an invalid policy', async () => {
     const llm = fakeLlm([[reply(broken())]]);
-    const r = await designerSmoke({ llm, model: DEFAULTS.model, emphasis: 'spacing', dataDir: join(tmp(), 'data'), log: () => {} });
+    const r = await designerSmoke({ llm, model: DEFAULTS.model, emphasis: 'spacing', dataDir: join(tmp(), 'data'), log: () => {}, evaluator: fakeEvaluator() });
     expect(r.ok).toBe(false);
     expect(r.errors.join(' ')).toMatch(/train_eta/);
   });

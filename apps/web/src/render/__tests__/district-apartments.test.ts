@@ -230,13 +230,17 @@ describe('apartments district: placements', () => {
     }
   });
 
-  it('never hides a stop, platform or queue slot from the default camera (30° elevation, from +x/+z)', () => {
-    const el = (30 * Math.PI) / 180, dir = new THREE.Vector3(Math.cos(el) * Math.SQRT1_2, Math.sin(el), Math.cos(el) * Math.SQRT1_2);
+  // The shipped rig looks down at ≈ 32.05° from +x/+z (render/camera.ts ISO_DIR); C1 studies 30°, 35.26° and 45°.
+  // Every stop, platform and queue slot must stay in view from the shipped rig and the steeper study views.
+  it('never hides a stop, platform or queue slot from the camera (32°, 35.26° and 45° from +x/+z)', () => {
     const hit = new THREE.Vector3();
-    for (const q of QUEUES) for (let slot = -1; slot < 5; slot++) {
-      const s = slot < 0 ? 0 : 0.8 + slot * 0.4;
-      const ray = new THREE.Ray(new THREE.Vector3(q.p.x + q.dir.x * s, 0.6, q.p.z + q.dir.z * s), dir);
-      for (const { it, box } of built()) expect(ray.intersectBox(box, hit), `${q.id} slot ${slot} hidden by ${it.kind} at ${it.x},${it.z}`).toBeNull();
+    for (const deg of [Math.atan2(62, Math.hypot(70, 70)) * (180 / Math.PI), 35.26, 45]) {
+      const el = (deg * Math.PI) / 180, dir = new THREE.Vector3(Math.cos(el) * Math.SQRT1_2, Math.sin(el), Math.cos(el) * Math.SQRT1_2);
+      for (const q of QUEUES) for (let slot = -1; slot < 5; slot++) {
+        const s = slot < 0 ? 0 : 0.8 + slot * 0.4;
+        const ray = new THREE.Ray(new THREE.Vector3(q.p.x + q.dir.x * s, 0.6, q.p.z + q.dir.z * s), dir);
+        for (const { it, box } of built()) expect(ray.intersectBox(box, hit), `${deg.toFixed(1)}°: ${q.id} slot ${slot} hidden by ${it.kind} at ${it.x},${it.z}`).toBeNull();
+      }
     }
   });
 });

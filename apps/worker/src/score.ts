@@ -52,21 +52,9 @@ export function runPolicy(policy: Policy, scenario: ScenarioInstance, intents?: 
   return runSync({ map: TOWN, scenario, controller: new PolicyController(policy), ...(intents?.length ? { intents } : {}) });
 }
 
-const notImplemented = (e: unknown) => e instanceof Error && e.message.startsWith('not implemented yet');
-
-/** `evaluatePolicy` from @headway/evolve (the CLI's scorer); the same engine loop here while that is still a stub. */
-export function evaluateInstances(policy: Policy, instances: ScenarioInstance[]): { score: SplitScore; results: RunResult[] } {
-  try {
-    return evaluatePolicy(policy, instances);
-  } catch (e) {
-    if (!notImplemented(e)) throw e;
-  }
-  const results = instances.map((i) => runPolicy(policy, i));
-  return { score: aggregate(results), results };
-}
-
-/** Default `AppDeps.evaluate`: train = stadium_exit + class_change × 1001–1004, val = × 2001–2002 (spec §7). */
-export const evaluateSplit: Evaluate = async (policy, split) => evaluateInstances(policy, SEEDS[split]);
+/** Default `AppDeps.evaluate`: the CLI's own scorer (`evaluatePolicy`) on train = stadium_exit + class_change × 1001–1004,
+ *  val = × 2001–2002 (spec §7), so worker and CLI rounds score identically. */
+export const evaluateSplit: Evaluate = async (policy, split) => evaluatePolicy(policy, SEEDS[split]);
 
 /** Everything but meta: what the simulator actually runs (a memo key; key order as stored). */
 export const policyKey = (p: Policy): string => JSON.stringify({ params: p.params, rules: p.rules, defaults: p.defaults, advisor: p.advisor ?? null });

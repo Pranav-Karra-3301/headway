@@ -111,7 +111,9 @@ export function placementBoxes(items: readonly PlacedAsset[]): Box[] {
     const len = typeof it.params?.length === 'number' ? it.params.length : null;
     const w = (len ?? c.w) * s, d = c.d * s;
     const cls: OccluderClass = c.family === 'vegetation' ? 'tree' : c.family === 'landmarks' ? 'landmark' : 'building';
-    out.push({ cx: it.x, cz: it.z, hx: w / 2, hz: d / 2, y0: 0, y1: c.h * s, rot: it.rot ?? 0, cls, kind: it.kind });
+    // trees are crown boxes (bible §2.3: y 0.9 to h); bushes, hedges and planters are solid from the ground
+    const crown = cls === 'tree' && c.h * s > 1.5 ? 0.9 * s : 0;
+    out.push({ cx: it.x, cz: it.z, hx: w / 2, hz: d / 2, y0: crown, y1: c.h * s, rot: it.rot ?? 0, cls, kind: it.kind });
   }
   return out;
 }

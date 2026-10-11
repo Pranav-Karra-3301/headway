@@ -9,13 +9,13 @@
 import * as THREE from 'three';
 import { stationPlacement } from '@headway/sim';
 import type { RouteId, StationId, StopId, TownMap } from '@headway/sim';
-import { createRegistry, type AssetRegistry } from '../assets/index';
+import { AssetRegistry, createRegistry } from '../assets/index';
 import type { PlacedAsset } from '../assets/types';
 import { DISTRICTS } from '../districts/index';
 import type { DistrictScenery } from '../districts/types';
 import {
   bakeGeometry, createForest, makeBoard, makeBuilding, makeClockTower, makeLawn, makeStadium, makeStation, makeStop,
-  recolorBaked, setBakedDetail, type Baked, type BuildingType, type Forest, type TreePlacement,
+  recolorBaked, setBakedDetail, STATION_CLOCK, type Baked, type BuildingType, type Forest, type TreePlacement,
 } from '../kit';
 import { KitMaterial } from '../materials';
 import { SCENERY, type SceneryItem } from '../scenery';
@@ -69,6 +69,16 @@ const SWAY_VARIANTS = 4;
 const MAX_PROTOTYPES = 6;
 const FADE = { ground: 0.3, scenery: 0.6, trees: 0.6, stop: 0.6 } as const;
 
+/** The asset registry, or an empty one if a family fails to register (its kinds then draw as placeholders). */
+function safeRegistry(): AssetRegistry {
+  try {
+    return createRegistry();
+  } catch (e) {
+    console.warn('[town] asset registry failed; district items will be placeholders', e);
+    return new AssetRegistry();
+  }
+}
+
 function hasTexture(o: THREE.Object3D): boolean {
   let tex = false;
   o.traverse((c) => {
@@ -83,15 +93,17 @@ function isPlaceholder(o: THREE.Object3D): boolean {
   return !!o.userData.placeholder;
 }
 
-/** Station model without the kit's own building (a district placed one beside the platform). */
-function platformOnly(station: THREE.Group): THREE.Group {
-  for (const c of [...station.children]) if (c.position.z < -1.5) station.remove(c);
+/** Station model without the kit's own building (and, when a district owns the area, without its clock). */
+function platformOnly(station: THREE.Group, dropClock: boolean): THREE.Group {
+  for (const c of [...station.children]) {
+    if (c.position.z < -1.5 || (dropClock && Math.abs(c.position.x - STATION_CLOCK.x) < 0.01)) station.remove(c);
+  }
   return station;
 }
 
 export function createStaticTown(map: TownMap, opts: StaticTownOptions): StaticTown {
   let palette = opts.palette;
-  const registry = opts.registry ?? createRegistry();
+  const registry = opts.registry ?? safeRegistry();
   const resolve = roleResolver(registry.roles);
   const kitShared = createClayKitShared(registry.roles, palette);
   const composed = composeScenery(opts.scenery ?? SCENERY, opts.districts ?? DISTRICTS);
@@ -148,7 +160,7 @@ export function createStaticTown(map: TownMap, opts: StaticTownOptions): StaticT
   for (const it of composed.base) {
     if (it.kind !== 'station' || !it.stationId) continue;
     const s = makeStation({ track: false, hands: false });
-    if (composed.platformOnly.has(it.stationId)) platformOnly(s);
+    if (composed.platformOnly.has(it.stationId)) platformOnly(s, composed.owned.has(it.stationId));
     ground.add(place(s, it.x, it.z, it.rot ?? 0));
   }
   // stations the scenery does not list still get their platform
@@ -156,7 +168,7 @@ export function createStaticTown(map: TownMap, opts: StaticTownOptions): StaticT
     if (composed.base.some((i) => i.kind === 'station' && i.stationId === st.id)) continue;
     const pl = stationPlacement(st.id as StationId);
     const s = makeStation({ track: false, hands: false });
-    if (composed.platformOnly.has(st.id)) platformOnly(s);
+    platformOnly(s, true);
     ground.add(place(s, pl.x, pl.z, pl.rot));
   }
   addBaked(bakeGeometry(ground, palette, { resolve }), groundMat, 'ground');
@@ -186,18 +198,15 @@ export function createStaticTown(map: TownMap, opts: StaticTownOptions): StaticT
       case 'tree':
         trees.push({ x: it.x, z: it.z, variant: it.variant ?? 0, ...(it.leaf !== undefined ? { leaf: it.leaf } : {}), ...(it.scale !== undefined ? { scale: it.scale } : {}) });
         break;
+      // Base landmarks stay kit models: FX anchors hands/floodlights to kit CLOCK_TOWER / STADIUM for base scenery
+      // (districts place A4's lm.clockTower / lm.stadium, which FX anchors separately).
       case 'clockTower':
-        if (registry.get('lm.clockTower')) {
-          baseGroup.add(build({ kind: 'lm.clockTower', x: it.x, z: it.z, rot, params: { hands: false } }));
-          clockTower = { x: it.x, z: it.z, rot, source: 'lm.clockTower' };
-        } else {
-          baseGroup.add(place(makeClockTower({ hands: false }), it.x, it.z, rot));
-          clockTower = { x: it.x, z: it.z, rot, source: 'kit' };
-        }
+        baseGroup.add(place(makeClockTower({ hands: false }), it.x, it.z, rot));
+        clockTower = { x: it.x, z: it.z, rot, source: 'kit' };
         stats.items++;
         break;
       case 'stadium':
-        baseGroup.add(registry.get('lm.stadium') ? build({ kind: 'lm.stadium', x: it.x, z: it.z, rot }) : place(makeStadium(), it.x, it.z, rot));
+        baseGroup.add(place(makeStadium(), it.x, it.z, rot));
         stats.items++;
         break;
       case 'small': case 'tall': case 'hall': {

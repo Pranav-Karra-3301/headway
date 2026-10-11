@@ -1,43 +1,46 @@
-// Owner: E3. The base material: one MeshStandardMaterial (lit like the town, receives shadows) whose colour is
-// computed per fragment from `aKind`:
-//   strata  — a grass (or sand, under the lake) lip and topsoil that follow the cut's surface, then gently wavy
-//             horizontal bands: dark soil, ochre clay, warm rock, bedrock; sliced mountains show layered rock;
-//   water   — a luminous column, light aqua at the surface (bright meniscus line) to deep blue at the bed, with
-//             slow drifting light bands;
-//   plinth  — warm wood with soft grain; floor — board green → wet sand → lake-bed teal by depth; pebbles — 3 tints.
+// Owner: E3. The base material (art bible §6.6): one MeshStandardMaterial, lit like the town, whose colour is chosen
+// per fragment from `aKind`:
+//   strata — flat soil bands (#AE8A6D, #94725B, #766558 in palette A) with gently wavy boundaries; a grass lip on
+//            land, a sand lip under the lake; sliced mountains show warm rock;
+//   water  — flat bands #80C5CD, #53A6B9, #3285A2 down to the bed, under a lighter 0.3 u surface band; a faint inner
+//            glow keeps it clear on the shaded east face;
+//   plinth — warm wood with soft grain; floor — a quiet ground tone (it is normally hidden).
 import * as THREE from 'three';
 import type { PaletteId } from '../../types';
 
 export interface BaseLook {
-  grass: string; soil: string; soilDark: string; clay: string; rock: string; bedrock: string; mountain: string;
-  sand: string; waterTop: string; waterDeep: string; foam: string;
-  wood: string; woodDark: string; floor: string; bedDeep: string;
-  pebbles: [string, string, string];
+  grass: string; sand: string; rock: string;
+  soil: [string, string, string];
+  waterSurface: string;
+  water: [string, string, string];
+  wood: string; woodDark: string; floor: string;
 }
 
 export const BASE_LOOKS: Record<PaletteId, BaseLook> = {
   a: {
-    grass: '#86C99A', soil: '#A9784F', soilDark: '#8E6244', clay: '#D6AD80', rock: '#B4A296', bedrock: '#93837A', mountain: '#A99A90',
-    sand: '#EBD5A6', waterTop: '#8FDDD5', waterDeep: '#3F8CC0', foam: '#F2FFFC',
-    wood: '#CDA172', woodDark: '#B58658', floor: '#A8D8B9', bedDeep: '#5FA3AE',
-    pebbles: ['#CFC3B8', '#8C7D74', '#A68F7B'],
+    grass: '#86C597', sand: '#D5BD8E', rock: '#B7AE9E',
+    soil: ['#AE8A6D', '#94725B', '#766558'],
+    waterSurface: '#A8DEDC', water: ['#80C5CD', '#53A6B9', '#3285A2'],
+    wood: '#CFA77B', woodDark: '#B98E62', floor: '#9DBFA6',
   },
   b: {
-    grass: '#B6C797', soil: '#94704F', soilDark: '#7C5D44', clay: '#D1B489', rock: '#ABA095', bedrock: '#877C72', mountain: '#A39A91',
-    sand: '#E6D4AD', waterTop: '#A8D6CB', waterDeep: '#4E8698', foam: '#F8FBF2',
-    wood: '#946F50', woodDark: '#7A5A40', floor: '#EADFC8', bedDeep: '#6E9EA3',
-    pebbles: ['#CEC6BA', '#857A71', '#A08A74'],
+    grass: '#B4C595', sand: '#C9AF86', rock: '#B2A590',
+    soil: ['#A88767', '#8E6F56', '#715F51'],
+    waterSurface: '#BDDCD2', water: ['#93C3BB', '#6FA3A6', '#4F7F90'],
+    wood: '#9A7552', woodDark: '#83603F', floor: '#C9C2AA',
   },
   c: {
-    grass: '#A6C288', soil: '#956446', soilDark: '#7C533B', clay: '#CF9F6F', rock: '#ACA098', bedrock: '#83776F', mountain: '#A2968E',
-    sand: '#E5D2AA', waterTop: '#9DCBDB', waterDeep: '#3C6D9E', foam: '#F6FBFF',
-    wood: '#A97E58', woodDark: '#8C6542', floor: '#E7E2CF', bedDeep: '#5E8FA6',
-    pebbles: ['#CBC4BE', '#80746E', '#9E8370'],
+    grass: '#A6C288', sand: '#CBB792', rock: '#B3AA9B',
+    soil: ['#AA8569', '#8F6F58', '#716155'],
+    waterSurface: '#B6DCE7', water: ['#8CBFD3', '#5E98C0', '#3E6E9E'],
+    wood: '#B08660', woodDark: '#966D48', floor: '#C7C6B8',
   },
 };
 
-const COLOR_KEYS = ['grass', 'soil', 'soilDark', 'clay', 'rock', 'bedrock', 'mountain', 'sand', 'waterTop', 'waterDeep', 'foam', 'wood', 'woodDark', 'floor', 'bedDeep'] as const;
-type ColorKey = (typeof COLOR_KEYS)[number];
+/** Band boundaries (u): water bands by depth below the surface; soil bands by world height. */
+export const BANDS = { surface: 0.3, water: [0.75, 1.2], lip: 0.3, soil: [-1.6, -3.3] } as const;
+
+const SCALARS = ['grass', 'sand', 'rock', 'waterSurface', 'wood', 'woodDark', 'floor'] as const;
 const uname = (k: string) => 'uB' + k[0]!.toUpperCase() + k.slice(1);
 
 const VERT_PARS = /* glsl */ `
@@ -54,62 +57,46 @@ vHwW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 `;
 
 const FRAG_PARS = /* glsl */ `
-${COLOR_KEYS.map((k) => `uniform vec3 ${uname(k)};`).join('\n')}
-uniform vec3 uBPebble0;
-uniform vec3 uBPebble1;
-uniform vec3 uBPebble2;
-uniform float uBTime;
+${SCALARS.map((k) => `uniform vec3 ${uname(k)};`).join('\n')}
+uniform vec3 uBSoil0;
+uniform vec3 uBSoil1;
+uniform vec3 uBSoil2;
+uniform vec3 uBWater0;
+uniform vec3 uBWater1;
+uniform vec3 uBWater2;
 uniform float uBWaterGlow;
 varying float vHwKind;
 varying float vHwTop;
 varying vec3 vHwW;
 float hwWave( float s, float f, float ph ) {
-  return sin( s * f + ph ) * 0.6 + sin( s * f * 2.31 + ph * 1.7 ) * 0.28 + sin( s * f * 5.13 + ph * 2.9 ) * 0.12;
+  return sin( s * f + ph ) * 0.62 + sin( s * f * 2.31 + ph * 1.7 ) * 0.26 + sin( s * f * 5.13 + ph * 2.9 ) * 0.12;
 }
-// step from a to b where x crosses 0, anti-aliased over aa
-vec3 hwBand( vec3 a, vec3 b, float x, float aa ) { return mix( a, b, smoothstep( -aa, aa, x ) ); }
+// a above the boundary x = 0, b below; anti-aliased over aa
+vec3 hwBand( vec3 below, vec3 above, float x, float aa ) { return mix( below, above, smoothstep( -aa, aa, x ) ); }
 vec3 hwStrata( vec3 w, float top ) {
   float s = w.x + w.z;
-  float aa = fwidth( w.y ) * 0.75 + 0.004;
-  float d = top - w.y;
-  float wet = step( top, -0.25 );
-  float y = w.y + 0.42 * hwWave( s, 0.11, 4.0 );
-  vec3 c = uBBedrock;
-  c = hwBand( c, uBRock, y + 7.4, aa );
-  c = hwBand( c, uBClay, y + 4.9, aa );
-  c = hwBand( c, uBSoilDark, y + 3.1, aa );
-  // sliced mountains: layered rock with soft alternating beds
-  float bed = smoothstep( 0.42, 0.5, abs( fract( ( w.y - 0.12 * s * 0.1 ) * 0.22 ) - 0.5 ) );
-  vec3 mtn = mix( uBMountain, uBBedrock, 0.28 * bed );
-  c = hwBand( c, mtn, y - 0.7, aa );
-  // surface-following topsoil + lip (grass on land, sand under the lake)
-  float lip = mix( 0.42, 0.58, wet ) + 0.07 * hwWave( s, 1.3, 1.0 );
-  float soil = lip + 1.25 + 0.3 * hwWave( s, 0.33, 2.0 );
-  c = mix( c, uBSoil, ( 1.0 - wet ) * smoothstep( aa, -aa, d - soil ) );
-  c = mix( c, mix( uBGrass, uBSand, wet ), smoothstep( aa, -aa, d - lip ) );
-  // a whisper of shading toward the bottom
-  c *= 0.9 + 0.1 * smoothstep( -10.0, -2.0, w.y );
-  return c;
+  float aa = fwidth( w.y ) * 0.75 + 0.003;
+  float wet = step( top, -0.5 );
+  float y = w.y + 0.17 * hwWave( s, 0.21, 4.0 );
+  vec3 c = uBSoil2;
+  c = hwBand( c, uBSoil1, y - ( ${BANDS.soil[1].toFixed(2)} ), aa );
+  c = hwBand( c, uBSoil0, y - ( ${BANDS.soil[0].toFixed(2)} ), aa );
+  c = hwBand( c, uBRock, y - 0.45, aa );
+  float lip = ${BANDS.lip.toFixed(2)} + 0.05 * hwWave( s, 1.1, 1.0 );
+  return mix( c, mix( uBGrass, uBSand, wet ), smoothstep( aa, -aa, top - w.y - lip ) );
 }
 vec3 hwWater( vec3 w, float level ) {
-  float s = w.x + w.z;
-  float d = max( level - w.y, 0.0 );
-  float k = smoothstep( 0.0, 4.4, d );
-  vec3 c = mix( uBWaterTop, uBWaterDeep, k );
-  float band = sin( d * 2.6 - s * 0.32 + uBTime * 0.7 ) * sin( s * 0.83 + uBTime * 0.37 );
-  c *= 1.0 + 0.07 * band * ( 1.0 - k * 0.7 );
-  float aa = fwidth( w.y ) + 0.004;
-  c = mix( c, uBFoam, smoothstep( 0.17 + aa, 0.1, d ) );
-  return c;
+  float aa = fwidth( w.y ) * 0.75 + 0.003;
+  float d = level - w.y;
+  vec3 c = uBWater2;
+  c = hwBand( c, uBWater1, ${BANDS.water[1].toFixed(2)} - d, aa );
+  c = hwBand( c, uBWater0, ${BANDS.water[0].toFixed(2)} - d, aa );
+  return hwBand( c, uBWaterSurface, ${BANDS.surface.toFixed(2)} - d, aa );
 }
 vec3 hwWood( vec3 w ) {
   float s = w.x + w.z;
-  float g = sin( w.y * 7.5 + sin( s * 0.17 ) * 1.6 + sin( s * 0.043 + 1.3 ) * 3.0 );
-  return mix( uBWood, uBWoodDark, smoothstep( 0.45, 1.0, g ) * 0.5 );
-}
-vec3 hwFloor( vec3 w ) {
-  vec3 c = mix( uBFloor, uBSand, smoothstep( -0.1, -0.55, w.y ) );
-  return mix( c, uBBedDeep, smoothstep( -1.0, -4.2, w.y ) );
+  float g = sin( w.y * 9.0 + sin( s * 0.17 ) * 1.6 + sin( s * 0.043 + 1.3 ) * 3.0 );
+  return mix( uBWood, uBWoodDark, smoothstep( 0.4, 1.0, g ) * 0.45 );
 }
 `;
 
@@ -120,13 +107,12 @@ float hwIsWater = 1.0 - step( 0.5, abs( vHwKind - 1.0 ) );
   if ( vHwKind < 0.5 ) hwC = hwStrata( vHwW, vHwTop );
   else if ( vHwKind < 1.5 ) hwC = hwWater( vHwW, vHwTop );
   else if ( vHwKind < 2.5 ) hwC = hwWood( vHwW );
-  else if ( vHwKind < 3.5 ) hwC = hwFloor( vHwW );
-  else hwC = vHwTop < 0.5 ? uBPebble0 : ( vHwTop < 1.5 ? uBPebble1 : uBPebble2 );
+  else hwC = uBFloor;
   diffuseColor.rgb = hwC;
 }
 `;
 const FRAG_ROUGH = /* glsl */ `
-roughnessFactor = mix( roughnessFactor, 0.42, hwIsWater );
+roughnessFactor = mix( roughnessFactor, 0.6, hwIsWater );
 `;
 const FRAG_EMISSIVE = /* glsl */ `
 totalEmissiveRadiance += diffuseColor.rgb * uBWaterGlow * hwIsWater;
@@ -142,15 +128,14 @@ export interface BaseMaterial {
   setPalette(p: PaletteId): void;
   /** 0 = day … 1 = dusk (eased): dims the water's inner glow. */
   setDusk(t: number): void;
-  setTime(t: number): void;
   dispose(): void;
 }
 
 export function createBaseMaterial(palette: PaletteId = 'a'): BaseMaterial {
-  const uniforms: Record<string, THREE.IUniform> = { uBTime: { value: 0 }, uBWaterGlow: { value: 0.4 } };
-  for (const k of COLOR_KEYS) uniforms[uname(k)] = { value: new THREE.Color() };
-  for (let i = 0; i < 3; i++) uniforms['uBPebble' + i] = { value: new THREE.Color() };
-  const material = new THREE.MeshStandardMaterial({ roughness: 0.93, metalness: 0 });
+  const uniforms: Record<string, THREE.IUniform> = { uBWaterGlow: { value: 0.12 } };
+  for (const k of SCALARS) uniforms[uname(k)] = { value: new THREE.Color() };
+  for (let i = 0; i < 3; i++) { uniforms['uBSoil' + i] = { value: new THREE.Color() }; uniforms['uBWater' + i] = { value: new THREE.Color() }; }
+  const material = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 });
   material.name = 'world-base';
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -164,15 +149,17 @@ export function createBaseMaterial(palette: PaletteId = 'a'): BaseMaterial {
   material.customProgramCacheKey = () => 'hw-world-base';
   const setPalette = (p: PaletteId) => {
     const L = BASE_LOOKS[p];
-    for (const k of COLOR_KEYS) (uniforms[uname(k)]!.value as THREE.Color).set(L[k as ColorKey]);
-    L.pebbles.forEach((h, i) => (uniforms['uBPebble' + i]!.value as THREE.Color).set(h));
+    for (const k of SCALARS) (uniforms[uname(k)]!.value as THREE.Color).set(L[k]);
+    for (let i = 0; i < 3; i++) {
+      (uniforms['uBSoil' + i]!.value as THREE.Color).set(L.soil[i]!);
+      (uniforms['uBWater' + i]!.value as THREE.Color).set(L.water[i]!);
+    }
   };
   setPalette(palette);
   return {
     material,
     setPalette,
-    setDusk: (t) => { uniforms.uBWaterGlow!.value = 0.4 - 0.22 * Math.max(0, Math.min(1, t)); },
-    setTime: (t) => { uniforms.uBTime!.value = t; },
+    setDusk: (t) => { uniforms.uBWaterGlow!.value = 0.12 + 0.1 * Math.max(0, Math.min(1, t)); },
     dispose: () => material.dispose(),
   };
 }

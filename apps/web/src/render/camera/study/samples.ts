@@ -1,16 +1,17 @@
-// Owner: C1 (camera study). Gameplay sample points whose visibility the study measures: stops, queue slots (people
-// waiting at stops and on platforms), platform edges, bus routes and the rail loop (outside the tunnel).
+// Owner: C1 (camera study). Gameplay sample points whose visibility the study measures — the art bible's §2.3 set
+// (docs/research/iso-art-direction.md): stop queue slots, platform queue slots, route paths every 1 u, the rail
+// every 1 u outside the tunnel — plus the stops themselves and the platforms' track-side edges.
 import { pointAt } from '@headway/sim';
 import type { TownMap, Vec2 } from '@headway/sim';
 import type { V3 } from './views';
 
-export type SampleClass = 'stop' | 'queue' | 'platform' | 'route' | 'rail';
-export const SAMPLE_CLASSES: SampleClass[] = ['stop', 'queue', 'platform', 'route', 'rail'];
+export type SampleClass = 'stop' | 'queue' | 'platformQueue' | 'platform' | 'route' | 'rail';
+export const SAMPLE_CLASSES: SampleClass[] = ['stop', 'queue', 'platformQueue', 'platform', 'route', 'rail'];
 export interface Sample { cls: SampleClass; place: string; p: V3 }
 
 export interface QueueSlotOptions { spacing?: number; perRow?: number; rowGap?: number; offset?: number }
 export interface SampleOptions extends QueueSlotOptions {
-  /** Queue slots sampled per stop / platform (default 12 = two rows of 6). */
+  /** Queue slots sampled per stop / platform (default 8, single file as in the bible). */
   slots?: number;
   routeStep?: number;
   railStep?: number;
@@ -21,7 +22,8 @@ export interface SampleOptions extends QueueSlotOptions {
 /** Torso centre of a 0.8 u person; platform deck height (kit station). */
 export const PERSON_Y = 0.4;
 export const DECK_Y = 0.55;
-const SLOT = { spacing: 0.42, perRow: 6, rowGap: 0.45, offset: 0.8 } as const;
+/** Bible §2.3: slot i at p + dir·(0.25 + 0.5 i); longer queues continue in parallel rows. */
+const SLOT = { spacing: 0.5, perRow: 8, rowGap: 0.45, offset: 0.25 } as const;
 
 /** Queue slot i: rows of `perRow` along `dir` starting `offset` from the stop; later rows step to the left of `dir`. */
 export function queueSlot(p: Vec2, dir: Vec2, i: number, o: QueueSlotOptions = {}): Vec2 {
@@ -54,7 +56,7 @@ function inSpan(d: number, span: { fromDist: number; toDist: number }, L: number
 }
 
 export function studySamples(map: TownMap, o: SampleOptions = {}): Sample[] {
-  const slots = o.slots ?? 12, routeStep = o.routeStep ?? 0.75, railStep = o.railStep ?? 1;
+  const slots = o.slots ?? 8, routeStep = o.routeStep ?? 1, railStep = o.railStep ?? 1;
   const out: Sample[] = [];
   for (const s of map.stops) {
     const kerb = { x: -s.queueDir.z, z: s.queueDir.x };
@@ -67,7 +69,7 @@ export function studySamples(map: TownMap, o: SampleOptions = {}): Sample[] {
   for (const st of map.rail.stations) {
     for (let i = 0; i < slots; i++) {
       const q = queueSlot(st.platform, st.queueDir, i, o);
-      out.push({ cls: 'queue', place: st.id, p: { x: q.x, y: DECK_Y + PERSON_Y, z: q.z } });
+      out.push({ cls: 'platformQueue', place: st.id, p: { x: q.x, y: DECK_Y + PERSON_Y, z: q.z } });
     }
     const e = platformEdge(map, st.id);
     for (let k = 0; k <= 18; k++) {
@@ -85,7 +87,7 @@ export function studySamples(map: TownMap, o: SampleOptions = {}): Sample[] {
   for (let d = 0; d < L; d += railStep) {
     if (o.railTunnel && inSpan(d, o.railTunnel, L)) continue;
     const q = pointAt(map.rail.loop, d);
-    out.push({ cls: 'rail', place: 'rail', p: { x: q.x, y: 0.9, z: q.z } });
+    out.push({ cls: 'rail', place: 'rail', p: { x: q.x, y: 0.7, z: q.z } });
   }
   return out;
 }

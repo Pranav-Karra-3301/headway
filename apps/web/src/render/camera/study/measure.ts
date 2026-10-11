@@ -37,7 +37,7 @@ export interface ViewResult {
   hidden: Record<SampleClass, ClassStat>;
   behindVehicle: { n: number; hidden: number; frac: number };
   /** Default fit for the study viewport, plus px/u when the inspector is open, in Play (dock), and on other screens. */
-  fit: Fit & { inspectorScale: number; playScale: number; alt: Record<string, number> };
+  fit: Fit & { refits: number; inspectorScale: number; playScale: number; alt: Record<string, number> };
   screen: ScreenStats;
   perPlace: PlaceStat[];
   hiddenPoints: Array<{ cls: SampleClass; p: V3; by: string }>;
@@ -95,7 +95,7 @@ export function measureView(view: ViewSpec, input: StudyInput): ViewResult {
     }
     const pl = places.get(s.place);
     if (!pl) continue;
-    if (s.cls === 'queue') {
+    if (s.cls === 'queue' || s.cls === 'platformQueue') {
       pl.queueN++;
       if (by) pl.queueHidden++;
       const v = vehicles.get(s.place);
@@ -113,7 +113,7 @@ export function measureView(view: ViewSpec, input: StudyInput): ViewResult {
   // ---- framing + screen readability
   const f = fitView(view, map, viewport, input.hud);
   const fit: ViewResult['fit'] = {
-    scale: f.scale, rect: f.rect, inner: f.inner, content: f.content, target: f.target, viewport: f.viewport,
+    scale: f.scale, rect: f.rect, inner: f.inner, content: f.content, target: f.target, viewport: f.viewport, refits: f.refits,
     inspectorScale: fitView(view, map, viewport, { ...input.hud, inspector: true }).scale,
     playScale: fitView(view, map, viewport, { ...input.hud, mode: 'play' }).scale,
     alt: Object.fromEntries(ALT_VIEWPORTS.map((v) => [`${v.w}×${v.h}`, fitView(view, map, v, input.hud).scale])),
@@ -160,7 +160,7 @@ export function measureView(view: ViewSpec, input: StudyInput): ViewResult {
  *  then queue spacing and queue-marker clashes. */
 export const SCORE_WEIGHTS = {
   visibility: 0.45, size: 0.35, queueSpacing: 0.1, markers: 0.1,
-  hidden: { queue: 0.4, stop: 0.2, platform: 0.15, route: 0.15, rail: 0.1 } as Record<SampleClass, number>,
+  hidden: { queue: 0.3, platformQueue: 0.15, stop: 0.15, platform: 0.1, route: 0.2, rail: 0.1 } as Record<SampleClass, number>,
 } as const;
 
 export function visibilityOf(r: Pick<ViewResult, 'hidden'>): number {

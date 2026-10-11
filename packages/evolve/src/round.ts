@@ -255,6 +255,7 @@ export async function runRound(deps: RoundDeps): Promise<{ round: Round; generat
   const gapLimitS = Math.max(worstGap(champTrain.results)?.gapS ?? 0, GAP_FLOOR_S);
   const trainGate = (d: Draft): string | null => {
     const gainPct = champJ > 0 ? (100 * (champJ - d.train!.J)) / champJ : 0;
+    if (gainPct < -EPS) return `worse on training (ΔJ ${signedPct(d.delta ?? -gainPct)})`;
     if (gainPct < MIN_GAIN_PCT - EPS) return `less than ${MIN_GAIN_PCT}% better on training`;
     const drop = champCompletion - d.train!.metrics.completionPct;
     if (drop > MAX_COMPLETION_DROP + EPS) return `completion fell ${drop.toFixed(1)} pts`;

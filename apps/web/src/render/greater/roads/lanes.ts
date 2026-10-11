@@ -8,7 +8,7 @@ import { polyline } from '@headway/sim';
 import type { Polyline, Vec2 } from '@headway/sim';
 import { linkLanes, type Lane, type LaneKind, type Port, type RoadClass, type Street } from '../grid';
 import { DIR_VEC, HIGHWAY_ROWS, KERB, OPPOSITE, STEP, cellCenter, cellRect, inGrid, inRect, rightOf, sideMid, type Dir, type GridFrame } from './cells';
-import { BEND_R, CURVE_R, ROUNDABOUT, dirsOf, type Network, type Piece } from './plan';
+import { ROUNDABOUT, dirsOf, type Network, type Piece } from './plan';
 
 export const LANE_SPEED: Readonly<Record<LaneKind, number>> = {
   ring: 6, parkway: 6, avenue: 5, radial: 5, local: 4, junction: 3.5, roundabout: 3.2, uturn: 2, highway: 9, ramp: 5,
@@ -70,8 +70,9 @@ function simplify(pts: Vec2[]): Vec2[] {
   return out;
 }
 
-/** Offset an open polyline to the right of its direction by d (mitred). */
-export function offsetRight(pts: readonly Vec2[], d: number): Vec2[] {
+/** Offset an open polyline to the right of its direction by d (mitred). Optional exact end directions (tangents)
+ *  keep lane ends on the junction boundaries when the polyline starts/ends with an arc chord. */
+export function offsetRight(pts: readonly Vec2[], d: number, startDir?: Vec2, endDir?: Vec2): Vec2[] {
   const n = pts.length;
   const segDir = (i: number): Vec2 => {
     const v = sub(pts[i + 1]!, pts[i]!), L = len(v) || 1;
@@ -79,6 +80,8 @@ export function offsetRight(pts: readonly Vec2[], d: number): Vec2[] {
   };
   const out: Vec2[] = [];
   for (let i = 0; i < n; i++) {
+    if (i === 0 && startDir) { out.push(add(pts[0]!, rightOf(startDir), d)); continue; }
+    if (i === n - 1 && endDir) { out.push(add(pts[n - 1]!, rightOf(endDir), d)); continue; }
     const r0 = rightOf(segDir(Math.max(0, i - 1))), r1 = rightOf(segDir(Math.min(n - 2, i)));
     let m = { x: r0.x + r1.x, z: r0.z + r1.z };
     const L = len(m) || 1;
@@ -117,7 +120,7 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
   const edges: Edge[] = [];
 
   const trace = (sc: number, sr: number, side: Dir, startStreet: string): Edge => {
-    const start: End = { kind: 'node', id: nodeId(sc, sr), c: sc, r: sc === sc ? sr : sr, side };
+    const start: End = { kind: 'node', id: nodeId(sc, sr), c: sc, r: sr, side };
     const pts: Vec2[] = [sideMid(g, sc, sr, side)];
     let street = '';
     let c = sc + STEP[side].dc, r = sr + STEP[side].dr, enter: Dir = OPPOSITE[side];
@@ -169,7 +172,6 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
     if (!end) throw new Error('greater grid: runaway edge trace');
     if (end.kind === 'node') visited.add(vkey(end.c, end.r, end.side));
     if (!street) street = startStreet;
-    void BEND_R; void CURVE_R;
     return { id: `e${edges.length}`, street, cls: clsOf(street), pts: simplify(pts), a: start, b: end };
   };
 
@@ -208,7 +210,9 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
   const portOf = (e: Edge, end: End & { kind: 'port' }, inLane: string | null, outLane: string | null): void => {
     const d = end.dir;
     const side: Dir = Math.abs(d.x) > Math.abs(d.z) ? (d.x > 0 ? 'e' : 'w') : d.z > 0 ? 's' : 'n';
-    ports.push({ id: `port-${end.port}-${side}-${ports.length}`, kind: end.port, side, p: end.p, dir: d, inLane, outLane, street: e.street });
+    let id = end.port === 'board' ? `board-${OPPOSITE[side]}` : `${end.port}-${side}`;
+    if (ports.some((q) => q.id === id)) id += `-${ports.length}`;
+    ports.push({ id, kind: end.port, side, p: end.p, dir: d, inLane, outLane, street: e.street });
   };
   const streetPaths = new Map<string, Polyline[]>();
   const rbLane = (rbId: string, io: 'in' | 'out', side: Dir) => `${rbId}:${io}-${side}`;
@@ -217,8 +221,11 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
     const L = e.pts.length >= 2 ? polyline(e.pts, false).length : 0;
     let fwd: Lane | null = null, bwd: Lane | null = null;
     if (L > 1e-6) {
-      fwd = mk(`${e.id}:f`, e.cls, offsetRight(e.pts, KERB.lane), { street: e.street });
-      bwd = mk(`${e.id}:b`, e.cls, offsetRight([...e.pts].reverse(), KERB.lane), { street: e.street });
+      const a = e.a as End & { kind: 'node' };
+      const d0 = DIR_VEC[a.side];
+      const d1 = e.b.kind === 'node' ? neg(DIR_VEC[e.b.side]) : e.b.dir;
+      fwd = mk(`${e.id}:f`, e.cls, offsetRight(e.pts, KERB.lane, d0, d1), { street: e.street });
+      bwd = mk(`${e.id}:b`, e.cls, offsetRight([...e.pts].reverse(), KERB.lane, neg(d1), neg(d0)), { street: e.street });
       const arr = streetPaths.get(e.street) ?? [];
       arr.push(polyline(e.pts, false));
       streetPaths.set(e.street, arr);

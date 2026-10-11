@@ -31,64 +31,95 @@ function outside(x: number, z: number): number {
   return Math.hypot(Math.max(E.minX - x, 0, x - E.maxX), Math.max(E.minZ - z, 0, z - E.maxZ));
 }
 
-describe('sky colours', () => {
-  it.each(PALS)('palette %s: day mint → cream with the palette background in the middle', (p) => {
+describe('sky colours (bible §6.5)', () => {
+  const ts = Array.from({ length: 41 }, (_, i) => -60 + i * 2.5);
+  it.each(PALS)('palette %s by day: the lightest band sits on the horizon, deepening toward the top', (p) => {
     const day = mixSky(p, 0);
-    const mid = srgb(skyAt(day, 0.5));
-    const bg = new THREE.Color(PALETTES[p].bg);
-    expect(Math.abs(mid.r - srgb(bg).r) + Math.abs(mid.g - srgb(bg).g) + Math.abs(mid.b - srgb(bg).b)).toBeLessThan(0.09);
-    const top = srgb(skyAt(day, 1)), bottom = srgb(skyAt(day, 0));
-    expect(bottom.r).toBeGreaterThan(bottom.b); // warm cream at the bottom
-    expect(top.b - top.r).toBeGreaterThan(bottom.b - bottom.r); // cooler at the top
+    const h = lum(skyAt(day, 0));
+    for (const t of ts) expect(lum(skyAt(day, t))).toBeLessThanOrEqual(h + 1e-6);
+    expect(lum(skyAt(day, 30))).toBeLessThan(h - 0.05);
+    const bottom = srgb(skyAt(day, -60));
+    expect(bottom.r + bottom.g + bottom.b).toBeGreaterThan(2.6); // pale haze around the base
   });
 
-  it.each(PALS)('palette %s: dusk indigo → peach, brightening toward the bottom', (p) => {
+  it('palette A by day: mint above the horizon, the bible ridge colours', () => {
+    const top = srgb(skyAt(mixSky('a', 0), 30));
+    expect(top.g).toBeGreaterThan(top.r);
+    expect(top.g).toBeGreaterThan(top.b);
+    const want = ['#89b3a0', '#a2c5b5', '#bcd8ca'];
+    mixSky('a', 0).ridges.forEach((c, i) => {
+      const got = srgb(c), w = new THREE.Color(want[i]!).convertLinearToSRGB();
+      expect(Math.abs(got.r - w.r) + Math.abs(got.g - w.g) + Math.abs(got.b - w.b)).toBeLessThan(0.02);
+    });
+  });
+
+  it.each(PALS)('palette %s at dusk: indigo top → peach horizon, brightening down to the horizon', (p) => {
     const dusk = mixSky(p, 1);
-    const top = skyAt(dusk, 1), bottom = skyAt(dusk, 0);
+    const top = skyAt(dusk, 30), horizon = skyAt(dusk, 0);
     expect(top.b).toBeGreaterThan(top.r);
     expect(lum(top)).toBeLessThan(0.05);
-    expect(bottom.r).toBeGreaterThan(bottom.g);
-    expect(bottom.g).toBeGreaterThan(bottom.b);
+    expect(horizon.r).toBeGreaterThan(horizon.g);
+    expect(horizon.g).toBeGreaterThan(horizon.b);
     let prev = -1;
-    for (let t = 1; t >= 0; t -= 0.1) { const l = lum(skyAt(dusk, t)); expect(l).toBeGreaterThan(prev - 1e-6); prev = l; }
+    for (let t = 30; t >= 0; t -= 1) { const l = lum(skyAt(dusk, t)); expect(l).toBeGreaterThan(prev - 1e-6); prev = l; }
+  });
+
+  it('ridges haze progressively: each farther layer is closer to the sky', () => {
+    for (const p of PALS) for (const k of [0, 1]) {
+      const m = mixSky(p, k), haze = skyAt(m, -14);
+      const dist = (c: THREE.Color) => Math.abs(c.r - haze.r) + Math.abs(c.g - haze.g) + Math.abs(c.b - haze.b);
+      expect(dist(m.ridges[1])).toBeLessThan(dist(m.ridges[0]));
+      expect(dist(m.ridges[2])).toBeLessThan(dist(m.ridges[1]));
+    }
   });
 
   it('blends smoothly between day and dusk', () => {
-    const a = skyAt(mixSky('a', 0), 1), b = skyAt(mixSky('a', 0.5), 1), c = skyAt(mixSky('a', 1), 1);
+    const a = skyAt(mixSky('a', 0), 30), b = skyAt(mixSky('a', 0.5), 30), c = skyAt(mixSky('a', 1), 30);
     expect(lum(b)).toBeLessThan(lum(a));
     expect(lum(b)).toBeGreaterThan(lum(c));
   });
 });
 
+/** Screen-up coordinate of a world point for the true-iso camera (looking down (−1, −1, −1)). */
+const screenY = (x: number, y: number, z: number) => { const up = new THREE.Vector3(-1, 2, -1).normalize(); return up.x * x + up.y * y + up.z * z; };
+
 describe('distant ridges', () => {
-  it('has 2–3 layers, farther ones taller and hazier', () => {
+  it('has 2–3 layers, farther ones authored lower and flatter', () => {
     expect(RIDGE_LAYERS.length).toBeGreaterThanOrEqual(2);
     expect(RIDGE_LAYERS.length).toBeLessThanOrEqual(3);
     for (let i = 1; i < RIDGE_LAYERS.length; i++) {
       const a = RIDGE_LAYERS[i - 1]!, b = RIDGE_LAYERS[i]!;
       expect(b.offset).toBeGreaterThan(a.offset);
-      expect(b.peak[1]).toBeGreaterThan(a.peak[1]);
-      expect(b.aerial).toBeGreaterThan(a.aerial);
+      expect(b.base).toBeLessThanOrEqual(a.base);
+      expect(b.amp).toBeLessThan(a.amp);
+      expect(b.wave).toBeGreaterThan(a.wave);
     }
+    expect(RIDGE_LAYERS[RIDGE_LAYERS.length - 1]!.trees).toBe(0); // no trees on the farthest
+  });
+
+  it('each farther layer still peeks above the nearer one on screen', () => {
+    const bands = RIDGE_LAYERS.map((s) => ridgeBand(layout, s));
+    const mean = (b: ReturnType<typeof ridgeBand>) => {
+      const pts = b.filter((p) => p.nz === -1 && p.x > -40 && p.x < 40);
+      return pts.reduce((a, p) => a + screenY(p.x, p.h, p.z), 0) / pts.length;
+    };
+    for (let i = 1; i < bands.length; i++) expect(mean(bands[i]!)).toBeGreaterThan(mean(bands[i - 1]!) + 2);
   });
 
   it.each(RIDGE_LAYERS.map((s, i) => [i, s] as const))('layer %i stays behind the mountain sides and tapers at both ends', (_i, spec) => {
     const band = ridgeBand(layout, spec);
-    expect(band.length).toBeGreaterThan(20);
+    expect(band.length).toBeGreaterThan(100);
     for (const p of band) {
-      // the whole slope (crest + front foot toward the diorama) stays outside the diorama and its plinth
-      const fx = p.x - p.nx * spec.run, fz = p.z - p.nz * spec.run;
       expect(behindMountains(p.x, p.z, 0)).toBe(true);
       expect(outside(p.x, p.z)).toBeGreaterThan(spec.offset - 0.01);
-      expect(behindMountains(fx, fz, 0)).toBe(true);
-      expect(outside(fx, fz)).toBeGreaterThan(BASE.plinthOut + 0.5);
+      expect(outside(p.x, p.z)).toBeGreaterThan(BASE.plinthOut + 1);
       expect(p.h).toBeGreaterThanOrEqual(0);
-      expect(p.h).toBeLessThanOrEqual(spec.peak[1] + 1e-6);
+      expect(p.h).toBeLessThanOrEqual(spec.base + spec.amp + 2);
       expect(Math.hypot(p.nx, p.nz)).toBeCloseTo(1, 5);
     }
-    expect(band[0]!.h).toBeLessThan(spec.peak[0] * 0.3);
-    expect(band[band.length - 1]!.h).toBeLessThan(spec.peak[0] * 0.3);
-    expect(Math.max(...band.map((p) => p.h))).toBeGreaterThan(spec.peak[0]);
+    expect(band[0]!.h).toBeLessThan(spec.base * 0.3);
+    expect(band[band.length - 1]!.h).toBeLessThan(spec.base * 0.3);
+    expect(Math.max(...band.map((p) => p.h))).toBeGreaterThan(spec.base);
     // covers the whole back of the diorama: from past the NE corner to past the SW corner
     expect(Math.max(...band.map((p) => p.x))).toBeGreaterThan(E.maxX);
     expect(Math.max(...band.map((p) => p.z))).toBeGreaterThan(E.maxZ);

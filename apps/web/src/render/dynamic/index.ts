@@ -160,7 +160,6 @@ export function createDynamicLayer(map: TownMap, opts: { palette: PaletteId; det
   const trainMat = new KitMaterial();
   const trainCars = [new THREE.Mesh(trainFront.geometry, trainMat), new THREE.Mesh(trainRear.geometry, trainMat)];
   for (const m of trainCars) { m.castShadow = m.receiveShadow = true; m.visible = false; m.name = 'train'; object.add(m); }
-  let trainId: string | null = null;
   const trainState = { raise: 0, x: 0, z: 0, heading: 0 };
 
   const ensureBus = (v: VehicleView): VehicleState => {
@@ -260,7 +259,6 @@ export function createDynamicLayer(map: TownMap, opts: { palette: PaletteId; det
       const dist = pv && pathKey(pv) === pathKey(v) ? lerpDist(pv.dist, v.dist, alpha, path.length, path.closed) : v.dist;
       if (v.kind === 'train') {
         trainSeen = true;
-        trainId = v.id;
         const sel = selected?.kind === 'train' && selected.id === v.id;
         trainState.raise += ((sel ? 0.14 : 0) - trainState.raise) * kf;
         const half = TRAIN.pitch / 2;

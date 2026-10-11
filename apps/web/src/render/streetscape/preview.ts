@@ -114,11 +114,17 @@ layer.object.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) tris += 
 const msg = document.getElementById('msg')!;
 msg.textContent = `streetscape · ${Math.round(tris).toLocaleString()} tris · built in ${ms.toFixed(0)} ms · ${(layer.object.userData.crossings as unknown[]).length} crossings · ${useDemo ? 'demo ground' : 'district ground'} · walk ${STREETSCAPE.walk} u`;
 
+// Render a handful of frames (headless screenshots run on a software rasteriser), then only on interaction.
+let frames = Number(q.get('frames') ?? 6) || 6;
 let last = performance.now();
-stage.renderer.setAnimationLoop(() => {
+const tick = () => {
   const t = performance.now();
-  stage.render((t - last) / 1000);
+  stage.render(Math.min(0.05, (t - last) / 1000));
   last = t;
-});
-addEventListener('resize', () => stage.resize());
+  if (--frames > 0) requestAnimationFrame(tick);
+};
+const wake = () => { if (frames <= 0) { frames = 30; last = performance.now(); requestAnimationFrame(tick); } else frames = Math.max(frames, 30); };
+stage.rig.controls?.addEventListener('change', wake);
+addEventListener('resize', () => { stage.resize(); wake(); });
+requestAnimationFrame(tick);
 (window as unknown as { __streetscapeReady: boolean }).__streetscapeReady = true;

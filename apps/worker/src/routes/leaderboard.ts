@@ -70,15 +70,19 @@ export function leaderboardRoutes(deps: AppDeps): Hono<AppContext> {
 
     let you: RunResult;
     let baselineJ: number;
-    let championJ: number;
     try {
       you = runPolicy(G0, { scenarioId: replay.scenarioId, seed: replay.seed, split: 'play' }, replay.intents);
-      const champion = (await latestGeneration(db))?.policy ?? G0;
       baselineJ = plainJ(G0, replay.seed);
-      championJ = plainJ(champion, replay.seed);
     } catch (err) {
       console.error('leaderboard re-simulation failed:', errText(err));
       return jsonError(c, 422, 'could not re-simulate this run', [errText(err)]);
+    }
+    // The AI line is context only: a champion that cannot run must not cost the player their entry.
+    let championJ: number | null = null;
+    try {
+      championJ = plainJ((await latestGeneration(db))?.policy ?? G0, replay.seed);
+    } catch (err) {
+      console.warn('champion run on the play seed failed:', errText(err));
     }
 
     const id = crypto.randomUUID();

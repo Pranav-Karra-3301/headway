@@ -8,7 +8,7 @@ import { CATALOG_BY_KIND } from '../assets/catalog';
 import { createRegistry } from '../assets/index';
 import type { PlacedAsset } from '../assets/types';
 import { footprintOf, validatePlacements } from '../assets/validate';
-import { DOWNTOWN } from '../districts/downtown';
+import { DOWNTOWN, DOWNTOWN_DROPPED } from '../districts/downtown';
 import { DISTRICTS } from '../districts/index';
 
 // ------------------------------------------------------------------------------------------------ geometry helpers
@@ -100,6 +100,10 @@ describe('D2 downtown district', () => {
       expect(CATALOG_BY_KIND.has(a.kind), a.kind).toBe(true);
       expect(registry.get(a.kind), a.kind).toBeDefined();
     }
+  });
+
+  it('authors a layout its own clearance pass leaves intact (nothing dropped)', () => {
+    expect(DOWNTOWN_DROPPED.map((a) => `${a.kind} @${a.x},${a.z}`)).toEqual([]);
   });
 
   it('passes validatePlacements: on the board, off roads and rails, no overlaps', () => {

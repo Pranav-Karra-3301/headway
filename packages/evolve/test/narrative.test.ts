@@ -46,6 +46,19 @@ describe('proposalNarrative', () => {
     expect(proposalNarrative(candidate, champion, 3)).toContain('Worse: 23 people were left behind at Stadium Gate; the queue peaked at 140 (was 5 left behind).');
   });
 
+  it('never pairs a cost with a smaller headline number (or a gain with a bigger one)', () => {
+    // the strongest instance shrank (41 → 24 riders) but more runs missed the connection: the summed impact grew
+    const champion = [runResult({ seed: 1001, findings: [missed(3000, 41, '41 riders reached Central from the train just after Route 2 left.')] }), runResult({ seed: 1002 })];
+    const candidate = [runResult({ seed: 1001, findings: [missed(2400, 24, '24 riders reached Central from the train just after Route 2 left.')] }),
+      runResult({ seed: 1002, findings: [missed(2400, 20, '20 riders reached Central from the train just after Route 2 left.')] })];
+    const worse = proposalNarrative(candidate, champion, 1.2);
+    expect(worse).toContain('Worse: 24 riders reached Central from the train just after Route 2 left (+30 pax-min over the training runs).');
+    expect(worse).not.toContain('was 41');
+    // and the mirror image for a gain
+    const eased = proposalNarrative(champion, candidate, -1.2);
+    expect(eased).toContain('Eased: 24 riders reached Central from the train just after Route 2 left (−30 pax-min over the training runs).');
+  });
+
   it('says so when nothing notable changed', () => {
     const same = [runResult({ findings: [missed(9000)] })];
     expect(proposalNarrative(same, same, -0.4)).toBe('ΔJ −0.4% on training. No finding changed noticeably.');

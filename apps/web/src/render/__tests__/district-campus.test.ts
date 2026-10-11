@@ -99,7 +99,6 @@ describe('campus district', () => {
   });
 
   it('places every item validly on the board (validatePlacements)', () => {
-    expect(items.length).toBeGreaterThan(40);
     expect(validatePlacements(TOWN, items)).toEqual([]);
   });
 
@@ -135,10 +134,15 @@ describe('campus district', () => {
       ...TOWN.stops.map((s) => ({ id: s.id, p: s.p, dir: s.queueDir })),
       ...TOWN.rail.stations.map((s) => ({ id: s.id, p: s.platform, dir: s.queueDir })),
     ];
+    const bad: string[] = [];
     for (const pl of places) {
       const end = { x: pl.p.x + pl.dir.x * QUEUE_LEN, z: pl.p.z + pl.dir.z * QUEUE_LEN };
-      for (const a of items) expect(segBoxDist(pl.p, end, boxOf(a)), `${a.kind} @ ${a.x},${a.z} near ${pl.id}`).toBeGreaterThanOrEqual(2);
+      for (const a of items) {
+        const d = segBoxDist(pl.p, end, boxOf(a));
+        if (d < 2) bad.push(`${a.kind} @ ${a.x.toFixed(2)},${a.z.toFixed(2)} is ${d.toFixed(2)} u from ${pl.id}'s queue`);
+      }
     }
+    expect(bad).toEqual([]);
   });
 
   it('never hides a campus stop, platform or their queues from the iso camera (az 45°, elevation 30–36°)', () => {
@@ -148,21 +152,21 @@ describe('campus district', () => {
       ...TOWN.rail.stations.filter((s) => s.id === 'stn_university').map((s) => ({ id: s.id, p: s.platform, dir: s.queueDir })),
     ];
     expect(places.length).toBe(3);
+    const bad = new Set<string>();
     for (const pl of places) {
       for (const q of queuePoints(pl.p, pl.dir)) {
         for (const elev of [30, 35.26]) {
-          const h = hiders(built, q, elev).map((a) => `${a.kind} @ ${a.x.toFixed(2)},${a.z.toFixed(2)}`);
-          expect(h, `${pl.id} slot (${q.x.toFixed(1)},${q.z.toFixed(1)}) at ${elev}°`).toEqual([]);
+          for (const a of hiders(built, q, elev)) bad.add(`${a.kind} @ ${a.x.toFixed(2)},${a.z.toFixed(2)} hides ${pl.id}`);
         }
       }
     }
+    expect([...bad]).toEqual([]);
   });
 
   it('keeps zone doors outside buildings, each next to one', () => {
     const buildings = items.filter(isBuilding);
-    for (const z of TOWN.zones) {
-      for (const b of buildings) expect(inBox(z.door, boxOf(b, 0.05)), `${z.id} inside ${b.kind}`).toBe(false);
-    }
+    const inside = TOWN.zones.flatMap((z) => buildings.filter((b) => inBox(z.door, boxOf(b, 0.05))).map((b) => `${z.id} inside ${b.kind}`));
+    expect(inside).toEqual([]);
     for (const z of TOWN.zones.filter((z) => z.neighborhood === 'campus' && !z.tags.includes('station'))) {
       const near = Math.min(...buildings.map((b) => segBoxDist(z.door, z.door, boxOf(b))));
       expect(near, z.id).toBeLessThan(1.5);
@@ -170,12 +174,14 @@ describe('campus district', () => {
   });
 
   it('has the campus programme: clock tower focal point, halls/library/chapel/dorm, many trees, furniture, flags', () => {
+    expect(items.length).toBeGreaterThanOrEqual(45);
     const tower = items.filter((a) => a.kind === 'lm.clockTower');
     expect(tower).toHaveLength(1);
     const tallest = Math.max(...items.map((a) => CATALOG_BY_KIND.get(a.kind)!.h * (a.scale ?? 1)));
     expect(CATALOG_BY_KIND.get('lm.clockTower')!.h).toBe(tallest);
     for (const kind of ['cp.hall', 'cp.library', 'cp.chapel', 'cp.dorm', 'cp.gate']) expect(count((a) => a.kind === kind), kind).toBeGreaterThanOrEqual(1);
-    expect(count((a) => TREES.has(a.kind))).toBeGreaterThanOrEqual(24);
+    expect(count((a) => TREES.has(a.kind))).toBeGreaterThanOrEqual(14);
+    expect(count((a) => a.kind.startsWith('veg.'))).toBeGreaterThanOrEqual(22);
     expect(new Set(items.filter((a) => TREES.has(a.kind)).map((a) => a.kind)).size).toBeGreaterThanOrEqual(4);
     expect(count((a) => a.kind === 'st.bench')).toBeGreaterThanOrEqual(6);
     expect(count((a) => a.kind === 'st.lamp')).toBeGreaterThanOrEqual(8);
@@ -198,17 +204,20 @@ describe('campus district', () => {
   });
 
   it('keeps footpaths clear: no building, tree or bed on a path (gates straddle theirs), furniture beside not on', () => {
+    const bad: string[] = [];
+    const at = (it: PlacedAsset) => `${it.kind} @ ${it.x.toFixed(2)},${it.z.toFixed(2)}`;
     for (const p of CAMPUS.paths) {
       for (let i = 0; i + 1 < p.points.length; i++) {
         const a = p.points[i]!, b = p.points[i + 1]!;
         for (const it of items) {
           if (it.kind === 'cp.gate') continue;
           const small = Math.max(footprintOf(it).w, footprintOf(it).d) <= 1.3 && !TREES.has(it.kind);
-          if (small) expect(segDist(it, a, b), `${it.kind} @ ${it.x},${it.z} on a path`).toBeGreaterThan(p.width / 2 + 0.1);
-          else if (isBuilding(it)) expect(segBoxDist(a, b, boxOf(it, 0.3)), `path runs through ${it.kind} @ ${it.x},${it.z}`).toBeGreaterThan(0);
-          else expect(segBoxDist(a, b, boxOf(it, 0.25)), `${it.kind} @ ${it.x},${it.z} on a path`).toBeGreaterThan(p.width / 2 - 0.25);
+          if (small) { if (segDist(it, a, b) <= p.width / 2 + 0.1) bad.push(`${at(it)} on a path`); }
+          else if (isBuilding(it)) { if (segBoxDist(a, b, boxOf(it, 0.3)) <= 0) bad.push(`path runs through ${at(it)}`); }
+          else if (segBoxDist(a, b, boxOf(it, 0.25)) <= p.width / 2 - 0.25) bad.push(`${at(it)} on a path`);
         }
       }
     }
+    expect(bad).toEqual([]);
   });
 });

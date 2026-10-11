@@ -27,8 +27,8 @@ export interface TerrainColors {
 
 export const TERRAIN_COLORS: Record<PaletteId, TerrainColors> = {
   a: {
-    foot: PALETTES.a.board, grass: '#9CD3A9', meadow: '#86C795', forest: '#5DAA78', upper: '#77AE93',
-    rock: '#CBC3B3', cliff: '#B7AE9E', sand: '#EFE3C6', haze: '#A9D3C2', accent: '#86C795',
+    foot: PALETTES.a.board, grass: '#9BD4A7', meadow: '#80C793', forest: '#4F9F70', upper: '#6EAE97',
+    rock: '#D5CEC1', cliff: '#B8AFA1', sand: '#EFE3C6', haze: '#A5D3C3', accent: '#80C793',
     strata: ['#7E9F6B', '#A88560', '#C9A97E', '#9C8F80'],
   },
   b: {

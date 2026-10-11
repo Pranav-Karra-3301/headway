@@ -23,7 +23,16 @@ const SHOTS: Record<string, [number, number, number]> = {
 };
 const shot = SHOTS[q.get('shot') ?? 'stadium'] ?? SHOTS.stadium!;
 const cx = Number(q.get('cx') ?? shot[0]), cz = Number(q.get('cz') ?? shot[1]), view = Number(q.get('view') ?? shot[2]);
-const { scene, renderer, loop } = devScene(view, new THREE.Vector3(cx, 0, cz));
+const { scene, renderer, camera, loop } = devScene(view, new THREE.Vector3(cx, 0, cz));
+// headless Chrome settles the viewport after load: keep the canvas and the ortho frustum in step with the window
+const fit = () => {
+  renderer.setSize(innerWidth, innerHeight);
+  const a = innerWidth / innerHeight;
+  Object.assign(camera, { left: (-view * a) / 2, right: (view * a) / 2, top: view / 2, bottom: -view / 2 });
+  camera.updateProjectionMatrix();
+};
+addEventListener('resize', fit);
+setTimeout(fit, 50);
 scene.background = new THREE.Color(dusk ? P.duskBg : P.bg);
 if (dusk) {
   renderer.toneMappingExposure = 0.9;

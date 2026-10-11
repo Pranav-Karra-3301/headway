@@ -62,7 +62,7 @@ const areas: GroundArea[] = [];
 const TX = Math.min(XL + 3.27, S_NORTH.x - 2.4 - 2.0 - 1.78);
 const EAST_Z = D_EAST.z + 0.1 + 1.75, PARK_Z = D_PARK.z - 0.05 - 1.75;
 put('res.tower', TX, EAST_Z, E, { floors: 5, accent: 1, wall: 0 });   // Eastview Towers
-put('res.tower', TX, PARK_Z, E, { floors: 5, accent: 2, wall: 1 });   // Parkside Towers (5 floors keep the Downtown stop in view)
+put('res.tower', TX, PARK_Z, S, { floors: 5, accent: 2, wall: 1 });   // Parkside Towers, lobby to South Rd at its door
 // Promenade: one paved forecourt along Station Rd holding both queues; a birch and a lamp between the two stops.
 const PX0 = TX + 1.88, PX1 = XS - 1.9;
 areas.push({ kind: 'plaza', polygon: rect(PX0, ZM + 1.9, PX1, ZS - 1.9) });
@@ -89,7 +89,7 @@ const gz0 = COURT_Z + 1.95, gz1 = GARDEN_Z - 1.4;
 areas.push({ kind: 'garden', polygon: rect(XS + 2.0, gz0, RX - 1.5, gz1) });
 tree('maple', D_COURT.x + 0.3, (gz0 + gz1) / 2, 1.3);
 tree('birch', D_COURT.x + 0.4, D_COURT.z - 1.0, 0.5);       // between the station and the tower
-tree('birch', XS + 2.0, GARDEN_Z - 0.2, 2.8);                // beside the cottage
+tree('birch', XS + 2.0, GARDEN_Z - 1.0, 2.8);                // beside the cottage
 put('st.lamp', XS + 1.55, D_COURT.z - 0.7, E);
 put('st.lamp', XS + 1.55, (gz0 + gz1) / 2, E);
 put('st.lamp', XS + 1.55, ZS - 1.55, E);
@@ -120,11 +120,10 @@ tree('birch', XA + 2.2, ZF + 2.45, 1.9);
 // The green on Allen St's axis: a big tree ends the vista; a path leads to a bench facing the trains.
 const GW0 = TA + 3.6, GW1 = XL + 1.0;
 areas.push({ kind: 'lawn', polygon: rect(GW0, ZF, GW1, RZ - 1.4) });
-tree('oak', XL - 0.4, ZF + 1.6, 1.2);
-tree('maple', GW0 + 1.2, ZF + 2.9, 2.6);
-put('veg.flowerbed', GW0 + 1.3, ZF + 0.6, S);
-put('st.bench', (GW0 + GW1) / 2 + 0.2, RZ - 1.85, S);
-paths.push({ points: [v((GW0 + GW1) / 2 - 0.4, ZS + 1.9), v((GW0 + GW1) / 2 - 0.3, ZF + 1.4), v((GW0 + GW1) / 2 + 0.2, RZ - 2.45)], width: 0.75, kind: 'footpath' });
+tree('oak', XL - 0.2, ZF + 1.4, 1.2);
+tree('maple', GW0 + 0.9, ZF + 2.0, 2.6);
+put('st.bench', GW0 + 2.4, RZ - 1.85, S);
+paths.push({ points: [v(GW0 + 2.5, ZS + 1.9), v(GW0 + 2.4, ZF + 1.4), v(GW0 + 2.4, RZ - 2.45)], width: 0.75, kind: 'footpath' });
 // Residents' parking opposite Parkside, hedged at the sides.
 const LOT_X = XL + 4.5;
 put('res.parking', LOT_X, ZS + 1.85 + 2.0, N, { cars: 4 });

@@ -20,6 +20,9 @@ export interface FieldOptions {
   cell?: number;
   /** Ground height of other world parts (terrain headlands); land wherever it rises above the water. */
   landHeight?: (x: number, z: number) => number;
+  /** Signed distance to another part's coastline (> 0 on land), e.g. the terrain headlands. Only used beyond the
+   *  board's mountain-side edges (x < board.minX or z < board.minZ), where the beach does not reach. */
+  landDist?: (x: number, z: number) => number;
 }
 
 /** Cap for the objects channel (nothing beyond this matters for foam). */
@@ -74,6 +77,22 @@ export function buildShoreField(plan: WaterPlan, opts: FieldOptions = {}): Shore
   for (let j = 0; j < h; j++) {
     const z = minZ + (j + 0.5) * cell;
     for (let i = 0; i < w; i++) shore[j * w + i] = plan.waterDist(minX + (i + 0.5) * cell, z);
+  }
+  if (opts.landDist) {
+    const B = plan.board;
+    const smooth = (e0: number, e1: number, v: number) => { const t = Math.max(0, Math.min(1, (v - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+    for (let j = 0; j < h; j++) {
+      const z = minZ + (j + 0.5) * cell;
+      const wz = smooth(B.minZ + 1, B.minZ - 2, z);
+      for (let i = 0; i < w; i++) {
+        const x = minX + (i + 0.5) * cell;
+        const wgt = Math.max(wz, smooth(B.minX + 1, B.minX - 2, x));
+        const k = j * w + i;
+        if (wgt <= 0 || shore[k]! < -3) continue;
+        const ext = -opts.landDist(x, z) + (1 - wgt) * 60;
+        if (ext < shore[k]!) shore[k] = ext;
+      }
+    }
   }
   if (opts.landHeight) {
     const land = new Uint8Array(w * h), water = new Uint8Array(w * h);

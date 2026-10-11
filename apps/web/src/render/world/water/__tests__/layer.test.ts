@@ -63,10 +63,11 @@ describe('water layer', () => {
     layer.update(ctx(1));
     const u = layer.uniforms;
     const t1 = u.uTime.value;
-    const boat1 = u.uBoatPose.value[u.movingIndex].clone();
+    const boat1 = u.uBoatPose.value[layer.movingBoat]!.clone();
     layer.update(ctx(3));
     expect(u.uTime.value).toBeGreaterThan(t1);
-    expect(u.uBoatPose.value[u.movingIndex].distanceTo(boat1)).toBeGreaterThan(0.05);
+    const boat2 = u.uBoatPose.value[layer.movingBoat]!;
+    expect(Math.hypot(boat2.x - boat1.x, boat2.z - boat1.z)).toBeGreaterThan(0.05);
   });
 
   it('eases into dusk and back, following the frame light', () => {

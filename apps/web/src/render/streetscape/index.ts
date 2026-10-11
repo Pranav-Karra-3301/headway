@@ -1,8 +1,8 @@
 // Owner: S1. The streetscape: everything on the ground between the buildings.
 // - Sidewalks + curbs along every road edge: raised stone slabs with a chamfered toy edge, rounded curb corners
 //   at junctions, cut clear of the rail, clipped to the board.
-// - A road bed under the composer's road strips (fills the rounded corners exactly; top at STREETSCAPE.roadTop,
-//   just below the kit road's 0.06 top so the composer's strips + centre dashes stay on top).
+// - Road fill in the rounded curb corners (the composer's strips + round junction pads leave a square corner there);
+//   top at STREETSCAPE.roadTop, just below the composer's road top, so its strips + centre dashes stay on top.
 // - Zebra crossings on every arm of the junctions nearest the stops, and a painted bay at every bus stop.
 // - District `paths` as gravel footpaths (smooth unions where paths meet, flared where they join a sidewalk) and
 //   plaza-edge bands; district `areas` as lawn / plaza / parking (painted bays) / sports (pitch lines) / garden.
@@ -19,8 +19,9 @@ import type { PaletteId } from '../types';
 import { type AreaOutline, buildAreas } from './areas';
 import { field, makeGrid, pointInLoop, polyDist, regions, smin, stampPolyline, windowOf } from './field';
 import {
-  armsByNode, type Bay, cornersOf, type Crossing, crossingsNearStops, rectsOverlap, roadS, stampRoads, stopBays,
+  armsByNode, type Bay, cornersOf, type Crossing, crossingsNearStops, rectsOverlap, roadS, stampCornerZones, stampRoads, stopBays,
 } from './network';
+import { ROAD } from '../town/network';
 import { resolveRole } from './roles';
 import { Mesher, paintQuad, slab } from './slab';
 
@@ -36,13 +37,14 @@ export const STREETSCAPE: {
   roadHalf: ROAD_WIDTH / 2,
   /** Sidewalk width from the curb. */
   walk: 1.0,
-  walkTop: 0.11,
-  bevel: 0.025,
+  walkTop: 0.1,
+  bevel: 0.045,
   /** Curb corner radius at junctions. */
   cornerR: 0.45,
-  roadTop: 0.054,
-  /** Top of zebra stripes and bay paint (sits on the kit road's 0.06 top). */
-  markTop: 0.068,
+  /** Road fill in the rounded curb corners, just under the composer's road strips (town/network ROAD.top). */
+  roadTop: ROAD.top - 0.008,
+  /** Top of zebra stripes and bay paint, just above the composer's road top. */
+  markTop: ROAD.top + 0.01,
   /** Paint / inlay thickness above an area surface. */
   paintTop: 0.012,
   /** No sidewalk within this distance of the rail centreline. */
@@ -52,7 +54,7 @@ export const STREETSCAPE: {
   heights: { lawn: 0.03, sports: 0.035, parking: 0.04, footpath: 0.045, plaza: 0.05, 'plaza-edge': 0.056, garden: 0.06 },
 };
 
-const ZEBRA = { stripes: 5, pitch: 0.44, width: 0.26, depth: 0.8, setback: 0.35 } as const;
+const ZEBRA = { stripes: 5, pitch: 0.44, width: 0.26, depth: 0.75, setback: 0.25 } as const;
 const BAY = { len: 3.4, wid: 0.72, line: 0.075 } as const;
 
 export interface StreetscapeBuild {
@@ -100,8 +102,9 @@ export function buildStreetscape(map: TownMap, districts: DistrictScenery[], pal
   const arms = armsByNode(map);
   const corners = cornersOf(map, arms, h, rc);
   const g = makeGrid(b, S.grid);
-  const road = field(g, 0);
+  const road = field(g, 0), zone = field(g, 1);
   stampRoads(g, road, map, corners, h, rc, h + w + 0.8);
+  stampCornerZones(g, zone, corners, h, rc);
   const rail = field(g, S.railClear + 1);
   stampPolyline(g, rail, map.rail.loop.points, true, S.railClear + 1);
   const bed = field(g, 1), walk = field(g, 1);
@@ -111,13 +114,13 @@ export function buildStreetscape(map: TownMap, districts: DistrictScenery[], pal
       const x = g.x0 + i * g.c, k = j * g.nx + i;
       const out = Math.max(b.minX - x, x - b.maxX, b.minZ - z, z - b.maxZ);
       const s = road[k]!;
-      bed[k] = Math.max(s, out);
+      bed[k] = Math.max(s, zone[k]!, out); // the fillets only (tucked 0.1 under the composer's strips)
       walk[k] = Math.max(-s, s - w, S.railClear - rail[k]!, out);
     }
   }
 
-  // ---- road bed + sidewalks
-  slab(regions(g, bed), { top: S.roadTop }, parts.get('road'), parts.get('road'));
+  // ---- corner road fill + sidewalks
+  slab(regions(g, bed, undefined, 0.002, 0.0005), { top: S.roadTop }, parts.get('road'), parts.get('road'));
   slab(regions(g, walk), { top: S.walkTop, bevel: S.bevel }, parts.get('ssWalk'), parts.get('ssCurb'));
 
   // ---- bus-stop bays and zebra crossings (skipping any crossing that would overlap a bay)

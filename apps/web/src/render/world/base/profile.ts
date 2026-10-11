@@ -7,21 +7,25 @@ import * as THREE from 'three';
 import type { Side, WorldLayout } from '../layout';
 
 export const BASE = {
-  /** Wall bottom = top face of the wooden plinth (world y). */
-  bottom: -10,
-  plinthH: 1.6,
+  /** Wall bottom = top face of the wooden plinth (world y): a 5.2 u cut (bible §6.6: 4–6 u). */
+  bottom: -5.2,
+  plinthH: 0.8,
   /** How far the plinth sticks out past the cut walls, and its corner radius in plan. */
-  plinthOut: 1.5,
-  plinthR: 3.2,
-  /** Ground beyond the board on the land sides (just under the board top, y = 0). */
-  floorY: -0.03,
-  /** Default water surface (E2's water mesh overrides it when found). */
-  waterLevel: -0.35,
-  /** Floor height at the shoreline (under E2's beach) and the lake bed at the far cut edges. */
-  beachY: -0.85,
-  bedY: -4.6,
+  plinthOut: 0.9,
+  plinthR: 2.6,
+  /** Default top of the cut on the land sides: board level (E1's terrain overrides it when found). */
+  landY: 0,
+  /** Default water surface (= E2's WATER_Y; E2's water mesh overrides it when found). */
+  waterLevel: -0.75,
+  /** Ground at the shoreline (just under the water) and the lake bed at the far cut edges (= E1/E2's LAKE_BED). */
+  shoreY: -0.95,
+  bedY: -2.4,
   /** The bed drops from the shore to `bedY` over this distance. */
-  shelf: 12,
+  shelf: 10,
+  /** The safety floor sits this far under the expected surfaces, so it never pokes through terrain/beach/water. */
+  floorDrop: 0.9,
+  /** Rounded top edge of the cut (bible: r 0.3). */
+  bevel: 0.3,
   /** Cut-edge sample spacing (u). */
   step: 1,
   /** Samples of sibling meshes are taken this far inside the extent (avoids their own edge faces). */
@@ -59,12 +63,17 @@ export function isWater(layout: WorldLayout, x: number, z: number): boolean {
  *  bed that deepens over `BASE.shelf` to `BASE.bedY`. */
 export function groundAt(layout: WorldLayout, x: number, z: number): number {
   const d = waterDistance(layout, x, z);
-  if (d > 0) return BASE.beachY + (BASE.bedY - BASE.beachY) * smooth(d / BASE.shelf);
+  if (d > 0) return BASE.shoreY + (BASE.bedY - BASE.shoreY) * smooth(d / BASE.shelf);
   const b = layout.board, s = layout.shore;
-  if (x < b.minX || z < b.minZ) return BASE.floorY;
+  if (x < b.minX || z < b.minZ) return BASE.landY;
   const t = Math.max((z - b.maxZ) / Math.max(1e-6, s.south - b.maxZ), (x - b.maxX) / Math.max(1e-6, s.east - b.maxX));
-  if (t > 0) return BASE.floorY + (BASE.beachY - BASE.floorY) * Math.min(1, t);
-  return BASE.floorY;
+  if (t > 0) return BASE.landY + (BASE.shoreY - BASE.landY) * Math.min(1, t);
+  return BASE.landY;
+}
+
+/** Safety floor under the terrain / beach / lake (hidden whenever E1 and E2 cover the ground). */
+export function floorAt(layout: WorldLayout, x: number, z: number): number {
+  return groundAt(layout, x, z) - BASE.floorDrop;
 }
 
 /** The four cut edges, clockwise from above: north (heading east), east (south), south (west), west (north).

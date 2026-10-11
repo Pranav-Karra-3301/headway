@@ -1,7 +1,7 @@
 // Owner: Task M. The canonical town (spec §4 topology) authored to the kit's scale.
 //
 // Layout (x east, z south; board 72 × 52 u):
-// - A toy railway rings the town (rounded rectangle, clockwise: Stadium → University → Central).
+// - A toy railway rings the town (rounded rectangle, anticlockwise seen north-up: Stadium → Central → University).
 // - A ring road runs inside the railway (7.4 u in from the rail) so every station has a road alongside its platform.
 // - Main St (E–W, exits west) ends at Central Station; Atherton St (N–S arterial) exits north and south; the South
 //   Rd continues east off the board. Side streets: Burrowes St (campus), Beaver Ave + Allen St (downtown), Park Ave
@@ -126,9 +126,12 @@ function rawBetween(from: string, to: string): Vec2[] {
 }
 
 // ---------------------------------------------------------------- rail
+/** Travel order (spec §4): Stadium → Central → University, so the stadium crowd reaches Central (and its r1/r2
+ *  connections) on the short side of the loop, and Apartments → Central → University is direct. */
+const RAIL_ORDER: StationId[] = ['stn_stadium', 'stn_central', 'stn_university'];
 function railLoop(): Polyline {
-  const start = v(STATION_AT.stn_stadium.at, RAIL_HZ); // the loop starts at Stadium's platform centre, heading west
-  const corners = [start, v(-RAIL_HX, RAIL_HZ), v(-RAIL_HX, -RAIL_HZ), v(RAIL_HX, -RAIL_HZ), v(RAIL_HX, RAIL_HZ)];
+  const start = v(STATION_AT.stn_stadium.at, RAIL_HZ); // the loop starts at Stadium's platform centre, heading east
+  const corners = [start, v(RAIL_HX, RAIL_HZ), v(RAIL_HX, -RAIL_HZ), v(-RAIL_HX, -RAIL_HZ), v(-RAIL_HX, RAIL_HZ)];
   return polyline(roundCorners(corners, RAIL_R, true, RAIL_SEGS), true);
 }
 const RAIL_LOOP = railLoop();
@@ -215,7 +218,7 @@ const STATION_NAMES: Record<StationId, { name: string; stopId: StopId }> = {
   stn_university: { name: 'University', stopId: 'stop_university_stn' },
   stn_central: { name: 'Central', stopId: 'stop_central_stn' },
 };
-const STATIONS: Station[] = (['stn_stadium', 'stn_university', 'stn_central'] as const).map((id) => {
+const STATIONS: Station[] = RAIL_ORDER.map((id) => {
   const f = stationFrame(id);
   return {
     id, name: STATION_NAMES[id].name, dist: nearestDist(RAIL_LOOP, f.rail),

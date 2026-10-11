@@ -205,7 +205,7 @@ export function formatEvent(e: EvolveEvent): string | null {
     case 'eval':
       return e.done === e.total ? `  ${e.proposalId} · ${e.split} ${e.done}/${e.total} runs` : null;
     case 'scored':
-      return `  ${e.proposalId} · ΔJ ${signedPct(e.deltaTrainPct)} on training · ${e.narrative}`;
+      return `  ${e.proposalId} · ${e.narrative.startsWith('ΔJ') ? e.narrative : `ΔJ ${signedPct(e.deltaTrainPct)} on training. ${e.narrative}`}`;
     case 'decision':
       return `  → ${e.reason}`;
     case 'error':

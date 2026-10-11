@@ -210,6 +210,7 @@ describe('promotion rule (spec §7)', () => {
     expect(valIds(r.ev.calls)).toEqual([]);
     expect((r.events.at(-1) as { reason: string }).reason).toMatch(/1%/);
     expect(r.round.proposals[0]!.narrative).toContain('Rejected: less than 1% better on training.');
+    expect(r.round.proposals[2]!.narrative).toContain('Rejected: worse on training (ΔJ +20.0%).');
     expect(r.round.status).toBe('done');
     expect(r.round.championAfter).toBe('g0');
   });

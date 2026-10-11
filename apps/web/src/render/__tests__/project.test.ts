@@ -128,6 +128,15 @@ describe('composeScenery', () => {
     const c = composeScenery(SCENERY, [stadium]);
     expect(c.platformOnly.has('stn_central')).toBe(true);
     expect(c.platformOnly.has('stn_university')).toBe(false);
+    expect(c.owned.size).toBe(0);
+  });
+  it('marks stations inside an active district region as owned (no kit building, no kit clock)', () => {
+    const st = SCENERY.find((i) => i.kind === 'station' && i.stationId === 'stn_stadium')!;
+    const d: DistrictScenery = { ...empty('stadium'), region: { center: { x: st.x, z: st.z }, radius: 3 }, items: [{ kind: 'st.bench', x: st.x + 1, z: st.z - 4 }] };
+    const c = composeScenery(SCENERY, [d]);
+    expect(c.owned.has('stn_stadium')).toBe(true);
+    expect(c.platformOnly.has('stn_stadium')).toBe(true);
+    expect(c.base.some((i) => i.kind === 'station' && i.stationId === 'stn_stadium')).toBe(true);
   });
   it('handles polygon regions', () => {
     const sq = { polygon: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }, { x: 0, z: 10 }] };

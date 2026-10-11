@@ -1,16 +1,18 @@
 // Owner: D4. The stadium district (game day at the stadium) and the railway dressing for the whole loop.
 //
 // Stadium block (Main St / West Rd / South Rd / Atherton St): A4's lm.stadium where Task M's base scenery and the
-// stadium zone doors expect it, main gate on the South Rd; banner flags and lamps at the gates; a paved fan plaza
-// from the east gate to the Stadium Gate stop whose south half stays open for the crowd queue, with a fountain,
-// benches and concession kiosks at its north end; two parking lots opening onto Atherton St; poplars on Main St.
+// stadium zone doors put it, main gate on the South Rd. A paved forecourt with banner flags, flowerbeds and lamps runs
+// along the South Rd into the east gate plaza, which stays open for the Stadium Gate crowd queue; a row of flags
+// separates it from a tailgate lawn (concession kiosks, picnic umbrellas); two parking lots open onto Atherton St; a
+// lawn verge with poplars lines Main St behind the bowl.
 // Railway (derived from TOWN + worldLayout, so it follows map edits): beside each platform a station building
-// (lm.stationCentral at Central, lm.stationHalt at University and Stadium) on the arrival side, front on the platform
-// edge, clear of the queue; a paved platform and a footpath from the paired bus stop; a station square and garden;
-// lm.levelCrossing on every road/rail crossing outside the rail tunnel; lm.railSignal home/starter signals at each
-// station and approach signals before each crossing, outside the loop, lamps facing oncoming trains.
-// Rules (tested): validatePlacements clean (level crossings excepted), 2 u clear around every stop/platform and the
-// first 5 u of its queue, nothing tall between a queue and the default camera (+x/+z).
+// (lm.stationCentral at Central, lm.stationHalt at University and Stadium) on the arrival side past the queue point,
+// front on the platform edge facing the track; a paved platform, a footpath from the paired bus stop, a station square
+// and garden; lm.levelCrossing on every road/rail crossing outside the rail tunnel; lm.railSignal starter and home
+// signals at each station and approach signals before each crossing, outside the loop, lamps facing oncoming trains.
+// Rules (tested in __tests__/district-stadium.test.ts): validatePlacements is clean (level crossings excepted: they sit
+// on the crossing), 2 u stay clear around every stop/platform and the first 5 u of its queue, and nothing tall stands
+// between a queue and the default camera (+x/+z). Dressing that would break a rule after a map edit is left out.
 import { pointAt, TOWN } from '@headway/sim';
 import type { Station, Vec2 } from '@headway/sim';
 import { CATALOG_BY_KIND } from '../assets/catalog';
@@ -23,12 +25,17 @@ import type { DistrictScenery, FootPath, GroundArea } from './types';
 const HALF_PI = Math.PI / 2;
 const v = (x: number, z: number): Vec2 => ({ x, z });
 const r2 = (n: number) => Math.round(n * 100) / 100;
+const r2v = (p: Vec2) => v(r2(p.x), r2(p.z));
 const add = (a: Vec2, b: Vec2, s = 1): Vec2 => v(a.x + b.x * s, a.z + b.z * s);
 const dot = (a: Vec2, b: Vec2) => a.x * b.x + a.z * b.z;
 /** rotation.y that turns an asset's front (local +z) toward world direction d, snapped to quarter turns. */
 const quarter = (d: Vec2) => Math.round(Math.atan2(d.x, d.z) / HALF_PI) * HALF_PI;
-const rect = (x0: number, z0: number, x1: number, z1: number): Vec2[] =>
-  [v(x0, z0), v(x1, z0), v(x1, z1), v(x0, z1)].map((p) => v(r2(p.x), r2(p.z)));
+/** Angle wrapped to (-π, π]. */
+const turn = (a: number) => {
+  const t = ((((a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
+  return t === -Math.PI ? Math.PI : t;
+};
+const rect = (x0: number, z0: number, x1: number, z1: number): Vec2[] => [v(x0, z0), v(x1, z0), v(x1, z1), v(x0, z1)].map(r2v);
 
 const items: PlacedAsset[] = [];
 const paths: FootPath[] = [];
@@ -40,7 +47,7 @@ const queueLines = [
   ...TOWN.stops.map((s) => ({ a: s.p, d: s.queueDir })),
   ...TOWN.rail.stations.map((s) => ({ a: s.platform, d: s.queueDir })),
 ];
-/** Thin poles never hide anyone; everything else taller than 1 u must not stand between a queue and the camera. */
+/** Thin poles never hide anyone; anything else taller than 1 u must not stand between a queue and the camera. */
 const POLES = new Set(['st.flag', 'st.lamp', 'lm.railSignal']);
 const CAM = v(Math.SQRT1_2, Math.SQRT1_2), CAM_SLOPE = Math.tan((35 * Math.PI) / 180);
 function clearOfQueues(it: PlacedAsset): boolean {
@@ -79,21 +86,19 @@ function make(kind: string, p: Vec2, rot = 0, params?: AssetParams, scale?: numb
   if (scale) it.scale = scale;
   return it;
 }
-/** Core pieces (stadium, stations, crossings) always go in; the tests hold them to the rules. */
+/** Core pieces (stadium, station buildings, crossings) always go in, first; the tests hold them to the rules. */
 const place = (kind: string, p: Vec2, rot = 0, params?: AssetParams, scale?: number) => { items.push(make(kind, p, rot, params, scale)); };
-/** Dressing only goes in where it fits, so map edits drop a bench rather than block a queue. */
-function dress(kind: string, p: Vec2, rot = 0, params?: AssetParams, scale?: number): boolean {
+/** Dressing only goes in where it fits, so a map edit drops a bench rather than block a queue. */
+function dress(kind: string, p: Vec2, rot = 0, params?: AssetParams, scale?: number): void {
   const it = make(kind, p, rot, params, scale);
-  if (!fits(it)) return false;
-  items.push(it);
-  return true;
+  if (fits(it)) items.push(it);
 }
 
 // ---------------------------------------------------------------- anchors from the map
 const node = (id: string, fb: Vec2): Vec2 => TOWN.roads.nodes.find((n) => n.id === id)?.p ?? fb;
-const XW = node('j_main_west', v(-26.8, 0)).x;    // West Rd
-const XA = node('j_main_atherton', v(-2, 0)).x;   // Atherton St
-const ZM = node('j_main_west', v(-26.8, 0)).z;    // Main St
+const XW = node('j_main_west', v(-26.8, 0)).x;      // West Rd
+const XA = node('j_main_atherton', v(-2, 0)).x;     // Atherton St
+const ZM = node('j_main_west', v(-26.8, 0)).z;      // Main St
 const ZS = node('j_south_atherton', v(-2, 14.6)).z; // South Rd
 const baseStadium = SCENERY.find((s) => s.kind === 'stadium');
 const hood = TOWN.neighborhoods.find((n) => n.id === 'stadium');
@@ -101,11 +106,109 @@ const hood = TOWN.neighborhoods.find((n) => n.id === 'stadium');
 const S = baseStadium ? v(baseStadium.x, baseStadium.z) : hood ? v(hood.center.x, hood.center.z) : v(-19.8, 7.3);
 const gateStop = TOWN.stops.find((s) => s.id === 'stop_stadium_gate');
 const G = gateStop ? gateStop.p : v(S.x + 8.3, ZS - 1.15);
+const BOWL = { a: 5.0, b: 3.75 };                   // A4 STADIUM_BOWL half extents (outer facade)
+
+// ---------------------------------------------------------------- railway geometry
+const loop = TOWN.rail.loop;
+const L = loop.length;
+function tangent(d: number): Vec2 {
+  const a = pointAt(loop, d - 0.3), b = pointAt(loop, d + 0.3);
+  const n = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  return v((b.x - a.x) / n, (b.z - a.z) / n);
+}
+function roadDist(p: Vec2): number {
+  let best = Infinity;
+  for (const e of TOWN.roads.edges) {
+    const P = e.path.points;
+    for (let i = 0; i + 1 < P.length; i++) {
+      const a = P[i]!, b = P[i + 1]!, vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.z - a.z) * vz) / l2)) : 0;
+      best = Math.min(best, Math.hypot(a.x + vx * t - p.x, a.z + vz * t - p.z));
+    }
+  }
+  return best;
+}
+/** Arc length of the loop point nearest p. */
+function distOn(p: Vec2): number {
+  const pts = loop.points;
+  let best = { d: 0, e: Infinity };
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!, b = pts[(i + 1) % pts.length]!, vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.z - a.z) * vz) / l2)) : 0;
+    const e = Math.hypot(a.x + vx * t - p.x, a.z + vz * t - p.z);
+    if (e < best.e) best = { d: loop.cum[i]! + Math.sqrt(l2) * t, e };
+  }
+  return best.d;
+}
+const tunnel = worldLayout(TOWN).railTunnel;
+function inTunnel(d: number, margin: number): boolean {
+  if (!tunnel) return false;
+  const from = tunnel.fromDist - margin, to = tunnel.toDist + margin;
+  const span = (((to - from) % L) + L) % L;
+  return (((d - from) % L) + L) % L <= span;
+}
+/** Every road-centreline × rail-centreline crossing, with the road's direction there and its arc length on the loop. */
+function crossings(): Array<{ p: Vec2; dir: Vec2; d: number }> {
+  const out: Array<{ p: Vec2; dir: Vec2; d: number }> = [];
+  const R = loop.points;
+  for (const e of TOWN.roads.edges) {
+    const P = e.path.points;
+    for (let i = 0; i + 1 < P.length; i++) for (let j = 0; j < R.length; j++) {
+      const a = P[i]!, b = P[i + 1]!, c = R[j]!, d = R[(j + 1) % R.length]!;
+      const rx = b.x - a.x, rz = b.z - a.z, sx = d.x - c.x, sz = d.z - c.z, den = rx * sz - rz * sx;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((c.x - a.x) * sz - (c.z - a.z) * sx) / den, u = ((c.x - a.x) * rz - (c.z - a.z) * rx) / den;
+      if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+      const p = v(a.x + rx * t, a.z + rz * t);
+      if (out.some((o) => Math.hypot(o.p.x - p.x, o.p.z - p.z) < 0.5)) continue;
+      const n = Math.hypot(rx, rz);
+      out.push({ p, dir: v(rx / n, rz / n), d: distOn(p) });
+    }
+  }
+  return out;
+}
+/** Level crossings only where the road meets the track at grade (not over the rail tunnel). */
+const atGrade = crossings().filter((c) => !inTunnel(c.d, 2));
+
+const PLATFORM_EDGE = 1.05, PLATFORM_BACK = 3.55, BUILDING_EDGE = 1.12, CLEAR = 2.25;
+const BUILDING: Record<string, string> = { stn_central: 'lm.stationCentral' };
+/** A station's frame: rail point at the platform centre, direction of travel, unit vectors along the platform
+ *  (toward the queue point = the arrival end) and inward (toward the platform), and the queue point's offset along. */
+interface Frame { s: Station; R: Vec2; t: Vec2; along: Vec2; inward: Vec2; aQ: number; kind: string; w: number; d: number; rot: number }
+function frameOf(s: Station): Frame {
+  const rail = pointAt(loop, s.dist);
+  const R = v(rail.x, rail.z);
+  const t = tangent(s.dist);
+  const toPlatform = v(s.platform.x - R.x, s.platform.z - R.z);
+  let inward = v(-t.z, t.x);
+  if (dot(toPlatform, inward) < 0) inward = v(-inward.x, -inward.z);
+  const along = v(-s.queueDir.x, -s.queueDir.z); // the queue grows from the arrival end toward the platform centre
+  const kind = BUILDING[s.id] ?? 'lm.stationHalt';
+  const c = CATALOG_BY_KIND.get(kind)!;
+  return { s, R, t, along, inward, aQ: dot(toPlatform, along), kind, w: c.w, d: c.d, rot: quarter(v(-inward.x, -inward.z)) };
+}
+const frames = TOWN.rail.stations.map(frameOf);
+const at = (f: Frame, a: number, n: number): Vec2 => add(add(f.R, f.along, a), f.inward, n);
+/** Building centre: arrival side past the queue point; front (local +z) on the platform edge, facing the track. */
+const buildingAlong = (f: Frame) => f.aQ + CLEAR + f.w / 2;
+const buildingIn = (f: Frame) => BUILDING_EDGE + f.d / 2;
+/** Platform extent along the track: from beyond the queue's far end to the building's far end. */
+const platformFrom = (f: Frame) => f.aQ - QUEUE_LEN - 1.6;
+const platformTo = (f: Frame) => buildingAlong(f) + f.w / 2;
+/** Inward offset where the station road's kerb clearance begins, scanning the building's span along the platform. */
+function roadReach(f: Frame, a0: number, a1: number, from: number): number {
+  let n = from;
+  while (n < from + 6 && [a0, (a0 + a1) / 2, a1].every((a) => roadDist(at(f, a, n + 0.05)) >= 1.75)) n += 0.05;
+  return n;
+}
+
+// ---------------------------------------------------------------- core pieces
+place('lm.stadium', S);
+for (const f of frames) place(f.kind, at(f, buildingAlong(f), buildingIn(f)), f.rot);
+// A4's crossing has the road along local z and the track along local x; a half turn is the same crossing.
+for (const c of atGrade) place('lm.levelCrossing', c.p, ((quarter(c.dir) % Math.PI) + Math.PI) % Math.PI);
 
 // ---------------------------------------------------------------- the stadium block
-const BOWL = { a: 5.0, b: 3.75 };                 // A4 STADIUM_BOWL half extents (outer facade)
-place('lm.stadium', S);
-
 // Main gate forecourt on the South Rd, paved through to the east gate plaza: banner flags either side of the gate,
 // flowerbeds along the kerb with a gap on the gate axis (toward Stadium Station across the road), lamps.
 const PX0 = S.x + BOWL.a + 0.35;
@@ -117,10 +220,10 @@ for (const s of [-1, 1]) {
   dress('st.lamp', v(S.x + s * 3.95, ZS - 2.0));
 }
 
-// East gate plaza: paved from the east gate to the Stadium Gate stop, open for the crowd queue; banner flags flank
-// the gate and line its north edge, lamps light its east (camera-side) edge.
+// East gate plaza: paved from the east gate to the Stadium Gate stop and left open for the crowd queue; banner flags
+// flank the gate and line its north edge, lamps light its east (camera-side) edge.
 const PX1 = G.x + 2.95, PZ1 = ZS - 1.6;
-const PZM = S.z - 1.6;                                // plaza / lawn seam, just north of the east gate
+const PZM = S.z - 1.6; // plaza / lawn seam, just north of the east gate
 areas.push({ kind: 'plaza', polygon: rect(PX0, PZM, PX1, PZ1) });
 const east = S.x + BOWL.a + 0.75;
 dress('st.flag', v(east, S.z + 1.75), 0, { color: 0 });
@@ -137,152 +240,47 @@ dress('st.tableUmbrella', v((PX0 + PX1) / 2 + 0.95, PZM - 1.05), 0, { color: 1 }
 dress('st.bench', v((PX0 + PX1) / 2 + 0.05, PZ0 + 0.45));
 dress('st.bin', v((PX0 + PX1) / 2 + 1.0, PZ0 + 0.45));
 
-// Parking along Atherton St (fronts open onto the street), filled for the game.
+// Parking along Atherton St (fronts open onto the street), full for the game.
 const lot = CATALOG_BY_KIND.get('res.parking')!;
-const lotScale = Math.min(1, (ZS - ZM - 3.2 - 0.25) / (2 * lot.w));
+const lotScale = r2(Math.min(1, (ZS - ZM - 3.2 - 0.25) / (2 * lot.w)));
 const lotX = XA - 1.55 - (lot.d * lotScale) / 2;
-dress('res.parking', v(lotX, ZM + 1.6 + (lot.w * lotScale) / 2), HALF_PI, { cars: 5 }, r2(lotScale));
-dress('res.parking', v(lotX, ZS - 1.6 - (lot.w * lotScale) / 2), HALF_PI, { cars: 4 }, r2(lotScale));
-// a low green seam between the plaza and the lots
-for (const z of [PZ0 + 1.6, S.z + 2.2]) dress('veg.bush', v(PX1 + 0.65, z));
+dress('res.parking', v(lotX, ZM + 1.6 + (lot.w * lotScale) / 2), HALF_PI, { cars: 5 }, lotScale);
+dress('res.parking', v(lotX, ZS - 1.6 - (lot.w * lotScale) / 2), HALF_PI, { cars: 4 }, lotScale);
 
 // Main St frontage behind the stadium: a lawn verge with poplars either side of the north door path.
 areas.push({ kind: 'lawn', polygon: rect(S.x - BOWL.a - 0.3, ZM + 1.6, S.x + BOWL.a + 0.3, S.z - BOWL.b + 0.2) });
 paths.push({ kind: 'footpath', width: 1.1, points: [v(S.x, r2(S.z - BOWL.b + 0.1)), v(S.x, ZM + 1.5)] });
 for (const dx of [-4.6, -3.0, -1.4, 1.4, 3.0, 4.6]) dress('veg.poplar', v(S.x + dx, ZM + 1.95), 0, { variant: 2 });
 
-// ---------------------------------------------------------------- railway: stations
-const loop = TOWN.rail.loop;
-const L = loop.length;
-function tangent(d: number): Vec2 {
-  const a = pointAt(loop, d - 0.3), b = pointAt(loop, d + 0.3);
-  const n = Math.hypot(b.x - a.x, b.z - a.z) || 1;
-  return v((b.x - a.x) / n, (b.z - a.z) / n);
-}
-const PLATFORM_EDGE = 1.05, PLATFORM_BACK = 3.55, BUILDING_EDGE = 1.12, CLEAR = 2.25;
-const BUILDING: Record<string, string> = { stn_central: 'lm.stationCentral' };
-
-/** Inward offset (from the rail) where the town-side road's kerb clearance begins, scanning along [a0, a1]. */
-function roadReach(rail: Vec2, along: Vec2, inward: Vec2, a0: number, a1: number, from: number): number {
-  const roadDist = (p: Vec2) => {
-    let best = Infinity;
-    for (const e of TOWN.roads.edges) {
-      const P = e.path.points;
-      for (let i = 0; i + 1 < P.length; i++) {
-        const a = P[i]!, b = P[i + 1]!, vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz;
-        const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.z - a.z) * vz) / l2)) : 0;
-        best = Math.min(best, Math.hypot(a.x + vx * t - p.x, a.z + vz * t - p.z));
-      }
-    }
-    return best;
-  };
-  let n = from;
-  while (n < from + 6) {
-    const ok = [a0, (a0 + a1) / 2, a1].every((a) => roadDist(add(add(rail, along, a), inward, n + 0.05)) >= 1.75);
-    if (!ok) break;
-    n += 0.05;
-  }
-  return n;
-}
-
-/** Platform extent per station, as arc lengths along the loop (trains run toward increasing dist). */
-const platformSpan: Array<{ depart: number; arrive: number }> = [];
-
-function dressStation(s: Station): void {
-  const rail = pointAt(loop, s.dist);
-  const R = v(rail.x, rail.z);
-  const t = tangent(s.dist);
-  let inward = v(-t.z, t.x);
-  if (dot(v(s.platform.x - R.x, s.platform.z - R.z), inward) < 0) inward = v(-inward.x, -inward.z);
-  const along = v(-s.queueDir.x, -s.queueDir.z);          // the queue grows from the arrival end toward the centre
-  const aQ = dot(v(s.platform.x - R.x, s.platform.z - R.z), along);
-  const kind = BUILDING[s.id] ?? 'lm.stationHalt';
-  const c = CATALOG_BY_KIND.get(kind)!;
-  // the building: arrival side, past the queue point, front (local +z) on the platform edge facing the track
-  const aB = aQ + CLEAR + c.w / 2;
-  const nB = BUILDING_EDGE + c.d / 2;
-  const rot = quarter(v(-inward.x, -inward.z));
-  place(kind, add(add(R, along, aB), inward, nB), rot);
-  // the platform: from beyond the queue's far end to the building's far end
-  const a0 = aQ - QUEUE_LEN - 1.6, a1 = aB + c.w / 2;
-  const k = Math.sign(dot(along, t)) || -1;               // +along runs against the direction of travel (k = -1)
-  const ends = [s.dist + k * a0, s.dist + k * a1];
-  platformSpan.push({ depart: Math.max(...ends), arrive: Math.min(...ends) });
-  const P = (a: number, n: number) => add(add(R, along, a), inward, n);
-  areas.push({ kind: 'plaza', polygon: [P(a0, PLATFORM_EDGE), P(a1, PLATFORM_EDGE), P(a1, PLATFORM_BACK), P(a0, PLATFORM_BACK)].map((p) => v(r2(p.x), r2(p.z))) });
-  paths.push({ kind: 'plaza-edge', width: 0.18, points: [P(a0, PLATFORM_EDGE + 0.12), P(a1, PLATFORM_EDGE + 0.12)].map((p) => v(r2(p.x), r2(p.z))) });
+// ---------------------------------------------------------------- stations: platform, links, square, garden
+for (const f of frames) {
+  const aB = buildingAlong(f), nB = buildingIn(f), a0 = platformFrom(f), a1 = platformTo(f);
+  const P = (a: number, n: number) => at(f, a, n);
+  areas.push({ kind: 'plaza', polygon: [P(a0, PLATFORM_EDGE), P(a1, PLATFORM_EDGE), P(a1, PLATFORM_BACK), P(a0, PLATFORM_BACK)].map(r2v) });
+  paths.push({ kind: 'plaza-edge', width: 0.18, points: [P(a0, PLATFORM_EDGE + 0.12), P(a1, PLATFORM_EDGE + 0.12)].map(r2v) });
   // footpath from the paired bus stop across to the platform queue
-  const stop = TOWN.stops.find((x) => x.id === s.stopId);
-  if (stop) {
-    const from = add(stop.p, stop.queueDir, 0.6);
-    paths.push({ kind: 'footpath', width: 1.2, points: [from, P(aQ, PLATFORM_BACK - 0.05)].map((p) => v(r2(p.x), r2(p.z))) });
-  }
-  // station square behind a halt (town entrance), out to the kerb clearance of the station road
-  const back = nB + c.d / 2;
-  const reach = roadReach(R, along, inward, aB - c.w / 2, aB + c.w / 2, back);
+  const stop = TOWN.stops.find((x) => x.id === f.s.stopId);
+  if (stop) paths.push({ kind: 'footpath', width: 1.2, points: [add(stop.p, stop.queueDir, 0.6), P(f.aQ, PLATFORM_BACK - 0.05)].map(r2v) });
+  // station square behind a halt (its town entrance), out to the kerb clearance of the station road
+  const back = nB + f.d / 2;
+  const reach = roadReach(f, aB - f.w / 2, aB + f.w / 2, back);
   if (reach - back > 1.2) {
-    areas.push({ kind: 'plaza', polygon: [P(aB - c.w / 2, back - 0.1), P(aB + c.w / 2, back - 0.1), P(aB + c.w / 2, reach), P(aB - c.w / 2, reach)].map((p) => v(r2(p.x), r2(p.z))) });
-    const mid = (back + reach) / 2;
-    dress('st.lamp', P(aB - c.w / 2 + 0.45, reach - 0.35));
-    dress('st.bikeRack', P(aB + c.w / 2 - 1.1, mid), rot);
+    areas.push({ kind: 'plaza', polygon: [P(aB - f.w / 2, back - 0.1), P(aB + f.w / 2, back - 0.1), P(aB + f.w / 2, reach), P(aB - f.w / 2, reach)].map(r2v) });
+    dress('st.lamp', P(aB - f.w / 2 + 0.45, reach - 0.35));
+    dress('st.bikeRack', P(aB + f.w / 2 - 1.1, (back + reach) / 2), f.rot);
     dress('veg.planter', P(aB + 0.9, back + 0.55));
-    dress('st.bench', P(aB - 1.4, back + 0.45), rot + Math.PI);
+    dress('st.bench', P(aB - 1.4, back + 0.45), turn(f.rot + Math.PI));
   }
   // station garden along the back of the platform, beyond the stop footpath (low beds only: camera side)
-  for (const a of [aQ - 3.1, aQ - 5.4]) dress('veg.flowerbed', P(a, PLATFORM_BACK + 1.45), rot);
+  for (const a of [f.aQ - 3.1, f.aQ - 5.4]) dress('veg.flowerbed', P(a, PLATFORM_BACK + 1.45), f.rot);
   // trees at the platform's far end and past the building
   dress('veg.birch', P(a0 - 0.6, PLATFORM_BACK + 1.0));
   dress('veg.birch', P(a0 + 0.6, PLATFORM_BACK + 2.4));
   dress('veg.oak', P(a1 + 1.6, nB + 1.0));
-  dress('veg.oak', P(a1 + 2.6, PLATFORM_BACK + 2.4));
+  dress('veg.maple', P(a1 + 3.6, PLATFORM_BACK + 1.4));
 }
-for (const s of TOWN.rail.stations) dressStation(s);
 
-// ---------------------------------------------------------------- railway: level crossings and signals
-const tunnel = worldLayout(TOWN).railTunnel;
-function inTunnel(d: number, margin: number): boolean {
-  if (!tunnel) return false;
-  const from = tunnel.fromDist - margin, to = tunnel.toDist + margin;
-  const span = (((to - from) % L) + L) % L;
-  return (((d - from) % L) + L) % L <= span;
-}
-/** Arc length of the loop point nearest p. */
-function distOn(p: Vec2): number {
-  const pts = loop.points;
-  let best = { d: 0, e: Infinity };
-  for (let i = 0; i < pts.length; i++) {
-    const a = pts[i]!, b = pts[(i + 1) % pts.length]!, vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz;
-    const tt = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.z - a.z) * vz) / l2)) : 0;
-    const e = Math.hypot(a.x + vx * tt - p.x, a.z + vz * tt - p.z);
-    if (e < best.e) best = { d: loop.cum[i]! + Math.sqrt(l2) * tt, e };
-  }
-  return best.d;
-}
-function crossings(): Array<{ p: Vec2; dir: Vec2; d: number }> {
-  const out: Array<{ p: Vec2; dir: Vec2; d: number }> = [];
-  const R = loop.points;
-  for (const e of TOWN.roads.edges) {
-    const P = e.path.points;
-    for (let i = 0; i + 1 < P.length; i++) for (let j = 0; j < R.length; j++) {
-      const a = P[i]!, b = P[i + 1]!, c = R[j]!, d = R[(j + 1) % R.length]!;
-      const rx = b.x - a.x, rz = b.z - a.z, sx = d.x - c.x, sz = d.z - c.z, den = rx * sz - rz * sx;
-      if (Math.abs(den) < 1e-9) continue;
-      const tt = ((c.x - a.x) * sz - (c.z - a.z) * sx) / den, u = ((c.x - a.x) * rz - (c.z - a.z) * rx) / den;
-      if (tt < 0 || tt > 1 || u < 0 || u > 1) continue;
-      const p = v(a.x + rx * tt, a.z + rz * tt);
-      if (out.some((o) => Math.hypot(o.p.x - p.x, o.p.z - p.z) < 0.5)) continue;
-      const n = Math.hypot(rx, rz);
-      out.push({ p, dir: v(rx / n, rz / n), d: distOn(p) });
-    }
-  }
-  return out;
-}
-const atGrade = crossings().filter((c) => !inTunnel(c.d, 2));
-for (const c of atGrade) {
-  // A4's crossing: road along local z, track along local x; a half turn is the same crossing.
-  const rot = ((quarter(c.dir) % Math.PI) + Math.PI) % Math.PI;
-  place('lm.levelCrossing', c.p, rot);
-}
+// ---------------------------------------------------------------- signals
 /** A colour-light signal outside the loop at arc length d, lamps toward trains arriving along +dist. */
 function signal(d: number): void {
   const dd = ((d % L) + L) % L;
@@ -290,14 +288,16 @@ function signal(d: number): void {
   const p = pointAt(loop, dd), t = tangent(dd);
   const pos = add(v(p.x, p.z), v(t.z, -t.x), 1.5);
   if (items.some((o) => o.kind === 'lm.railSignal' && Math.hypot(o.x - pos.x, o.z - pos.z) < 4)) return;
-  const it = make('lm.railSignal', pos, r2(Math.atan2(-t.x, -t.z)));
-  if (fits(it)) items.push(it);
+  dress('lm.railSignal', pos, r2(turn(Math.atan2(-t.x, -t.z))));
 }
-for (const p of platformSpan) {
-  signal(p.depart + 1.5);                              // starter: just past the departure end of the platform
-  signal(p.arrive - 2.2);                              // home: before the arrival end
+for (const f of frames) {
+  // +along runs against the direction of travel, so the departure end is beyond the queue's far end
+  const k = Math.sign(dot(f.along, f.t)) || -1;
+  const ends = [f.s.dist + k * platformFrom(f), f.s.dist + k * platformTo(f)];
+  signal(Math.max(...ends) + 1.5); // starter: just past the departure end of the platform
+  signal(Math.min(...ends) - 2.2); // home: before the arrival end
 }
-for (const c of atGrade) signal(c.d - 6);              // approach: before each level crossing
+for (const c of atGrade) signal(c.d - 6); // approach: before each level crossing
 
 // ---------------------------------------------------------------- the district
 const stadiumStation = TOWN.rail.stations.find((s) => s.id === 'stn_stadium');

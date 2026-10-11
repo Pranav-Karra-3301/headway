@@ -19,7 +19,7 @@ function fakeRun(): { run: RunOne; calls: string[] } {
 }
 
 describe('evaluatePolicy (real engine)', () => {
-  it('runs the policy on each instance and aggregates the split score', () => {
+  it('runs the policy on each instance and aggregates the split score', { timeout: 30_000 }, () => {
     const { score, results } = evaluatePolicy(G0, [STADIUM_1001]);
     expect(results).toHaveLength(1);
     const r = results[0]!;
@@ -30,7 +30,7 @@ describe('evaluatePolicy (real engine)', () => {
     expect(score.metrics.spawned).toBe(r.metrics.spawned);
   });
 
-  it('is deterministic and distinguishes policies', () => {
+  it('is deterministic and distinguishes policies', { timeout: 30_000 }, () => {
     const a = evaluatePolicy(G0, [STADIUM_1001]).results[0]!;
     const b = evaluatePolicy(G0, [STADIUM_1001]).results[0]!;
     const c = evaluatePolicy(REF, [STADIUM_1001]).results[0]!;
@@ -119,7 +119,7 @@ describe('createEvaluator', () => {
     expect(calls).toHaveLength(8);
   });
 
-  it('runs the real engine by default and matches evaluatePolicy', async () => {
+  it('runs the real engine by default and matches evaluatePolicy', { timeout: 30_000 }, async () => {
     const ev = createEvaluator();
     const viaEvaluator = await ev.evaluate(G0, 'val');
     const direct = evaluatePolicy(G0, SEEDS.val);

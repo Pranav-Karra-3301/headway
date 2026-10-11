@@ -149,9 +149,12 @@ async function designRounds(o: {
     ? { ...o.champion.advisor, enabled: true } : genericAdvisor;
   let currentScored = await scoreAdvisor(current, 'current');
   log(`design: starting point J ${Math.round(currentScored.arm.score.J)} (${signedPct(currentScored.arm.deltaPct)} vs rules)`);
-  // The evolved arm is the best valid candidate (lowest J, earliest on ties) even when it does not beat the start, so the
-  // Lab always shows what the designers produced; iteration continues from whichever is better.
-  let best: { advisor: JevAdvisor; J: number } | null = null;
+  // The evolved arm is the best valid candidate even when it does not beat the start, so the Lab always shows what the
+  // designers produced; iteration continues from whichever is better.
+  // Ranking: lower J, then fewer Jev calls (same outcome for less latency and risk), then the earliest.
+  const asked = (arm: JevArm) => arm.jev?.asked ?? 0;
+  let best: { advisor: JevAdvisor; J: number; asked: number } | null = current === genericAdvisor
+    ? null : { advisor: current, J: currentScored.arm.score.J, asked: asked(currentScored.arm) };
   const candidates: DesignCandidate[] = [];
   for (let round = 1; round <= o.rounds; round++) {
     const evidence = jevEvidence({ rules: rulesArm, jev: currentScored.arm, results: currentScored.results });
@@ -167,12 +170,13 @@ async function designRounds(o: {
       log(`  designer ${i}: J ${Math.round(scored.arm.score.J)} (${signedPct(scored.arm.deltaPct)} vs rules) — ${d.summary}`);
       candidates.push({ round, designer: i, valid: true, summary: d.summary, rationale: d.rationale, errors: [], model: d.model,
         advisor: d.advisor, J: scored.arm.score.J, deltaPct: scored.arm.deltaPct });
-      if (!best || scored.arm.score.J < best.J) best = { advisor: d.advisor, J: scored.arm.score.J };
+      const cand = { advisor: d.advisor, J: scored.arm.score.J, asked: asked(scored.arm) };
+      if (!best || cand.J < best.J || (cand.J === best.J && cand.asked < best.asked)) best = cand;
       if (scored.arm.score.J < currentScored.arm.score.J) { current = d.advisor; currentScored = scored; }
     }
     log(`design round ${round}: best so far J ${Math.round(currentScored.arm.score.J)} (${signedPct(currentScored.arm.deltaPct)} vs rules)`);
   }
-  return { best: best?.advisor ?? (current === genericAdvisor ? null : current), candidates };
+  return { best: best?.advisor ?? null, candidates };
 }
 
 export interface JevCompareDeps { provider?: DecisionProvider; log?: (s: string) => void; env?: Record<string, string>; now?: () => string }
@@ -210,7 +214,16 @@ export async function main(argv: string[], deps: JevCompareDeps = {}): Promise<n
 
   log(`comparing on ${instances.map((i) => `${i.scenarioId}#${i.seed}`).join(', ')} (Jev ${args.flag('fake') ? 'fake' : model}, ${timeoutMs} ms deadline)`);
   const report = await compareJev({ champion, provider, evolved, instances, timeoutMs, model: args.flag('fake') ? 'fake' : model, log, ...(deps.now ? { now: deps.now } : {}) });
-  if (design) report.design = design;
+  if (design) {
+    report.design = design;
+    const valid = design.candidates.filter((c) => c.valid);
+    const evo = report.arms.find((a) => a.id === 'jev_evolved');
+    const gen = report.arms.find((a) => a.id === 'jev_generic');
+    if (evo && gen) {
+      const vsGeneric = gen.score.J > 0 ? ((evo.score.J - gen.score.J) / gen.score.J) * 100 : 0;
+      report.notes.push(`Evolved instructions: best of ${valid.length} valid Jev-track candidates (${design.candidates.length} designed), scored on these same seeds; ${signedPct(vsGeneric)} J vs generic.`);
+    }
+  }
   if (live.calls > 0) {
     const ok = live.calls - live.failures;
     report.notes.push(`Live Jev calls: ${live.calls} (${live.failures} failed), mean latency ${ok > 0 ? Math.round(live.latencyMs / ok) : 0} ms; repeated situations were served from the SHA-256 cache.`);

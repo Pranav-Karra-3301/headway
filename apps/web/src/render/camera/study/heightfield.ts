@@ -20,9 +20,16 @@ export interface HeightFieldOptions {
   include?: (m: THREE.Mesh) => boolean;
 }
 
-/** Lit, visible meshes only: screen-space backdrops and custom-shader props (sky, ridges) are not scenery. */
+/** Vertex attributes of plain / kit-baked geometry. Anything else (e.g. water's `aBoat`, the sky's `aDrift`) means
+ *  the vertex shader poses the mesh, so its buffer positions are not where it is drawn. */
+const PLAIN_ATTRIBUTES = new Set(['position', 'normal', 'uv', 'uv1', 'color', 'tangent', 'aGlow', 'aTint']);
+
+/** Lit, visible meshes with plain geometry only: screen-space backdrops, custom-shader props (sky, ridges) and
+ *  shader-posed meshes (boats) are skipped. */
 export function defaultInclude(m: THREE.Mesh): boolean {
   if (!m.visible || m.userData.noOcclude || m.userData.noPick) return false;
+  if ((m.geometry as THREE.InstancedBufferGeometry).isInstancedBufferGeometry) return false;
+  if (Object.keys(m.geometry.attributes).some((a) => !PLAIN_ATTRIBUTES.has(a))) return false;
   const mats = Array.isArray(m.material) ? m.material : [m.material];
   return mats.every((x) => x && !(x as THREE.ShaderMaterial).isShaderMaterial && x.visible && !(x.transparent && x.opacity < 0.5));
 }

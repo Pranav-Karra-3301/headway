@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · Nittany Lake (E2 water preview)</title>
+    <link rel="preload" href="/fonts/GumballRounded.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("/fonts/GumballRounded.ttf") format("truetype"); font-display: block; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: #1F2A44;
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .gb { font-family: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif; }
+      #msg { position: fixed; left: 18px; bottom: 14px; font-size: 13px; opacity: .7; }
+      body.dusk #msg { color: #FFF4E2; }
+      body.clean #msg { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="msg" class="gb"></div>
+    <script type="module" src="./dev.ts"></script>
+  </body>
+</html>

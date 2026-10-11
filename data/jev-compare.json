@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-10-11T20:21:52.052Z",
+  "createdAt": "2026-10-11T20:30:17.829Z",
   "simVersion": "1",
   "mapVersion": "1",
   "model": "typesafe/jev-1.13",
@@ -165,7 +165,7 @@
               "Hold 60 s"
             ],
             "chosen": "Depart now",
-            "p": 0.9
+            "p": 0.87
           },
           {
             "situation": "Bus b5 (Route 3) at Stadium Station. 0 aboard of 40. Train is at the platform now with 0 riders transferring to Route 3. Next Route 3 bus is 3 min behind. Previous Route 3 bus left 3.5 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" in 2.5 min.",
@@ -176,7 +176,7 @@
               "Hold 60 s"
             ],
             "chosen": "Depart now",
-            "p": 0.92
+            "p": 0.95
           },
           {
             "situation": "Bus b2 (Route 1) at University Station. 1 aboard of 40. Train arrives in 84 s with 0 riders transferring to Route 1. Next Route 1 bus is 4 min behind. Previous Route 1 bus left 4 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" in 2 min.",
@@ -187,7 +187,7 @@
               "Hold 60 s"
             ],
             "chosen": "Depart now",
-            "p": 0.87
+            "p": 0.9
           },
           {
             "situation": "Bus b2 (Route 1) at University Station. 7 aboard of 40. Train arrives in 30 s with 0 riders transferring to Route 1. Next Route 1 bus is 3.5 min behind. Previous Route 1 bus left 4 min ago (target spacing 3.5 min). 0 still waiting here; 0 waiting at the next two stops. Event \"Stadium closes\" was 6 min ago.",
@@ -198,59 +198,247 @@
               "Hold 60 s"
             ],
             "chosen": "Depart now",
-            "p": 0.91
+            "p": 0.93
           }
         ]
+      }
+    },
+    {
+      "id": "jev_evolved",
+      "label": "Jev, evolved instructions",
+      "policyId": "g0-jev-evolved",
+      "advisor": {
+        "provider": "jev",
+        "enabled": true,
+        "askWhen": [
+          {
+            "f": "is_station",
+            "op": "==",
+            "v": 1
+          },
+          {
+            "f": "train_eta_s",
+            "op": "<=",
+            "v": 90
+          },
+          {
+            "f": "expected_transfers",
+            "op": ">",
+            "v": 0
+          },
+          {
+            "f": "headway_ratio",
+            "op": "<",
+            "v": 1
+          },
+          {
+            "f": "hold_used_s",
+            "op": "<",
+            "v": 120
+          }
+        ],
+        "holdOptionsS": [
+          0,
+          15,
+          30,
+          45
+        ],
+        "instructions": "You dispatch city buses at train stations. Decide whether to depart now or hold. Hold only if a train is arriving within 90 s AND at least one rider will transfer to this route AND this bus is running early (headway_ratio < 1.0, i.e., less time since the previous bus than the target spacing). Otherwise depart now. When holding, choose the shortest hold that covers the train arrival: if train arrives in <=15 s hold 15 s, <=30 s hold 30 s, <=45 s hold 45 s, else depart now. Never hold if more than 120 s of hold budget is already used this loop. Do not hold if 0 riders are transferring, if the bus is already late (headway_ratio >= 1.0), or if the next bus is less than 2 min behind (it can pick up transfers)."
+      },
+      "score": {
+        "J": 3312313,
+        "runs": 2,
+        "metrics": {
+          "J": 3312313,
+          "spawned": 2694,
+          "completed": 2406,
+          "unfinished": 288,
+          "completionPct": 89.31,
+          "meanJourneyS": 846.88,
+          "meanWaitS": 509.01,
+          "p95WaitS": 1290.41,
+          "maxWaitS": 1440,
+          "transfersMade": 121,
+          "missedConnections": 78,
+          "leftBehind": 892,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 7024.91,
+            "deadheadDistanceU": 0,
+            "holdS": 0,
+            "trainDwellS": 2003
+          }
+        }
+      },
+      "deltaPct": 0,
+      "runs": [
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1001,
+          "J": 1638425,
+          "completionPct": 89.47,
+          "meanWaitS": 486.46,
+          "missedConnections": 31,
+          "transfersMade": 56,
+          "holdS": 0,
+          "hash": "8a581e6b"
+        },
+        {
+          "scenarioId": "stadium_exit",
+          "seed": 1002,
+          "J": 1673888,
+          "completionPct": 89.15,
+          "meanWaitS": 531.3,
+          "missedConnections": 47,
+          "transfersMade": 65,
+          "holdS": 0,
+          "hash": "e0584df4"
+        }
+      ],
+      "jev": {
+        "asked": 0,
+        "answered": 0,
+        "timeouts": 0,
+        "errors": 0,
+        "chosen": {},
+        "meanLatencyMs": null,
+        "samples": []
       }
     }
   ],
   "notes": [
-    "No evolved Jev instructions yet (the champion has no advisor of its own): the evolved arm is omitted.",
-    "Live Jev calls: 19 (0 failed), mean latency 208 ms; repeated situations were served from the SHA-256 cache."
+    "Evolved instructions: best of 3 valid Jev-track candidates (3 designed), scored on these same seeds; 0.0% J vs generic.",
+    "Live Jev calls: 45 (0 failed), mean latency 208 ms; repeated situations were served from the SHA-256 cache."
   ],
   "design": {
     "candidates": [
       {
         "round": 1,
         "designer": 0,
-        "valid": false,
-        "summary": "",
-        "rationale": "",
-        "errors": [
-          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: timed out after 90000 ms"
-        ],
+        "valid": true,
+        "summary": "Hold only when a train with transferring riders is imminent or the bus is running early, and cap holds to avoid downstream queue blowups.",
+        "rationale": "The current advisor never holds because it only triggers when train_eta_s <= 120, but the sample situations show 0 transferring riders, so holding is useless. By adding conditions for expected_transfers > 0 and headway_ratio < 1 (bus running early), Jev will hold only when it can help train transfers or spacing, reducing missed connections and downstream waits without delaying riders unnecessarily.",
+        "errors": [],
         "model": "deepseek-ai/DeepSeek-V4.1-Flash",
-        "advisor": null,
-        "J": null,
-        "deltaPct": null
+        "advisor": {
+          "provider": "jev",
+          "enabled": true,
+          "askWhen": [
+            {
+              "f": "is_station",
+              "op": "==",
+              "v": 1
+            },
+            {
+              "f": "train_eta_s",
+              "op": "<=",
+              "v": 90
+            },
+            {
+              "f": "expected_transfers",
+              "op": ">",
+              "v": 0
+            },
+            {
+              "f": "headway_ratio",
+              "op": "<",
+              "v": 1
+            },
+            {
+              "f": "hold_used_s",
+              "op": "<",
+              "v": 120
+            }
+          ],
+          "holdOptionsS": [
+            0,
+            15,
+            30,
+            45
+          ],
+          "instructions": "You dispatch city buses at train stations. Decide whether to depart now or hold. Hold only if a train is arriving within 90 s AND at least one rider will transfer to this route AND this bus is running early (headway_ratio < 1.0, i.e., less time since the previous bus than the target spacing). Otherwise depart now. When holding, choose the shortest hold that covers the train arrival: if train arrives in <=15 s hold 15 s, <=30 s hold 30 s, <=45 s hold 45 s, else depart now. Never hold if more than 120 s of hold budget is already used this loop. Do not hold if 0 riders are transferring, if the bus is already late (headway_ratio >= 1.0), or if the next bus is less than 2 min behind (it can pick up transfers)."
+        },
+        "J": 3312313,
+        "deltaPct": 0
       },
       {
         "round": 1,
         "designer": 1,
-        "valid": false,
-        "summary": "",
-        "rationale": "",
-        "errors": [
-          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: timed out after 90000 ms"
-        ],
+        "valid": true,
+        "summary": "Trigger Jev only when a train is imminent and actually brings transfers, and let it hold to catch those riders or fix spacing when queues are large.",
+        "rationale": "The current advisor asks too rarely and only on train_eta_s, yet Jev always departs because it sees zero transfers; meanwhile large queues build downstream. New askWhen fires when a train is close, transfers are expected, or the bus is early/late relative to target spacing with a large downstream queue. Instructions give concrete thresholds to hold for train transfers or spacing, and to depart now only when holding cannot help.",
+        "errors": [],
         "model": "deepseek-ai/DeepSeek-V4.1-Flash",
-        "advisor": null,
-        "J": null,
-        "deltaPct": null
+        "advisor": {
+          "provider": "jev",
+          "enabled": true,
+          "askWhen": [
+            {
+              "f": "is_station",
+              "op": "==",
+              "v": 1
+            },
+            {
+              "f": "train_eta_s",
+              "op": "<=",
+              "v": 180
+            },
+            {
+              "f": "expected_transfers",
+              "op": ">=",
+              "v": 1
+            }
+          ],
+          "holdOptionsS": [
+            0,
+            20,
+            40,
+            60
+          ],
+          "instructions": "You dispatch city buses at stops paired with a train station. Decide depart now or hold briefly. Hold only when the gain clearly outweighs delay to riders aboard and downstream. Hold 20-40 s if a train arrives within 180 s and brings at least 1 transferring rider, especially if more than 10 transfers or more than 5 riders wait here. Hold 20-40 s if this bus is early (headway_ahead_s < 0.8 * target_headway_s) and the next bus is more than 2 min behind. If downstream_queue is over 30 and this bus has room, hold only if train transfers are also expected; otherwise depart now. Depart now if no train transfer is expected within 180 s, if the bus is already late (headway_ahead_s > 1.2 * target_headway_s), or if holding would make it more than 2 min late. Never hold more than 60 s; prefer 20 s when uncertain."
+        },
+        "J": 3312313,
+        "deltaPct": 0
       },
       {
         "round": 1,
         "designer": 2,
-        "valid": false,
-        "summary": "",
-        "rationale": "",
-        "errors": [
-          "luminal: empty content; fallback deepseek/deepseek-v4-pro failed: openrouter: empty content"
-        ],
+        "valid": true,
+        "summary": "Widen the ask gate and instruct Jev to hold when a train with transfers is close or the bus is running ahead of schedule, otherwise depart now.",
+        "rationale": "The current gate (train_eta_s <= 120) fires only 20 times and Jev always chooses Depart now, so the advisor never captures train-transfer or spacing gains. Allowing Jev to be asked whenever a train is near, riders are transferring, or the bus is early relative to target headway lets it selectively hold: waiting for imminent train transfers and bunching prevention reduce missed connections and downstream queue buildup at Old Main and Stadium Station, while a strict 'otherwise depart now' rule limits delay for onboard and downstream riders.",
+        "errors": [],
         "model": "deepseek-ai/DeepSeek-V4.1-Flash",
-        "advisor": null,
-        "J": null,
-        "deltaPct": null
+        "advisor": {
+          "provider": "jev",
+          "enabled": true,
+          "askWhen": [
+            {
+              "f": "is_station",
+              "op": "==",
+              "v": 1
+            },
+            {
+              "f": "hold_used_s",
+              "op": "<",
+              "v": 120
+            },
+            {
+              "f": "train_eta_s",
+              "op": "<=",
+              "v": 180
+            }
+          ],
+          "holdOptionsS": [
+            0,
+            15,
+            30,
+            45,
+            60
+          ],
+          "instructions": "You dispatch buses at train-station stops. Decide: depart now or hold briefly. Hold to let transfer riders from a train that is arriving soon catch this bus, or to fix spacing after a bus ahead left too recently. Holding delays everyone aboard and all riders waiting at the next two stops, so only hold when the gain clearly outweighs that cost. If train arrives in 150 s or less and expected transfers are 8 or more, hold up to 30-60 s so they can board. If this bus left the same stop less than 60% of target spacing ago (headway_ratio below 0.6) while the bus behind is still several minutes away, hold 15-45 s to space out. If transfer riders to this route are 0-7 and this bus is already near or past target spacing, or many riders are waiting downstream and no train connection is imminent, depart now. When unsure, depart now."
+        },
+        "J": 3312313,
+        "deltaPct": 0
       }
     ]
   }

@@ -1,11 +1,13 @@
-// Owner: E3. Sky layer = 2 draw calls:
-//   1. backdrop — a screen-space gradient (day mint → cream, dusk indigo → peach) drawn first behind everything, with
-//      a faint sun glow, a few dusk stars and the diorama's soft drop shadow on the void below it (an SDF of the
-//      plinth footprint on a plane under the base, so it costs nothing extra);
-//   2. props — 3 layered low-poly distant ridges wrapped round the back (north + west) of the diorama with aerial
-//      perspective + misty feet that melt into the gradient, and a few slow faceted clouds drifting high behind the
-//      mountains. Bands only show while they are behind the diorama as seen from the camera (rotation-safe).
-// Neither mesh takes part in picking or in override passes (GTAO normals), and neither casts shadows.
+// Owner: E3. Sky layer = 2 draw calls (art bible §6.5):
+//   1. backdrop — a full-screen pass drawn first behind everything. Its gradient is world-anchored: each pixel's
+//      view ray is followed to the farthest ridge curtain, and the height where it crosses (above the horizon line)
+//      picks the colour, so the lightest haze band always hugs the ridge line, deepening toward the top (day mint,
+//      dusk indigo → peach). It also paints a few dusk stars and the diorama's soft contact shadow on the void below
+//      the base (an SDF of the plinth footprint, offset to screen right like the key light).
+//   2. props — three flat distant-ridge silhouettes wrapped round the back (N + W) of the diorama, mixed toward the
+//      haze (t = 0.35 / 0.55 / 0.75) with misty feet melting into the sky and a thin peach rim at dusk, plus four
+//      slow smooth clouds high in the haze band. Bands show only while behind the diorama (peek-safe).
+// Neither mesh is pickable, joins override passes (GTAO normals) or casts shadows.
 import * as THREE from 'three';
 import type { TownMap } from '@headway/sim';
 import type { FrameContext, RenderLayer } from '../../layers';
@@ -23,10 +25,10 @@ export { RIDGE_LAYERS } from './ridges';
 
 const SUN_DAY = new THREE.Vector3(-14, 34, 22).normalize();
 const SUN_DUSK = new THREE.Vector3(-30, 12, 14).normalize();
-const GLOW_DAY = new THREE.Vector2(-0.72, 0.78);
-const GLOW_DUSK = new THREE.Vector2(-0.95, -0.05);
-/** Drop shadow: plane depth below the plinth, shift (toward the lower right on screen), corner radius, blur. */
-const SHADOW = { below: 4, dx: 2.5, dz: 1.5, radius: 9, blur: 10 };
+/** The horizon line sits this far above the farthest ridge layer's mean crest. */
+const HORIZON_LIFT = 2.5;
+/** Contact shadow: plane depth below the plinth, shift toward screen right (+x −z), corner radius, blur. */
+const SHADOW = { below: 2.2, shift: 1.6, radius: 7, blur: 6 };
 
 /** Skip drawing when an override material (e.g. GTAO's normal pass) replaces ours. */
 function onlyOwnMaterial(mesh: THREE.Mesh, own: THREE.Material, before?: (r: THREE.WebGLRenderer, c: THREE.Camera) => void): void {
@@ -45,24 +47,26 @@ export function createSkyLayer(map: TownMap, layout: WorldLayout): RenderLayer {
   const ease = new DuskEase();
   const mix = createSkyMix();
   const E = layout.extent;
+  const far = RIDGE_LAYERS[RIDGE_LAYERS.length - 1]!;
 
-  const sky = { uSky0: { value: mix.stops[0] }, uSky1: { value: mix.stops[1] }, uSky2: { value: mix.stops[2] }, uSky3: { value: mix.stops[3] } };
+  const viewDir = { value: new THREE.Vector3(-1, -1, -1).normalize() };
+  const sky = {
+    uSky0: { value: mix.stops[0] }, uSky1: { value: mix.stops[1] }, uSky2: { value: mix.stops[2] }, uSky3: { value: mix.stops[3] }, uSky4: { value: mix.stops[4] },
+    uFar: { value: new THREE.Vector4(E.minX - far.offset, E.minZ - far.offset, far.offset, far.base + HORIZON_LIFT) },
+    uCorner: { value: new THREE.Vector2(E.minX, E.minZ) },
+    uViewDir: viewDir,
+  };
   const time = { value: 0 };
-  const dusk = { value: 0 };
 
   // ---------------------------------------------------------------- backdrop
   const hx = (E.maxX - E.minX) / 2 + BASE.plinthOut, hz = (E.maxZ - E.minZ) / 2 + BASE.plinthOut;
   const bd = {
     ...sky,
     uInvViewProj: { value: new THREE.Matrix4() },
-    uShadowRect: { value: new THREE.Vector4((E.minX + E.maxX) / 2 + SHADOW.dx, (E.minZ + E.maxZ) / 2 + SHADOW.dz, hx, hz) },
+    uShadowRect: { value: new THREE.Vector4((E.minX + E.maxX) / 2 + SHADOW.shift, (E.minZ + E.maxZ) / 2 - SHADOW.shift, hx, hz) },
     uShadowParams: { value: new THREE.Vector4(BASE.bottom - BASE.plinthH - SHADOW.below, SHADOW.radius, SHADOW.blur, 0.5) },
     uShadowTint: { value: mix.shadow },
-    uGlow: { value: mix.glow },
-    uGlowAmt: { value: 0 },
-    uGlowPos: { value: new THREE.Vector2() },
-    uAspect: { value: 1.6 },
-    uDusk: dusk,
+    uStars: { value: 0 },
     uTime: time,
     uPixel: { value: 1 },
   };
@@ -74,26 +78,19 @@ export function createSkyLayer(map: TownMap, layout: WorldLayout): RenderLayer {
   backdrop.frustumCulled = false;
   backdrop.renderOrder = -1e6;
   backdrop.raycast = () => {};
-  const viewport = new THREE.Vector4();
-  onlyOwnMaterial(backdrop, bdMat, (renderer, camera) => {
-    bd.uInvViewProj.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
-    renderer.getCurrentViewport(viewport);
-    bd.uAspect.value = viewport.z / Math.max(1, viewport.w);
-    bd.uPixel.value = renderer.getPixelRatio();
-  });
 
   // ---------------------------------------------------------------- distant ridges + clouds
   const attrs = emptyAttribs();
-  for (const spec of RIDGE_LAYERS) appendRidge(attrs, ridgeBand(layout, spec), spec);
+  RIDGE_LAYERS.forEach((spec, i) => appendRidge(attrs, ridgeBand(layout, spec), spec, i));
   appendClouds(attrs, cloudSpecs(layout));
   const pr = {
     ...sky,
-    uRidgeLit: { value: mix.ridgeLit },
-    uRidgeShade: { value: mix.ridgeShade },
+    uRidge0: { value: mix.ridges[0] }, uRidge1: { value: mix.ridges[1] }, uRidge2: { value: mix.ridges[2] },
+    uRim: { value: mix.rim },
+    uRimAmt: { value: 0 },
     uCloudLit: { value: mix.cloudLit },
     uCloudShade: { value: mix.cloudShade },
     uLightDir: { value: SUN_DAY.clone() },
-    uCamBack: { value: new THREE.Vector3(0.6, 0.53, 0.6) },
     uCamFwd: { value: new THREE.Vector2(-Math.SQRT1_2, -Math.SQRT1_2) },
     uTime: time,
   };
@@ -102,13 +99,18 @@ export function createSkyLayer(map: TownMap, layout: WorldLayout): RenderLayer {
   props.name = 'sky:props';
   props.frustumCulled = false; // clouds drift in the vertex shader
   props.raycast = () => {};
-  const fwd = new THREE.Vector3();
-  onlyOwnMaterial(props, prMat, (_r, camera) => {
-    camera.getWorldDirection(fwd);
-    pr.uCamBack.value.copy(fwd).negate();
-    const l = Math.hypot(fwd.x, fwd.z);
-    if (l > 1e-4) pr.uCamFwd.value.set(fwd.x / l, fwd.z / l);
+
+  const setView = (camera: THREE.Camera) => {
+    camera.getWorldDirection(viewDir.value);
+    const l = Math.hypot(viewDir.value.x, viewDir.value.z);
+    if (l > 1e-4) pr.uCamFwd.value.set(viewDir.value.x / l, viewDir.value.z / l);
+  };
+  onlyOwnMaterial(backdrop, bdMat, (renderer, camera) => {
+    setView(camera);
+    bd.uInvViewProj.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
+    bd.uPixel.value = renderer.getPixelRatio();
   });
+  onlyOwnMaterial(props, prMat, (_r, camera) => setView(camera));
 
   object.add(backdrop, props);
 
@@ -116,10 +118,9 @@ export function createSkyLayer(map: TownMap, layout: WorldLayout): RenderLayer {
   const apply = () => {
     const t = ease.amount;
     mixSky(palette, t, mix);
-    dusk.value = t;
-    bd.uGlowAmt.value = mix.glowAmt;
-    bd.uGlowPos.value.copy(GLOW_DAY).lerp(GLOW_DUSK, t);
     bd.uShadowParams.value.w = mix.shadowAmt;
+    bd.uStars.value = mix.stars;
+    pr.uRimAmt.value = mix.rimAmt;
     pr.uLightDir.value.copy(SUN_DAY).lerp(SUN_DUSK, t).normalize();
   };
   apply();

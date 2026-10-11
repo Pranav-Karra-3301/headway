@@ -13,7 +13,7 @@ import type { TownMap, Vec2 } from '@headway/sim';
 import type { KenneyId } from '../../assets/kenney/index';
 import type { CellUse, Junction, JunctionArm, RoadCell, RoadClass, RoadTileKind, Roundabout } from '../grid';
 import {
-  DIR_VEC, DIRS, HIGHWAY_ROWS, OPPOSITE, STEP, cellCenter, inGrid, inRect, sideMid,
+  DIR_VEC, DIRS, HIGHWAY_ROWS, KERB, OPPOSITE, STEP, cellCenter, inGrid, inRect, sideMid,
   type CellRect, type Dir, type GridFrame,
 } from './cells';
 
@@ -148,12 +148,18 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     else if (e.side === 'w') { c = ringW; r = rowOf(e.p.z); }
     else { c = ringE; r = rowOf(e.p.z); }
     if (misaligned) {
-      // the connector cell sits between the board edge and the roundabout's inner arm
+      // the connector cell sits between the board edge and the roundabout's inner arm; its S-bend (sidewalks
+      // ±KERB.walk wide) may reach into the neighbouring cell on the side the town road is offset to
       const inward = OPPOSITE[e.side];
-      const cc = e.side === 'e' ? c1 + 1 : e.side === 's' ? c : c;
+      const cc = e.side === 'e' ? c1 + 1 : c;
       const cr = e.side === 's' ? r1 + 1 : r;
+      const lateral = offCentre(e), reach = Math.abs(lateral) + KERB.walk > g.tile / 2;
+      const ext = reach ? Math.sign(lateral) : 0;
+      const cells = e.side === 'e' || e.side === 'w'
+        ? { c: cc, r: Math.min(cr, cr + ext), w: 1, h: 1 + Math.abs(ext) }
+        : { c: Math.min(cc, cc + ext), r: cr, w: 1 + Math.abs(ext), h: 1 };
       pieces.push({
-        id: `conn-${e.side}`, kind: 'connector', street: e.street, cells: { c: cc, r: cr, w: 1, h: 1 },
+        id: `conn-${e.side}`, kind: 'connector', street: e.street, cells,
         arms: [{ c: cc, r: cr, side: e.side }], board: { p: e.p, side: inward },
       });
     }
@@ -318,11 +324,10 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     });
     if (n === 1 || n >= 3) {
       const arms: JunctionArm[] = open.map((d, j) => ({ dir: DIR_VEC[d], p: sideMid(g, c, r, d), street: armStreets[j]! }));
-      const classes = armStreets.map((s) => streetClass.get(s) ?? 'local');
-      junctions.push({
-        id: `j${c}-${r}`, kind: n === 1 ? 'end' : n === 3 ? 'tee' : 'cross', center: cellCenter(g, c, r), arms,
-        signals: n >= 3 && classes.some((x) => x === 'ring' || x === 'parkway') && classes.some((x) => x !== 'local'),
-      });
+      const names = [...new Set(armStreets)];
+      const cls = (s: string) => streetClass.get(s) ?? 'local';
+      const signals = n >= 3 && names.some((a) => (cls(a) === 'ring' || cls(a) === 'parkway') && names.some((b) => b !== a && cls(b) !== 'local'));
+      junctions.push({ id: `j${c}-${r}`, kind: n === 1 ? 'end' : n === 3 ? 'tee' : 'cross', center: cellCenter(g, c, r), arms, signals });
     }
   }
   for (const p of pieces) {

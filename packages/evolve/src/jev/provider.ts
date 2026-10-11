@@ -63,7 +63,8 @@ export function createJevProvider(o: { baseUrl: string; apiKey: string; model: s
         ...(signal ? { signal } : {}),
       });
       if (!res.ok) {
-        const text = (await res.text().catch(() => '')).slice(0, 200).replaceAll(o.apiKey, '***');
+        let text = (await res.text().catch(() => '')).slice(0, 200);
+        if (o.apiKey) text = text.replaceAll(o.apiKey, '***');
         throw new Error(`jev: HTTP ${res.status}${text ? ` ${text}` : ''}`);
       }
       let parsed: unknown;

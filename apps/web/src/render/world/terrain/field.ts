@@ -122,6 +122,11 @@ const PEAKS: ReadonlyArray<readonly [number, number, number, number]> = [
   [21, -50, 2.5, 10],
   [-60, 21, 1.5, 9],
 ];
+/** Rocky islets off the headland points: x, z, height, radius (they ignore the coastal fade). */
+const STACKS: ReadonlyArray<readonly [number, number, number, number]> = [
+  [57.5, -36.5, 2.6, 1.5],
+  [-48.5, 49, 2.2, 1.3],
+];
 const SPUR = { top: 3.7, edge: 4.9, gap: 1.7, minLen: 2.4, sidewalk: 0.6, maxIn: 2.6, wing: 2.6 } as const;
 const MOUND = { top: 3.75, reach: 8.5, behind: 14 } as const;
 
@@ -204,7 +209,7 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     const side = (-t.z * (cx - mid.x) + t.x * (cz - mid.z)) >= 0 ? 1 : -1;
     const nIn = { x: -t.z * side, z: t.x * side };
     // inward foot: march toward town until the next road's sidewalk
-    let win = SPUR.maxIn;
+    let win: number = SPUR.maxIn;
     for (let s = 0; s <= poly.length; s += 0.5) {
       const p = pointAt(poly, s), tt = tangent(poly, s), ni = { x: -tt.z * side, z: tt.x * side };
       for (let u = 0.5; u <= SPUR.maxIn; u += 0.05) {
@@ -304,15 +309,17 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     return dN > 0 && dW > 0 ? Math.hypot(dN, dW) : Math.max(dN, dW);
   };
   function ridge(x: number, z: number, d: number): number {
-    const t = d + 2.4 * fbm(x / 23, z / 23, 11);
-    const n1 = fbm(x / 13, z / 13, 21), n2 = fbm(x / 19, z / 19, 31), n3 = fbm(x / 27, z / 27, 41);
+    // three layers (foothills → mid ridge → crest), each broken into a chain of hills by an along-band
+    // modulation, with real valleys between the layers so the iso view reads them as stacked silhouettes
+    const t = d + 2.2 * fbm(x / 21, z / 21, 11);
+    const a1 = 0.55 + 0.45 * fbm(x / 8.5, z / 8.5, 21), a2 = 0.6 + 0.4 * fbm(x / 12, z / 12, 31), a3 = 0.7 + 0.3 * fbm(x / 17, z / 17, 41);
     let pk = 0;
     for (const [px, pz, ph, pr] of PEAKS) { const dx = x - px, dz = z - pz; pk += ph * Math.exp(-(dx * dx + dz * dz) / (pr * pr)); }
-    const r1 = 4.6 * (0.78 + 0.42 * n1) * bump((t - 7) / 6.5);
-    const r2 = 9.8 * (0.78 + 0.36 * n2) * bump((t - 16.5) / 8);
-    const r3 = (14.5 * (0.82 + 0.3 * n3) + pk) * bump((t - 26.5) / 9.5);
-    let h = sunion(sunion(r1, r2, 2.2), r3, 2.8) + 1.2 * smooth(0, 10, t);
-    h += (0.55 * fbm(x / 5.5, z / 5.5, 51) + 0.18 * fbm(x / 2.3, z / 2.3, 61)) * smooth(0.5, 5, h);
+    const r1 = 5.4 * a1 * bump((t - 6.6) / 4.8);
+    const r2 = (10.8 * a2 + 0.35 * pk) * bump((t - 15.6) / 6);
+    const r3 = (15 * a3 + pk) * bump((t - 26) / 7.6);
+    let h = sunion(sunion(r1, r2, 1.6), r3, 2.2) + 1.1 * smooth(0, 12, t);
+    h += (0.42 * fbm(x / 5, z / 5, 51) + 0.14 * fbm(x / 2.2, z / 2.2, 61)) * smooth(0.5, 5, h);
     return Math.max(0, h) * smooth(0, 2.6, d);
   }
 
@@ -330,7 +337,9 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     // two never z-fight; elsewhere the foothills start flush with the board. Then a short bank down to the lake bed.
     const lift = 0.1 * beachZone(x, z);
     const base = lerp(LAKE_BED, lift, smooth(-2, 1.2, L));
-    return smin(base + h * land, MAX_HEIGHT, 2.5);
+    let stack = -Infinity;
+    for (const [sx, sz, sh, sr] of STACKS) { const dx = x - sx, dz = z - sz; stack = Math.max(stack, LAKE_BED + (sh - LAKE_BED) * Math.exp(-(dx * dx + dz * dz) / (sr * sr))); }
+    return smin(Math.max(base + h * land, stack), MAX_HEIGHT, 2.5);
   }
 
   function region(x: number, z: number): -1 | 0 | 1 {
@@ -346,8 +355,8 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
 
   function forest(x: number, z: number, hh?: number): number {
     const h = hh ?? height(x, z);
-    const n = fbm(x / 15, z / 15, 71) + 0.35 * fbm(x / 5, z / 5, 81);
-    return smooth(-0.32, 0.28, n) * smooth(0.3, 1.4, h) * (1 - smooth(14.5, 18.5, h));
+    const n = fbm(x / 14, z / 14, 71) + 0.3 * fbm(x / 4.5, z / 4.5, 81);
+    return smooth(-0.2, 0.12, n) * smooth(0.4, 1.4, h) * (1 - smooth(14, 17.5, h));
   }
 
   function slope(x: number, z: number): number {
