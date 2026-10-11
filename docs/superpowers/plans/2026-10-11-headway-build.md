@@ -550,3 +550,25 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 
 - **Engine done** (early-engine workflow): real engine + passengers + metrics, 193 sim tests green, 10–17 ms per run, Play fairness exact (doing nothing = g0). Gaps found: train↔bus transfers almost never happen (1 / 5,348 stadium riders) because the rail ran Stadium → University → Central; REF beats g0 by only 1.7 %. A tuning agent is **reversing the rail to Stadium → Central → University** and retuning demand/behaviour (owns town.ts rail order, scenarios.ts, config.ts, builtin.ts, sim tests; report in `docs/research/sim-tuning.md`). Anything that shows fan counts or the rail order in copy (prompts, UI, demo script) must read them from `SCENARIOS` / `TOWN`, never hard-code "1,200".
 - **Art bible ready:** `docs/research/iso-art-direction.md` (30-item scoring checklist). Binding for the grand integration and the art loop: ortho camera 35.264° elevation, 45° azimuth from the south-east, no free rotation by default; fit the transit network into the HUD-safe rectangle; tall buildings only on the north/west sides of stops (University Station's building currently hides 7 of 8 platform slots — fix); **gameplay owns saturation** (route, stop, train and queue colours) — tone down teal/mustard roofs and the red canopy where they compete; mountains at the back, water at the front; post effects never blur gameplay.
+
+---
+
+## v9 user feedback (17:45) — binding for every agent that starts from now, the grand integration and the art loop
+
+**Resources (the laptop crashed once):** never launch Chrome directly — use `scripts/shot.sh <url> <out.png> [w] [h] [virtual_ms]` (one headless Chrome at a time machine-wide, GPU, low priority, 60 s cap; defaults 1280 × 800). Never start your own Vite: use the shared dev server **http://127.0.0.1:5173** (serves every page incl. `/render-dev.html`, `/assets-dev.html`, `/districts-dev.html`, `/world-dev.html`, `/greater-roads-dev.html`, `/camera-study.html`). Run tests by file; vitest is capped at 2 workers; no parallel full builds. A governor (`scripts/governor.py`) pauses extra headless Chromes and stops stray dev servers. Integrated testing and monitoring happen on Cloudflare deploys (`https://headway.pranavkarra001.workers.dev`), not extra local servers.
+
+**Don't duplicate work:** the current app on the shared dev server is approved — build on existing files, don't replace working pieces unless the plan says so; read before writing.
+
+**Roads:** no cream/"dirt" roads. All drivable roads — the playable town's streets and the greater town — use the Kenney `city-kit-roads` look (asphalt, lane markings, sidewalks, crosswalk/intersection/roundabout pieces). Where the playable town's road centrelines don't sit on the 4 u tile grid, render them procedurally in the same asphalt + marking style with Kenney-matched colours.
+
+**Traffic:** ambient cars never spawn or vanish inside the city. They enter and leave only through world exits — mountain tunnels (north/west) and bridges/causeways (south/east) — and pass through the greater town on their way in and out.
+
+**Tunnels must make sense:** a portal only where a road or the rail meets a mountain slope, the road visibly continuing into it, with a stone portal face, lights and a hillside above; no free-standing portals on flat ground.
+
+**Rail:** no rectangle around the town. The sim-tuning agent is reshaping `TOWN.rail.loop` into a regional line: out of a north-west ridge tunnel → University → Central → off the board south-east across a bay bridge → back west along the lakeshore → Stadium → back into the ridge tunnel (same 3 stations and stops, direction Stadium → Central → University). Rail may now extend outside `TOWN.bounds`; world agents place the tunnel portal and the bay bridge from `docs/research/sim-tuning.md`.
+
+**Organic city:** the city must not read as a fixed rectangle. Blocks thin out irregularly into parks, fields, forest, foothills and an irregular shoreline; the greater-town ring road and parkway follow organic curves; the diorama base may stay a rounded slab, but the town on it is irregular.
+
+**Typography & UX:** Gumball Rounded only for the wordmark, headings and titles; **General Sans** (self-hosted `/fonts/GeneralSans-*.otf`) for all other UI text, labels, chips and numbers. Explainers are short and visual (icons, small diagrams, one-line captions), never walls of text; follow good UX practice (clear hierarchy, generous spacing, progressive disclosure).
+
+**Version control:** the coordinator commits after every completed track; agents still never run git.
