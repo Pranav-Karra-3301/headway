@@ -43,6 +43,10 @@ export const HW = {
   mergeEnd: 32,
   /** Lanes start/end this far inside the tunnel (hidden behind the portal). */
   tunnelIn: 3,
+  /** One-lane ramp asphalt half-width, the junction-arm half-width it widens to, and the taper length. */
+  rampHalf: 1.15,
+  armHalf: 1.6,
+  taper: 4,
 } as const;
 
 export interface HighwayLane extends Lane {
@@ -59,6 +63,10 @@ export interface SlipRoad {
   id: 'eb-off' | 'eb-on' | 'wb-off' | 'wb-on';
   /** Road centreline (y = 0), drawn in the direction of travel. */
   path: Vec2[];
+  /** Asphalt half-width per path point: one lane (HW.rampHalf), widening to a Kenney street arm at the junction. */
+  half: number[];
+  /** Traffic lane offset (right of travel) per path point: centred on the ramp, KERB.lane at the junction. */
+  laneOff: number[];
   /** Path-point index range [from, to] where the road runs clear of the expressway (inner kerb drawn). */
   innerKerb: [number, number];
   /** Path-point index range of the outer kerb (it starts / ends a little into the S-curve, off the expressway). */
@@ -121,8 +129,9 @@ export interface HighwayPlan {
   lanes: HighwayLane[];
   ports: HighwayPort[];
   props: Prop[];
-  /** Hillside over the tunnel: footprint the layer's heightfield covers. */
-  hill: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Hillside over the tunnel: footprint the layer's heightfield covers (west of the portal it may spill south of
+   *  the band: that is mountain land beyond the grid; east of the portal it stays inside the band, z ≤ bandMaxZ). */
+  hill: { minX: number; maxX: number; minZ: number; maxZ: number; bandMaxZ: number };
 }
 
 const smooth = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -174,7 +183,7 @@ export function highwayPlan(map: TownMap): HighwayPlan {
   if (!port) throw new Error('highway: G0 grid has no highway port');
   const xn = port.p.x;
   const cn = cellOf(g, xn, zS).c;
-  const xPortal = g.bounds.minX + T;
+  const xPortal = g.bounds.minX;
   const xw = xPortal - HW.tunnelIn;
   const xe = g.bounds.maxX;
   const { H, flatHalf: F, slant: S } = HW;
@@ -191,15 +200,39 @@ export function highwayPlan(map: TownMap): HighwayPlan {
 
   // ---- slip roads (centrelines, y = 0)
   const D0 = HW.divergeStart, D1 = HW.divergeEnd, M0 = HW.mergeStart, M1 = HW.mergeEnd;
-  // off-ramps: S-curve (points 0–12) then straight to the junction (13); on-ramps: straight (0–1) then S-curve (1–13)
-  const off = (id: 'eb-off' | 'wb-off', path: Vec2[]): SlipRoad => ({ id, path, hwSide: -1, innerKerb: [12, 13], outerKerb: [3, 13] });
-  const on = (id: 'eb-on' | 'wb-on', path: Vec2[]): SlipRoad => ({ id, path, hwSide: -1, innerKerb: [0, 1], outerKerb: [0, 11] });
-  const slips: SlipRoad[] = [
-    off('eb-off', [...sCurve({ x: xn - D0, z: zEB }, { x: xn - D1, z: zS }), { x: xn - T / 2, z: zS }]),
-    on('eb-on', [{ x: xn + T / 2, z: zS }, ...sCurve({ x: xn + M0, z: zS }, { x: xn + M1, z: zEB })]),
-    off('wb-off', [...sCurve({ x: xn + D0, z: zWB }, { x: xn + D1, z: zN }), { x: xn + T / 2, z: zN }]),
-    on('wb-on', [{ x: xn - T / 2, z: zN }, ...sCurve({ x: xn - M0, z: zN }, { x: xn - M1, z: zWB })]),
-  ];
+  // one-lane ramps: off = S-curve off the slow lane (points 0–12), straight, then a taper widening to the junction
+  // arm; on = taper narrowing from the junction arm, straight, S-curve into the slow lane
+  const [lFast, lSlow] = HW.lanes;
+  const ebF = zc + lFast, ebS = zc + lSlow, wbF = zc - lFast, wbS = zc - lSlow;
+  const rl = 0.6; // slip-road / link lane offset (G0 street convention)
+  const taperPts = (xEdge: number, dir: 1 | -1, z: number): Vec2[] => {
+    const out: Vec2[] = [];
+    for (let i = 0; i <= 8; i++) out.push({ x: xEdge - dir * HW.taper * (1 - i / 8), z });
+    return out; // from the taper start to the junction edge (direction of travel = dir)
+  };
+  const offRamp = (id: 'eb-off' | 'wb-off', dir: 1 | -1, laneZ: number, slipZ: number): SlipRoad => {
+    const xEdge = xn - dir * T / 2;
+    const path = [...sCurve({ x: xn - dir * D0, z: laneZ }, { x: xn - dir * D1, z: slipZ }), ...taperPts(xEdge, dir, slipZ)];
+    const n = path.length, t0 = n - 9;
+    const k = (i: number) => (i < t0 ? 0 : smooth((i - t0) / 8));
+    return {
+      id, path, hwSide: -1, innerKerb: [12, n - 1], outerKerb: [3, n - 1],
+      half: path.map((_, i) => HW.rampHalf + (HW.armHalf - HW.rampHalf) * k(i)), laneOff: path.map((_, i) => rl * k(i)),
+    };
+  };
+  const onRamp = (id: 'eb-on' | 'wb-on', dir: 1 | -1, laneZ: number, slipZ: number): SlipRoad => {
+    const xEdge = xn + dir * T / 2;
+    const taper: Vec2[] = [];
+    for (let i = 0; i <= 8; i++) taper.push({ x: xEdge + dir * HW.taper * (i / 8), z: slipZ });
+    const path = [...taper, ...sCurve({ x: xn + dir * M0, z: slipZ }, { x: xn + dir * M1, z: laneZ })];
+    const n = path.length;
+    const k = (i: number) => (i > 8 ? 0 : smooth(1 - i / 8));
+    return {
+      id, path, hwSide: -1, innerKerb: [0, 9], outerKerb: [0, n - 3],
+      half: path.map((_, i) => HW.rampHalf + (HW.armHalf - HW.rampHalf) * k(i)), laneOff: path.map((_, i) => rl * k(i)),
+    };
+  };
+  const slips: SlipRoad[] = [onRamp('eb-on', 1, ebS, zS), offRamp('eb-off', 1, ebS, zS), offRamp('wb-off', -1, wbS, zN), onRamp('wb-on', -1, wbS, zN)];
 
   const junctions: Junction3[] = [
     { id: 'j-s', c: cn, r: g.highway.r + g.highway.h - 1, center: { x: xn, z: zS }, arms: ['n', 'e', 's', 'w'] },
@@ -216,23 +249,29 @@ export function highwayPlan(map: TownMap): HighwayPlan {
     lanes.push(lane);
     return lane;
   };
-  const [lFast, lSlow] = HW.lanes;
-  const ebF = zc + lFast, ebS = zc + lSlow, wbF = zc - lFast, wbS = zc - lSlow;
-  const rl = 0.6; // slip-road / link lane offset (G0 street convention)
+  const slipLane = (sid: SlipRoad['id']): Vec2[] => {
+    const sr = slips.find((x) => x.id === sid)!;
+    return sr.path.map((p, i) => {
+      const a = sr.path[Math.max(0, i - 1)]!, b = sr.path[Math.min(sr.path.length - 1, i + 1)]!;
+      const L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+      const r = rightOf({ x: (b.x - a.x) / L, z: (b.z - a.z) / L });
+      return { x: p.x + r.x * sr.laneOff[i]!, z: p.z + r.z * sr.laneOff[i]! };
+    });
+  };
   // eastbound (+x)
   mk('eb-fast', 'highway', along(xw, xe, ebF, 1, inRamp), HIGHWAY_NAME, true);
   mk('eb-slow-1', 'highway', [{ x: xw, z: ebS }, { x: xn - D0, z: ebS }], HIGHWAY_NAME);
   mk('eb-slow-2', 'highway', along(xn - D0, xn + M1, ebS, 1, inRamp), HIGHWAY_NAME, true);
   mk('eb-slow-3', 'highway', [{ x: xn + M1, z: ebS }, { x: xe, z: ebS }], HIGHWAY_NAME);
-  mk('eb-off', 'ramp', [...sCurve({ x: xn - D0, z: ebS }, { x: xn - D1, z: zS + rl }), { x: xn - T / 2, z: zS + rl }], `${HIGHWAY_NAME} exit`);
-  mk('eb-on', 'ramp', [{ x: xn + T / 2, z: zS + rl }, ...sCurve({ x: xn + M0, z: zS + rl }, { x: xn + M1, z: ebS })], `${HIGHWAY_NAME} entry`);
+  mk('eb-off', 'ramp', slipLane('eb-off'), `${HIGHWAY_NAME} exit`);
+  mk('eb-on', 'ramp', slipLane('eb-on'), `${HIGHWAY_NAME} entry`);
   // westbound (−x)
   mk('wb-fast', 'highway', along(xe, xw, wbF, 1, inRamp), HIGHWAY_NAME, true);
   mk('wb-slow-1', 'highway', [{ x: xe, z: wbS }, { x: xn + D0, z: wbS }], HIGHWAY_NAME);
   mk('wb-slow-2', 'highway', along(xn + D0, xn - M1, wbS, 1, inRamp), HIGHWAY_NAME, true);
   mk('wb-slow-3', 'highway', [{ x: xn - M1, z: wbS }, { x: xw, z: wbS }], HIGHWAY_NAME);
-  mk('wb-off', 'ramp', [...sCurve({ x: xn + D0, z: wbS }, { x: xn + D1, z: zN - rl }), { x: xn + T / 2, z: zN - rl }], `${HIGHWAY_NAME} exit`);
-  mk('wb-on', 'ramp', [{ x: xn - T / 2, z: zN - rl }, ...sCurve({ x: xn - M0, z: zN - rl }, { x: xn - M1, z: wbS })], `${HIGHWAY_NAME} entry`);
+  mk('wb-off', 'ramp', slipLane('wb-off'), `${HIGHWAY_NAME} exit`);
+  mk('wb-on', 'ramp', slipLane('wb-on'), `${HIGHWAY_NAME} entry`);
   // North Rd under the overpass
   mk('link-n', 'radial', [{ x: xn + rl, z: zS - T / 2 }, { x: xn + rl, z: zN + T / 2 }], LINK_NAME);
   mk('link-s', 'radial', [{ x: xn - rl, z: zN + T / 2 }, { x: xn - rl, z: zS - T / 2 }], LINK_NAME);
@@ -285,12 +324,12 @@ export function highwayPlan(map: TownMap): HighwayPlan {
     props.push(p);
   };
   // median lights every 12 u from the portal approach to the east end (on the deck too)
-  for (let x = xPortal + 8; x <= xe - 4; x += 12) P('light', x, zc, 0, 1, 0, heightAt(x));
-  // gantries: exit signs ahead of the slip roads (EB faces −x; WB rotated π), route signs after the interchange
-  P('gantry', xn - D0 - 10, zEB, 0);
-  P('gantry', xn + D0 + 10, zWB, Math.PI);
-  P('gantryWide', xn + M1 + 12, zEB, 0);
-  P('gantryWide', xn - M1 - 12, zWB, Math.PI);
+  for (let x = xPortal + 10; x <= xe - 4; x += 12) P('light', x, zc, 0, 1, 0, heightAt(x));
+  // gantries between the lights: exit signs ahead of the slip roads (EB faces −x; WB rotated π), route signs after
+  P('gantry', xn - 46, zEB, 0);
+  P('gantry', xn + 50, zWB, Math.PI);
+  P('gantryWide', xn + 38, zEB, 0);
+  P('gantryWide', xn - 34, zWB, Math.PI);
   // overpass pillars: two rows just outside the link road's sidewalks
   for (const sx of [-1, 1]) for (const dz of [-3.1, -1.05, 1.05, 3.1]) P('pillar', xn + sx * 3.4, zc + dz, 0, 1, 0, 0, H - HW.deckT);
   // signals at the slip-road junction corners away from the deck
@@ -302,7 +341,7 @@ export function highwayPlan(map: TownMap): HighwayPlan {
   // verges: a tree belt on the north (back) verge, low planting on the south (camera) side; never on slip roads
   const slipSpanN: [number, number] = [xn - M1 - 1, xn + D0 + 1];
   const slipSpanS: [number, number] = [xn - D0 - 1, xn + M1 + 1];
-  const hill = { minX: xPortal - 14, maxX: xPortal + 8, minZ: z0 - 5, maxZ: z1 - 0.4 };
+  const hill = { minX: xPortal - 16, maxX: xPortal + 7.5, minZ: z0 - 6, maxZ: z1 + 10, bandMaxZ: z1 - 0.4 };
   let k = 0;
   for (let x = hill.maxX + 2; x < xe - 1; x += 2.6) {
     k++;
@@ -322,12 +361,12 @@ export function highwayPlan(map: TownMap): HighwayPlan {
   }
   // pines and rocks on the hillside over the tunnel (kept off the cutting in front of the portal)
   k = 0;
-  for (let i = 0; i < 70 && k < 26; i++) {
+  for (let i = 0; i < 120 && k < 34; i++) {
     const x = hill.minX + 1 + hash01(i, 23) * (hill.maxX - hill.minX - 2);
     const z = hill.minZ + 1 + hash01(i, 29) * (hill.maxZ - hill.minZ - 2);
     const inCut = x > xPortal - 1.6 && Math.abs(z - zc) < HW.outer + 2.2;
     const front = x > xPortal - 0.5 && Math.abs(z - zc) < 6.8;
-    if (inCut || front || z > z1 - 1.4) continue;
+    if (inCut || front || (x > xPortal - 1 && z > z1 - 1.4) || z > z1 + 7) continue;
     k++;
     P(hash01(i, 31) < 0.85 ? 'pine' : 'rock', x, z, hash01(i, 37) * Math.PI * 2, 0.9 + hash01(i, 41) * 0.45, Math.floor(hash01(i, 43) * 97));
   }

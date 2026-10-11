@@ -11,7 +11,7 @@ import { KitMaterial } from '../../materials';
 import type { PaletteId } from '../../types';
 import { KERB } from '../roads/cells';
 import { classifyRoadTri } from '../roads/tiles';
-import { Acc, band, dashes, knKey, path3, recolorHighway, ribbon, soffit, subPath, wall, type ColorKey, type Path3 } from './mesh';
+import { Acc, band, dashes, knKey, latMap, path3, recolorHighway, ribbon, soffit, wall, type ColorKey, type Path3 } from './mesh';
 import { HW, hash01, highwayPlan, type HighwayPlan, type Prop } from './plan';
 
 export interface GreaterHighwayOptions {
@@ -32,8 +32,8 @@ const R = (n: string) => `city-kit-roads/${n}` as KenneyId;
 const N = (n: string) => `nature-kit/${n}` as KenneyId;
 const PINES = [N('tree_pineDefaultA'), N('tree_pineRoundA'), N('tree_pineRoundE'), N('tree_pineTallC_detailed')];
 const TREES = [N('tree_default'), N('tree_oak'), N('tree_detailed')];
-const BUSHES = [N('plant_bushDetailed'), N('plant_bushLarge')];
-const ROCKS = [N('stone_tallE'), N('stone_tallH'), N('stone_tallB')];
+const BUSHES = [N('plant_bushLarge'), N('tree_fat'), N('plant_bushLarge')];
+const ROCKS = [N('rock_largeA'), N('rock_largeD'), N('rock_smallTopB'), N('rock_largeC')];
 const TILES = { cross: R('road-crossroad'), tee: R('road-intersection'), straight: R('road-straight') };
 const PROPS = { light: R('light-curved-double'), gantry: R('sign-highway-detailed'), gantryWide: R('sign-highway-wide'), pillar: R('bridge-pillar-wide'), signal: R('traffic-light') };
 
@@ -161,18 +161,21 @@ export function createGreaterHighwayLayer(map: TownMap, opts: GreaterHighwayOpti
   X.box('coping', d1 - 0.12, H - HW.deckT - 0.1, zc, 0.26, 0.2, 2 * HW.outer + 0.1);
   for (const sx of [-1, 1]) X.box('concreteDark', xn + sx * 3.4, H - HW.deckT - 0.12, zc, 0.6, 0.24, 2 * HW.outer - 0.3);
 
-  // ---- slip roads (surface): Kenney street cross-section, drawn just under the expressway where they overlap it
+  // ---- slip roads (surface): one-lane ramps (white edge lines, kerbs) widening to the Kenney junction arms,
+  // drawn just under the expressway where they overlap it
   for (const s of plan.slips) {
     const p = path3(s.path, 0);
     const lo = top - 0.004;
-    ribbon(S, 'lane', p, -KERB.carriage, KERB.carriage, lo);
-    dashes(S, 'mark', p, -0.04, 0.04, 1.0, 1.0, lo + 0.0015, 0.5);
+    const half = s.half, neg = latMap(half, (v) => -v);
+    ribbon(S, 'lane', p, neg, half, lo);
+    ribbon(S, 'mark', p, latMap(half, (v) => -v + 0.14), latMap(half, (v) => -v + 0.22), lo + 0.0015);
+    ribbon(S, 'mark', p, latMap(half, (v) => v - 0.22), latMap(half, (v) => v - 0.14), lo + 0.0015);
     const kerb = (range: [number, number], inner: boolean) => {
       const q = path3(s.path.slice(range[0], range[1] + 1), 0);
+      const hh = half.slice(range[0], range[1] + 1);
       const sgn = inner ? s.hwSide : -s.hwSide;
-      const a = sgn > 0 ? KERB.carriage : -KERB.walk, b = sgn > 0 ? KERB.walk : -KERB.carriage;
-      band(S, 'walk', q, a, b, lo, KERB.walkTop - lo, 'curb');
-      ribbon(S, 'gutter', q, sgn > 0 ? KERB.carriage - 0.2 : -KERB.carriage, sgn > 0 ? KERB.carriage : -KERB.carriage + 0.2, lo + 0.001);
+      const edge = latMap(hh, (v) => sgn * v), outer = latMap(hh, (v) => sgn * (v + KERB.walk - KERB.carriage));
+      band(S, 'walk', q, sgn > 0 ? edge : outer, sgn > 0 ? outer : edge, lo, KERB.walkTop - lo, 'curb');
     };
     kerb(s.innerKerb, true);
     kerb(s.outerKerb, false);
@@ -297,8 +300,9 @@ function placeProp(X: Acc, p: Prop, plan: HighwayPlan): void {
       const list = p.kind === 'pine' ? PINES : p.kind === 'tree' ? TREES : p.kind === 'bush' ? BUSHES : ROCKS;
       const id = pick(list, p.v);
       const y = p.kind === 'rock' || p.kind === 'pine' ? groundAt(plan, p.x, p.z) - 0.05 : groundAt(plan, p.x, p.z);
-      const s = p.kind === 'rock' ? p.s * 0.9 : p.kind === 'bush' ? p.s * 1.1 : p.s;
-      if (kenneyInto(X, id, mat4(p.x, y, p.z, p.rot, s))) return;
+      const s = p.kind === 'rock' ? p.s * 0.75 : p.kind === 'bush' ? (id.endsWith('tree_fat') ? p.s * 0.42 : p.s * 1.7) : p.s;
+      const remap = (i: KenneyPartInfo): ColorKey | null => (i.role === 'knDirt' || i.role === 'knDirtDark' || i.role === 'knWhite' ? 'rock' : i.role === 'knGrass' ? 'hillMeadow' : null);
+      if (kenneyInto(X, id, mat4(p.x, y, p.z, p.rot, s), remap)) return;
       fallbackPlant(X, p, y);
       return;
     }
@@ -419,17 +423,21 @@ function buildPortal(X: Acc, plan: HighwayPlan): void {
   }
 }
 
-/** Hill height above the band ground at (x, z) (0 outside the hill, and in the approach cutting). */
+/** Hill height above the band ground at (x, z) (0 outside the hill, and in the approach cutting). West of the
+ *  portal the hill spills south onto mountain land beyond the grid; east of it it stays inside the band. */
 export function hillHeight(plan: HighwayPlan, x: number, z: number): number {
   const hb = plan.hill;
   if (x < hb.minX || x > hb.maxX || z < hb.minZ || z > hb.maxZ) return 0;
   const sm = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
   const dz = z - plan.zc, ux = x - plan.xPortal;
-  const across = dz >= 0 ? 1 - sm((dz - 5.0) / 2.7) : 1 - sm((-dz - 6.5) / 5.5);
+  if (ux > 0 && z > hb.bandMaxZ) return 0;
+  // the south flank eases out over mountain land west of the portal and tightens to the band edge at the portal
+  const southEnd = (hb.maxZ - plan.zc) + ((hb.bandMaxZ - plan.zc) - (hb.maxZ - plan.zc)) * sm((ux + 9) / 9);
+  const across = dz >= 0 ? 1 - sm((dz - 5.0) / Math.max(0.5, southEnd - 5.0)) : 1 - sm((-dz - 6.5) / 6.5);
   if (across <= 0) return 0;
   const crest = 4.95;
   let along: number;
-  if (ux <= 0) along = crest + 1.7 * sm(-ux / 5) - 2.4 * sm((-ux - 8) / 6);
+  if (ux <= 0) along = crest + 1.8 * sm(-ux / 5) - 2.6 * sm((-ux - 9) / 7);
   else {
     if (Math.abs(dz) < PORTAL.half) return 0;
     along = crest * (1 - sm(ux / (PORTAL.wing + 0.5)));
@@ -465,12 +473,12 @@ function buildHill(X: Acc, plan: HighwayPlan): void {
         if (p.y < 0.01 && q.y < 0.01 && r.y < 0.01) continue;
         const n = new THREE.Vector3().subVectors(q, p).cross(new THREE.Vector3().subVectors(r, p)).normalize();
         const jitter = hash01(Math.round(p.x * 7), Math.round(p.z * 7));
-        const key: ColorKey = n.y < 0.6 ? 'hillRock' : hy > 3.6 + jitter * 0.8 ? 'hillForest' : hy > 1.3 + jitter ? 'hillMeadow' : 'hillGrass';
+        const key: ColorKey = n.y < 0.42 ? 'hillRock' : hy > 3.4 + jitter * 0.9 ? 'hillForest' : hy > 1.2 + jitter ? 'hillMeadow' : 'hillGrass';
         X.tri(key, p, q, r);
       }
     }
   };
   patch(hb.minX, xp, hb.minZ, hb.maxZ);
   patch(xp, hb.maxX, hb.minZ, zc - PORTAL.half);
-  patch(xp, hb.maxX, zc + PORTAL.half, hb.maxZ);
+  patch(xp, hb.maxX, zc + PORTAL.half, hb.bandMaxZ);
 }

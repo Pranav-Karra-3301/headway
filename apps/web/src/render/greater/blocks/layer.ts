@@ -4,6 +4,7 @@
 //   statics  buildings, cars, props, street lights, traffic lights, signs, poles              1 mesh
 //   trees    one InstancedMesh per tree kind × variant (swaying KitMaterial)                  ≤ 15
 //   wires    power lines strung between the poles (LineSegments)                              1
+//   glow     dusk halos round the street-light heads + soft pools under them (fx/glow)        2
 // Highlight: scenery fades 60 % toward the background while a route is highlighted (ctx.highlightedRoute).
 //   await preloadGreaterBlocks();                       // Kenney models (falls back to kit builders if missing)
 //   const layer = createGreaterBlocksLayer(TOWN, { palette: 'a' });  scene.add(layer.object);
@@ -13,7 +14,8 @@ import { createRegistry, type AssetRegistry } from '../../assets/index';
 import { kenneyIdsFor, kenneyModel, kenneyReady, preloadKenney, type KenneyId } from '../../assets/kenney/index';
 import { bakeGeometry, recolorBaked, type Baked, type RoleResolver } from '../../kit/bake';
 import type { FrameContext, RenderLayer } from '../../layers';
-import { KitMaterial } from '../../materials';
+import { createHalos, createPools, type GlowItem } from '../../fx/glow';
+import { KitMaterial, shared } from '../../materials';
 import { PALETTES, type Palette } from '../../palettes';
 import { createClayKit, createClayKitShared, disposeClayKitShared, placementSeed, roleResolver } from '../../town/kitContext';
 import type { PaletteId } from '../../types';
@@ -258,6 +260,17 @@ export function createGreaterBlocksLayer(map: TownMap, opts: GreaterBlocksOption
   wires.matrixAutoUpdate = false;
   if (wirePos.length) { object.add(wires); stats.meshes++; }
 
+  // ---------------------------------------------------------------- dusk glow (street lights)
+  const lamp = measureLamp(build);
+  const heads = plan.items.filter((it) => it.kind === 'kn.prop.streetLight').map((it) => ({
+    x: it.x + Math.sin(it.rot) * lamp.reach, y: lamp.h, z: it.z + Math.cos(it.rot) * lamp.reach,
+  }));
+  const lampColor = () => PALETTES[palette].lamp;
+  const halos = createHalos(heads.map((p): GlowItem => ({ p, size: 0.8, color: lampColor(), strength: 1.1 })));
+  const pools = createPools(heads.map((p): GlowItem => ({ p: { x: p.x, y: 0.06, z: p.z }, size: 1.6, color: lampColor(), strength: 0.3 })));
+  const glows = [halos, pools];
+  for (const gl of glows) { gl.mesh.visible = false; object.add(gl.mesh); stats.meshes++; }
+
   disposeClayKitShared(kitShared);
 
   // ---------------------------------------------------------------- fade / palette
@@ -276,20 +289,36 @@ export function createGreaterBlocksLayer(map: TownMap, opts: GreaterBlocksOption
       sceneryMat.fade.value = fade;
       treeMat.fade.value = fade;
       wireMat.opacity = 0.55 * (1 - fade * 0.6);
+      const intensity = shared.uDusk.value * (1 - 0.45 * fade);
+      for (const gl of glows) {
+        gl.material.uniforms.uI!.value = intensity;
+        gl.mesh.visible = intensity > 0.004 && gl.mesh.count > 0;
+      }
     },
     setPalette(p) {
       if (p === palette) return;
       palette = p;
       for (const b of bakes) recolorBaked(b, p);
+      for (const gl of glows) gl.recolor(() => lampColor());
     },
     dispose() {
       for (const b of bakes) b.geometry.dispose();
       wireGeo.dispose();
       wireMat.dispose();
+      for (const gl of glows) gl.dispose();
       for (const m of mats) m.dispose();
       object.clear();
     },
   };
+}
+
+/** Street-light head: height and reach of the arm along +z (from the built model at rot 0). */
+function measureLamp(build: (it: BlockItem) => THREE.Object3D): { h: number; reach: number } {
+  const o = build({ kind: 'kn.prop.streetLight', x: 0, z: 0, rot: 0, role: 'street', block: '' });
+  o.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(o);
+  if (box.isEmpty()) return { h: 1.7, reach: 0.45 };
+  return { h: box.max.y - 0.08, reach: Math.max(0, box.max.z - 0.12) };
 }
 
 /** Pole cross-arm: which local axis it spans, its half length and the wire height (from the built model). */

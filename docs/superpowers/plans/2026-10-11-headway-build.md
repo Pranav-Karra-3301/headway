@@ -596,3 +596,15 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 - Roundabouts only where they read naturally (exit roads meeting the highway/parkway); the ring road becomes curved connector roads, not a rectangle.
 - Every outer road joins the playable town's exits; cars enter/leave only via the ridge tunnels and the causeway bridges.
 - Keep it cheap and readable: the playable town stays the visual focus; outer areas are quieter (lower saturation, fewer props).
+
+---
+
+## Grand-integration checklist (collected from finished tracks, 19:00)
+
+**Camera + occlusion (C1/C2):** switch the game to the C2 rig (`stage.ts` imports `'../camera/rig'`; TownRenderer passes `camera: { map }`, calls `rig.fitToSafeArea()`, wires `xray.attach` / `xray.update`). Overview must frame the in-board network (people are only ~10 px at 1600 × 1000 because the west rail detour widened the fit). Move occluders: `cp.library` at (−7, −11) and the `veg.oak` at (10, 4) (→ 0 % queues/stops hidden); the 10 worst route occluders incl. `res.tower` (15, 3), `lm.stationCentral`, `res.townhouses` (→ ~10 % of route length hidden). At Overview the bottom-left shows ~9 u past the water's edge — clamp or extend the base.
+**World (E1–E4):** `layout.railTunnel` is stale — derive it from `RAIL_SPANS.tunnel`; add lamps to the rail portals; move D5's `lm.waterTower` east (it hides the NW rail portal at (−36, −21.9)); causeways should run to the base edge, not stop mid-lake; terrain trees/ridges hide the rail approaching both portals (thin them); keep world draw calls ≤ 15.
+**Post:** tilt-shift off below 0.95× zoom and gentler at the beauty-shot zoom; never blur gameplay.
+**Kenney:** verify every `families/kenney*.ts` import resolves (E1 saw `./kenney-vegetation-k1` missing in `world-dev`), preload all Kenney ids used by DISTRICTS + greater town before building.
+**Traffic:** cars spawn/despawn only at tunnels and causeway bridges (v9).
+**Art notes (v8/v10):** downtown gray blocks → warm brick/cream; route ribbons ~20 % dimmer at dusk; gameplay owns saturation.
+**Copy/UX (v9):** General Sans everywhere except titles; short, visual explainers; no hard-coded fan counts.

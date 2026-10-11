@@ -61,7 +61,7 @@ const WOOD_TREES_W = ['veg.pine', 'veg.pine', 'veg.pine', 'veg.oak', 'veg.birch'
 const WOOD_TREES = ['veg.oak', 'veg.pine', 'veg.maple', 'veg.oak', 'veg.birch', 'veg.pine'];
 const BELT_TREES = ['veg.oak', 'veg.poplar', 'veg.maple', 'veg.oak', 'veg.pine'];
 /** Distinct shapes per tree kind (the layer instances one prototype per kind × variant). */
-export const TREE_VARIANTS: Record<string, number> = { 'veg.oak': 4, 'veg.pine': 3, 'veg.maple': 2, 'veg.birch': 2, 'veg.poplar': 1, 'veg.cherry': 1, 'veg.bush': 2 };
+export const TREE_VARIANTS: Record<string, number> = { 'veg.oak': 3, 'veg.pine': 3, 'veg.maple': 2, 'veg.birch': 1, 'veg.poplar': 1, 'veg.cherry': 1, 'veg.bush': 1 };
 
 const yawTo = (d: Vec2) => Math.atan2(d.x, d.z);
 /** Raw Kenney traffic light (city-kit-roads). */
@@ -200,7 +200,7 @@ function fillStrip(c: Ctx, f: Frame, u0: number, u1: number): void {
       if (r() < 0.35) add(c, 'st.mailbox', f.at(u + gap - 0.05, 0.3), f.rot, 'prop');
     } else if (!shop && gap >= 1.05) {
       if (r() < 0.55) tree(c, YARD_TREES, f.at(u + gap / 2, setback + 0.4 + r() * Math.max(0, d - 0.8)), 0.72);
-      else add(c, 'veg.bush', f.at(u + gap / 2, setback + 0.5 + r() * 0.6), r() * 6.28, 'tree', { params: { variant: Math.floor(r() * 2) } });
+      else add(c, 'veg.bush', f.at(u + gap / 2, setback + 0.5 + r() * 0.6), r() * 6.28, 'tree', { params: { variant: 0 } });
     }
     if (shop && r() < 0.6) add(c, r() < 0.55 ? 'kn.prop.parasol' : 'kn.prop.planter', f.at(hu + (r() - 0.5) * (w - 1.2), 0.42), f.rot, 'prop');
     // back garden
@@ -290,9 +290,11 @@ function fillShops(c: Ctx): void {
   lot(c, 'parking', f.rect(0.35, f.L - 0.35, 0.65, shopV - 0.45));
   lot(c, 'paving', f.rect(0.2, f.L - 0.2, shopV - 0.45, shopV + 0.05));
   const entries = [f.L * 0.22, f.L * 0.74];
-  for (let u = 1.2; u < f.L - 1.4; u += 3.4) {
-    if (entries.some((e) => Math.abs(e - (u + 1.5)) < 2.6)) continue;
-    add(c, 'veg.hedge', f.at(u + 1.5, 0.38), f.rot, 'prop', { params: { length: 2.8 } });
+  lot(c, 'garden', f.rect(0.2, f.L - 0.2, 0.1, 0.62), 1);
+  for (let u = 1.0, k = 0; u < f.L - 0.8; u += 1.9, k++) {
+    if (entries.some((e) => Math.abs(e - u) < 1.5)) continue;
+    if (k % 2 === 0) tree(c, ['veg.oak', 'veg.maple'], f.at(u, 0.36), 0.62);
+    else add(c, 'veg.bush', f.at(u, 0.36), r() * 6.28, 'tree', { scale: 0.8, params: { variant: 0 } });
   }
   const stall = 1.3, v0 = 0.75, depth = 2.05;
   for (let u = 0.6; u + stall < f.L - 0.6; u += stall) {

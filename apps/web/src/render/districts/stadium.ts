@@ -4,7 +4,7 @@
 // stadium zone doors put it, main gate on the South Rd. A paved forecourt with banner flags, flowerbeds and lamps runs
 // along the South Rd into the east gate plaza, which stays open for the Stadium Gate crowd queue; a row of flags
 // separates it from a tailgate lawn (concession kiosks, picnic umbrellas); two parking lots open onto Atherton St; a
-// lawn verge with poplars lines Main St behind the bowl.
+// lawn verge with low hedges lines Main St behind the bowl.
 // Railway (derived from TOWN + worldLayout, so it follows map edits): beside each platform a station building
 // (lm.stationCentral at Central, lm.stationHalt at University and Stadium) on the arrival side past the queue point,
 // front on the platform edge facing the track; a paved platform, a footpath from the paired bus stop, a station square
@@ -267,10 +267,11 @@ const lotX = XA - 1.55 - (lot.d * lotScale) / 2;
 dress('res.parking', v(lotX, ZM + 1.6 + (lot.w * lotScale) / 2), HALF_PI, { cars: 5 }, lotScale);
 dress('res.parking', v(lotX, ZS - 1.6 - (lot.w * lotScale) / 2), HALF_PI, { cars: 4 }, lotScale);
 
-// Main St frontage behind the stadium: a lawn verge with poplars either side of the north door path.
+// Main St frontage behind the stadium: a lawn verge with clipped hedges either side of the north door path. Main St
+// carries routes 1 and 3 and this is its camera side, so the planting stays low (poplars here hid the buses).
 areas.push({ kind: 'lawn', polygon: rect(S.x - BOWL.a - 0.3, ZM + 1.6, S.x + BOWL.a + 0.3, S.z - BOWL.b + 0.2) });
 paths.push({ kind: 'footpath', width: 1.1, points: [v(S.x, r2(S.z - BOWL.b + 0.1)), v(S.x, ZM + 1.5)] });
-for (const dx of [-4.6, -3.0, -1.4, 1.4, 3.0, 4.6]) dress('veg.poplar', v(S.x + dx, ZM + 1.95), 0, { variant: 2 });
+for (const sx of [-1, 1]) dress('veg.hedge', v(S.x + sx * 2.95, ZM + 2.05), 0, { length: 3.4 });
 
 // ---------------------------------------------------------------- stations: platform, links, square, garden
 for (const f of frames) {

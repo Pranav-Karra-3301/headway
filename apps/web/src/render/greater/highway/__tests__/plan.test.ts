@@ -86,7 +86,8 @@ describe('highway plan', () => {
 
   it('keeps props out of the lanes and off the board', () => {
     for (const p of plan.props) {
-      expect(p.z).toBeLessThan(plan.z1 + 0.01);
+      // inside the grid everything stays in the band; west of the grid (mountain land) the hill pines may spill south
+      if (p.x >= g.bounds.minX) expect(p.z, `${p.kind} at ${p.x.toFixed(1)}`).toBeLessThan(plan.z1 + 0.01);
       if ((p.kind === 'pine' || p.kind === 'tree' || p.kind === 'bush') && p.x > plan.xPortal) { // (hill pines stand over the bores)
         expect(Math.abs(p.z - plan.zc), `${p.kind} at ${p.x.toFixed(1)}`).toBeGreaterThan(HW.outer + 0.3);
       }

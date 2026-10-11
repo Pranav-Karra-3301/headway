@@ -207,10 +207,23 @@ export function pathLength(p: Path3): number {
   return L;
 }
 
+/** Lateral offsets (+ = right of travel) per point: constant or per-point arrays. */
+export type Lat = number | readonly number[];
+/** Points offset to the right by a per-point lateral (mitred like offsetRight). */
+export function offsetVar(pts: readonly Vec2[], lat: Lat): Vec2[] {
+  if (typeof lat === 'number') return offsetRight(pts, lat);
+  const u = offsetRight(pts, 1);
+  return pts.map((p, i) => ({ x: p.x + (u[i]!.x - p.x) * lat[i]!, z: p.z + (u[i]!.z - p.z) * lat[i]! }));
+}
+/** Negate / shift a lateral. */
+export function latMap(l: Lat, f: (v: number) => number): Lat {
+  return typeof l === 'number' ? f(l) : l.map(f);
+}
+
 /** Up-facing strip between lateral offsets l0 < l1 (+ = right of travel) at the path height + dy. */
-export function ribbon(acc: Acc, key: ColorKey, p: Path3, l0: number, l1: number, dy = 0): void {
+export function ribbon(acc: Acc, key: ColorKey, p: Path3, l0: Lat, l1: Lat, dy = 0): void {
   if (p.pts.length < 2) return;
-  const A = offsetRight(p.pts, l0), B = offsetRight(p.pts, l1);
+  const A = offsetVar(p.pts, l0), B = offsetVar(p.pts, l1);
   for (let i = 0; i + 1 < p.pts.length; i++) {
     const y0 = p.ys[i]! + dy, y1 = p.ys[i + 1]! + dy;
     acc.quad(key, V(A[i]!.x, y0, A[i]!.z), V(B[i]!.x, y0, B[i]!.z), V(B[i + 1]!.x, y1, B[i + 1]!.z), V(A[i + 1]!.x, y1, A[i + 1]!.z));
@@ -228,9 +241,9 @@ export function soffit(acc: Acc, key: ColorKey, p: Path3, l0: number, l1: number
 }
 
 /** Vertical wall along the path at lateral offset `lat`, from y = bot(i) to y = top(i), facing right (+) or left. */
-export function wall(acc: Acc, key: ColorKey, p: Path3, lat: number, bot: (i: number, y: number) => number, top: (i: number, y: number) => number, facingRight: boolean): void {
+export function wall(acc: Acc, key: ColorKey, p: Path3, lat: Lat, bot: (i: number, y: number) => number, top: (i: number, y: number) => number, facingRight: boolean): void {
   if (p.pts.length < 2) return;
-  const A = offsetRight(p.pts, lat);
+  const A = offsetVar(p.pts, lat);
   for (let i = 0; i + 1 < p.pts.length; i++) {
     const a = A[i]!, b = A[i + 1]!;
     const a0 = bot(i, p.ys[i]!), a1 = top(i, p.ys[i]!), b0 = bot(i + 1, p.ys[i + 1]!), b1 = top(i + 1, p.ys[i + 1]!);
@@ -241,12 +254,12 @@ export function wall(acc: Acc, key: ColorKey, p: Path3, lat: number, bot: (i: nu
 }
 
 /** A raised band (kerb, parapet, jersey barrier): top strip l0..l1 at h above the path, walls on both sides. */
-export function band(acc: Acc, key: ColorKey, p: Path3, l0: number, l1: number, base: number, h: number, sideKey: ColorKey = key, ends = true): void {
+export function band(acc: Acc, key: ColorKey, p: Path3, l0: Lat, l1: Lat, base: number, h: number, sideKey: ColorKey = key, ends = true): void {
   ribbon(acc, key, p, l0, l1, base + h);
   wall(acc, sideKey, p, l0, (_i, y) => y + base, (_i, y) => y + base + h, false);
   wall(acc, sideKey, p, l1, (_i, y) => y + base, (_i, y) => y + base + h, true);
   if (!ends || p.pts.length < 2) return;
-  const A = offsetRight(p.pts, l0), B = offsetRight(p.pts, l1), n = p.pts.length;
+  const A = offsetVar(p.pts, l0), B = offsetVar(p.pts, l1), n = p.pts.length;
   const y0 = p.ys[0]! + base, yn = p.ys[n - 1]! + base;
   acc.quad(sideKey, V(B[0]!.x, y0, B[0]!.z), V(A[0]!.x, y0, A[0]!.z), V(A[0]!.x, y0 + h, A[0]!.z), V(B[0]!.x, y0 + h, B[0]!.z));
   acc.quad(sideKey, V(A[n - 1]!.x, yn, A[n - 1]!.z), V(B[n - 1]!.x, yn, B[n - 1]!.z), V(B[n - 1]!.x, yn + h, B[n - 1]!.z), V(A[n - 1]!.x, yn + h, A[n - 1]!.z));
