@@ -45,7 +45,7 @@ def sig(pgid, s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--max', type=int, default=2)
+    ap.add_argument('--max', type=int, default=0, help='0 = adaptive: 3 if load < 18, 2 if < 32, else 1')
     ap.add_argument('--kill-after', type=int, default=150)
     ap.add_argument('--vite-max-age', type=int, default=25)
     a = ap.parse_args()
@@ -57,11 +57,13 @@ def main():
         for pid, pgid, age in mains:
             if age > a.kill_after:
                 sig(pgid, signal.SIGCONT); sig(pgid, signal.SIGKILL); stopped.discard(pgid)
+        load1 = os.getloadavg()[0]
+        cap = a.max if a.max > 0 else (3 if load1 < 18 else 2 if load1 < 32 else 1)
         live = sorted({(pgid, max(ag for _, g, ag in mains if g == pgid)) for _, pgid, _ in mains if _ is not None}, key=lambda x: -x[1])
         for i, (pgid, age) in enumerate(live):
             if age > a.kill_after:
                 continue
-            if i < a.max:
+            if i < cap:
                 if pgid in stopped:
                     sig(pgid, signal.SIGCONT); stopped.discard(pgid)
             elif pgid not in stopped:
