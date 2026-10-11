@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "headway.pranavkarra.me", "custom_domain": true }],
   "account_id": "ed61a2220d42b5b8a61059cce9af9980",
   "observability": {
     "enabled": true
