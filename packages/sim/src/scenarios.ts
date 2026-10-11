@@ -26,21 +26,44 @@ const HALLS: ZoneSelector = { neighborhood: 'campus', tag: 'hall' };
 const SHOPS: ZoneSelector = { neighborhood: 'downtown', tag: 'retail' };
 const HOMES: ZoneSelector = { neighborhood: 'apartments', tag: 'housing' };
 
+const zones = (...ids: string[]): ZoneSelector => ({ zones: ids });
 const STADIUM_EXIT: ScenarioDef = {
   id: 'stadium_exit', kind: 'stadium_exit', name: 'Stadium exit', clockStart: '21:30',
   durationS: 1800, clearingS: 900,
+  // Tuned (sim tuning, docs/research/sim-tuning.md). Two crowds leave at the closing:
+  // - East and North Gates (600): mostly buses from Stadium Gate / Old Main (r3 and r1, the crunch a pre-staged bus
+  //   relieves) to Eastview, Allen Corner and the rest of downtown, plus the walkers to campus and nearby shops;
+  // - South Gate (430), beside Stadium Station: the train crowd. Most live in Garden Row and Parkside Towers (train to
+  //   Central, then r2 to Apartments South: the bus–train transfers that holding at Central protects) or head out of
+  //   town from Central; it drains more slowly (decay 600 s), so several trains carry it.
   demand: [
     {
-      id: 'stadium_crowd', from: { neighborhood: 'stadium', tag: 'stadium' },
+      id: 'stadium_crowd', from: zones('z_stadium_east', 'z_stadium_north'),
       to: [
-        { sel: HOMES, share: 0.45 },
-        { sel: SHOPS, share: 0.25 },
-        { sel: HALLS, share: 0.15 },
-        { sel: { zones: ['z_stn_central'] }, share: 0.15 },
+        { sel: zones('z_eastview'), share: 0.24 },
+        { sel: zones('z_allen_corner'), share: 0.16 },
+        { sel: zones('z_garden_row'), share: 0.10 },
+        { sel: zones('z_southside'), share: 0.10 },
+        { sel: zones('z_stn_central'), share: 0.10 },
+        { sel: zones('z_central_plaza'), share: 0.08 },
+        { sel: zones('z_parkside'), share: 0.06 },
+        { sel: zones('z_beaver_shops'), share: 0.06 },
+        { sel: zones('z_main_market'), share: 0.05 },
+        { sel: HALLS, share: 0.05 },
       ],
-      // Tuned (Wave 1 integration): 1,000 rather than the spec's 1,200 keeps g0 above 85% completion on every
-      // train/val/showcase/play seed while Old Main still queues 250–300 at the peak.
-      total: 1000, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 },
+      total: 600, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 },
+    },
+    {
+      id: 'stadium_rail', from: zones('z_stadium_south'),
+      to: [
+        { sel: zones('z_garden_row'), share: 0.52 },
+        { sel: zones('z_stn_central'), share: 0.14 },
+        { sel: zones('z_parkside'), share: 0.12 },
+        { sel: zones('z_southside'), share: 0.08 },
+        { sel: zones('z_stn_university'), share: 0.08 },
+        { sel: SHOPS, share: 0.06 },
+      ],
+      total: 430, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 600 },
     },
     background(300),
   ],

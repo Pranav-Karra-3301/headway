@@ -65,7 +65,9 @@ describe('built-in policies', () => {
 
   it('REF is queue-responsive and otherwise behaves like G0', () => {
     expect(REF.meta).toMatchObject({ id: 'ref', emphasis: 'reference' });
-    expect(REF.params).toEqual(G0.params);
+    // sim tuning: REF starts the Campus Loop's spare bus on the Stadium route (1/2/3); otherwise G0's params
+    expect(REF.params).toEqual({ ...G0.params, allocation: { r1: 1, r2: 2, r3: 3 } });
+    expect(G0.params.allocation).toEqual({ r1: 2, r2: 2, r3: 2 });
     expect(REF.defaults).toEqual(G0.defaults);
     const byAction = (t: string) => REF.rules.filter((r) => r.do.type === t);
     expect(byAction('dispatch')[0]).toMatchObject({ on: 'bus_at_terminal', when: [{ f: 'route_queue', op: '>=', v: 40 }] });

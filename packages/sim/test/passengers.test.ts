@@ -7,11 +7,14 @@ import { TOWN } from '../src/map/town';
 import { stream } from '../src/rng';
 import { SCENARIOS } from '../src/scenarios';
 import { createTripPlanner, generatePassengers } from '../src/passengers/index';
-import { profilePoints, sampleSpawnT } from '../src/passengers/demand';
+import { profilePoints, sampleSpawnT, selectZones } from '../src/passengers/demand';
 import { STATION_TRANSFER_WALK_S, attractiveSet, candidatesFor } from '../src/passengers/planner';
 import { LINE_TOWN } from './fixtures/passengersMap';
 
 const CFG = withConfig();
+/** The synthetic line town's expected costs are hand-computed at the spec §5.3 train speed (0.75 u/s), independent of
+ *  the tuned DEFAULT_CONFIG. */
+const LINE_CFG = withConfig({ train: { ...CFG.train, speed: 0.75 } });
 
 /** A mid-range passenger with no choice noise (spec §5.4 draw midpoints). */
 function typical(over: Partial<PassengerSpec> = {}): PassengerSpec {
@@ -111,7 +114,8 @@ describe('generatePassengers', () => {
       const scale = stream(seed, 'demand').range(...def.perturb.demandScale);
       const crowd = ps.filter((p) => isStadium(p.origin)).length;
       const total = (id: string) => def.demand.find((g) => g.id === id)!.total;
-      expect(Math.abs(crowd - total('stadium_crowd') * scale)).toBeLessThanOrEqual(1);
+      // two stadium generators (East/North Gates, South Gate), each rounded on its own
+      expect(Math.abs(crowd - (total('stadium_crowd') + total('stadium_rail')) * scale)).toBeLessThanOrEqual(1);
       expect(Math.abs(ps.length - crowd - total('background') * scale)).toBeLessThanOrEqual(1);
     }
     const cc = SCENARIOS.class_change;
@@ -136,12 +140,20 @@ describe('generatePassengers', () => {
   });
 
   it('sends the crowd by the scenario shares and never to the origin zone', () => {
-    const crowd = list.filter((p) => isStadium(p.origin));
-    const share = (pred: (z: Zone) => boolean) => crowd.filter((p) => pred(zone(TOWN, p.dest))).length / crowd.length;
-    expect(share((z) => z.neighborhood === 'apartments' && z.tags.includes('housing'))).toBeCloseTo(0.45, 1);
-    expect(share((z) => z.neighborhood === 'downtown' && z.tags.includes('retail'))).toBeCloseTo(0.25, 1);
-    expect(share((z) => z.neighborhood === 'campus' && z.tags.includes('hall'))).toBeCloseTo(0.15, 1);
-    expect(share((z) => z.id === 'z_stn_central')).toBeCloseTo(0.15, 1);
+    // per stadium generator (East/North Gates; South Gate): its crowd goes to each destination entry by share
+    const gens = def.demand.filter((g) => g.id.startsWith('stadium'));
+    expect(gens.map((g) => g.id)).toEqual(['stadium_crowd', 'stadium_rail']);
+    for (const g of gens) {
+      const from = new Set(selectZones(TOWN, g.from).map((z) => z.id));
+      const crowd = list.filter((p) => from.has(p.origin));
+      expect(crowd.length).toBeGreaterThan(300);
+      const sum = g.to.reduce((a, e) => a + e.share, 0);
+      for (const e of g.to) {
+        const to = new Set(selectZones(TOWN, e.sel).map((z) => z.id));
+        expect(crowd.filter((p) => to.has(p.dest)).length / crowd.length, `${g.id} → ${JSON.stringify(e.sel)}`).toBeCloseTo(e.share / sum, 1);
+      }
+    }
+    expect(list.filter((p) => isStadium(p.origin)).length).toBeGreaterThan(900);
     for (const p of list) {
       expect(p.origin).not.toBe(p.dest);
       expect(TOWN.zones.some((z) => z.id === p.origin)).toBe(true);
@@ -249,10 +261,10 @@ describe('spawn-time profiles', () => {
 
 // ------------------------------------------------------------------------------------------------ planner (fixture)
 describe('trip planner on a synthetic line town', () => {
-  const planner = createTripPlanner(LINE_TOWN, CFG);
+  const planner = createTripPlanner(LINE_TOWN, LINE_CFG);
 
   it('enumerates walk, bus↔bus and bus↔train candidates for apartments → university', () => {
-    expect(candidatesFor(LINE_TOWN, CFG, 'z_home', 'z_univ').map((c) => c.key)).toEqual([
+    expect(candidatesFor(LINE_TOWN, LINE_CFG, 'z_home', 'z_univ').map((c) => c.key)).toEqual([
       'walk',
       'bb:stop_apts_south>stop_central_stn>stop_university_stn',
       'bt:stop_apts_south>stn_central>stn_university',
@@ -303,7 +315,7 @@ describe('trip planner on a synthetic line town', () => {
     (a.legs[0] as Extract<Leg, { kind: 'walk' }>).from.x = 999;
     a.legs.length = 0;
     const b = planner.plan(typical());
-    expect(b).toEqual(createTripPlanner(LINE_TOWN, CFG).plan(typical()));
+    expect(b).toEqual(createTripPlanner(LINE_TOWN, LINE_CFG).plan(typical()));
     expect((b.legs[0] as Extract<Leg, { kind: 'walk' }>).from.x).toBe(0);
   });
 
@@ -321,7 +333,7 @@ describe('trip planner on a synthetic line town', () => {
 
 // ------------------------------------------------------------------------------------------------ reconsideration
 describe('reconsider', () => {
-  const planner = createTripPlanner(LINE_TOWN, CFG);
+  const planner = createTripPlanner(LINE_TOWN, LINE_CFG);
   const centralPlatform = { x: 30, z: 2 };
   const toPlaza: Leg[] = [
     { kind: 'train', board: 'stn_central', alight: 'stn_stadium' },

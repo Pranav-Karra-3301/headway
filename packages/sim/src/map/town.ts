@@ -1,8 +1,10 @@
 // Owner: Task M. The canonical town (spec §4 topology) authored to the kit's scale.
 //
 // Layout (x east, z south; board 72 × 52 u):
-// - A toy railway rings the town (rounded rectangle, anticlockwise seen north-up: Stadium → Central → University).
-// - A ring road runs inside the railway (7.4 u in from the rail) so every station has a road alongside its platform.
+// - A regional rail line (travel order Stadium → Central → University) crosses the board on three station runs (the
+//   south, east and north sides) and closes off the board: a bridge over the bay to the south-east and a tunnel through
+//   the north-west ridge (see `railLoop`, RAIL_SPANS).
+// - A ring road runs 7.4 u inside the station runs so every station has a road alongside its platform.
 // - Main St (E–W, exits west) ends at Central Station; Atherton St (N–S arterial) exits north and south; the South
 //   Rd continues east off the board. Side streets: Burrowes St (campus), Beaver Ave + Allen St (downtown), Park Ave
 //   (south side).
@@ -34,7 +36,7 @@ const ROAD_SEGS = 8;
 const KERB = 1.15;
 
 const BOUNDS = { minX: -36, maxX: 36, minZ: -26, maxZ: 26 };
-const RAIL_HX = 30, RAIL_HZ = 22, RAIL_R = 6, RAIL_SEGS = 12;
+const RAIL_HX = 30, RAIL_HZ = 22; // station runs: the east (Central) and the north / south (University / Stadium) straights
 const RING_INSET = 7.4;
 const XW = -26.8;                   // West Rd (no station on the west side: hugs the rail)
 const XE = RAIL_HX - RING_INSET;    // East Rd (22.6), Central Station side
@@ -127,14 +129,73 @@ function rawBetween(from: string, to: string): Vec2[] {
 
 // ---------------------------------------------------------------- rail
 /** Travel order (spec §4): Stadium → Central → University, so the stadium crowd reaches Central (and its r1/r2
- *  connections) on the short side of the loop, and Apartments → Central → University is direct. */
+ *  connections) first, and Apartments → Central → University is direct. */
 const RAIL_ORDER: StationId[] = ['stn_stadium', 'stn_central', 'stn_university'];
+/**
+ * A regional line, not a ring: only the three station runs sit on the board (the platforms keep their places on the
+ * old ring, 22 u / 30 u from the centre). In travel order from Stadium's platform centre (heading east):
+ * - S-curve down onto the lakeshore beach (z 27, just off the board's south edge), level-crossing Atherton St's
+ *   south exit square-on, then a long bridge out over the bay (z 35) that swings north to re-enter the board at the
+ *   south-east and run up the east side (crossing the South Rd exit square-on) through Central;
+ * - round the north-east and west along the north side (crossing Atherton St's north exit square-on) through
+ *   University, leaving the board west into the north-west ridge;
+ * - a tunnel through the ridge (x −44, off the board) that comes back out heading south-east and swings east into
+ *   Stadium. The west road exit (Main St) passes over the tunnel; no road crosses the west side.
+ * Each corner has its own fillet r (minimum curve radius = r·cos(turn/2) ≥ 6.2 u); every station has a straight of at
+ * least ±5 u for its 9 u platform. Only arithmetic is used, so every JS engine builds the same loop.
+ */
+const RAIL_SEGS = 16;
+const RAIL_BEACH_Z = 27, RAIL_BRIDGE_Z = 35, RAIL_TUNNEL_X = -44;
+/** Control polygon in travel order: [corner, fillet radius]. */
+const RAIL_CONTROL: Array<[Vec2, number]> = [
+  [v(STATION_AT.stn_stadium.at, RAIL_HZ), 0],         // Stadium platform centre (loop start), heading east
+  [v(-10.6, RAIL_HZ), 7], [v(-5.6, RAIL_BEACH_Z), 7], // S-curve down to the beach
+  [v(4, RAIL_BEACH_Z), 7], [v(10, RAIL_BRIDGE_Z), 7], // lakeshore, then out onto the bridge
+  [v(RAIL_HX, RAIL_BRIDGE_Z), 10],                    // bridge swings north, back onto the board at the south-east
+  [v(RAIL_HX, -RAIL_HZ), 10],                         // up the east side through Central, round the north-east
+  [v(RAIL_TUNNEL_X, -RAIL_HZ), 10],                   // west along the north side through University, into the ridge
+  [v(RAIL_TUNNEL_X, 12), 10], [v(-30, RAIL_HZ), 8],   // tunnel south, out of the ridge heading south-east, east to Stadium
+];
 function railLoop(): Polyline {
-  const start = v(STATION_AT.stn_stadium.at, RAIL_HZ); // the loop starts at Stadium's platform centre, heading east
-  const corners = [start, v(RAIL_HX, RAIL_HZ), v(RAIL_HX, -RAIL_HZ), v(-RAIL_HX, -RAIL_HZ), v(-RAIL_HX, RAIL_HZ)];
-  return polyline(roundCorners(corners, RAIL_R, true, RAIL_SEGS), true);
+  const n = RAIL_CONTROL.length;
+  const pts: Vec2[] = [];
+  for (let i = 0; i < n; i++) {
+    const [p, r] = RAIL_CONTROL[i]!;
+    if (r <= 0) { pts.push(p); continue; }
+    const arc = roundCorners([RAIL_CONTROL[(i + n - 1) % n]![0], p, RAIL_CONTROL[(i + 1) % n]![0]], r, false, RAIL_SEGS);
+    pts.push(...arc.slice(1, -1)); // the fillet alone (each neighbour adds its own)
+  }
+  return polyline(pts, true);
 }
 const RAIL_LOOP = railLoop();
+/** Calibration (sim tuning, docs/research/sim-tuning.md): what passengers are told the train headway is. */
+const RAIL_ADVERTISED_HEADWAY_S = 330;
+
+/** The world's south shoreline (water beyond z > 30: a 4 u beach strip below the board's south edge). */
+export const RAIL_SHORE_Z = BOUNDS.maxZ + 4;
+/** Arc-distance spans along `rail.loop` (travel direction, [from, to], 0.1 u resolution) for the world framing:
+ *  `tunnel` = the whole off-board run through the north-west ridge (portals at or just beyond its ends, both off the
+ *  board); `bridge` = the run over the bay (z > RAIL_SHORE_Z); `offBoard` = every stretch outside TownMap.bounds (the
+ *  south one is lakeshore beach → bridge → beach landing at the south-east). Stations, platforms and stops are on board. */
+export const RAIL_SPANS: { tunnel: [number, number]; bridge: [number, number]; offBoard: Array<[number, number]> } = (() => {
+  const b = BOUNDS;
+  const off = (d: number) => { const p = pointAt(RAIL_LOOP, d); return p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ; };
+  const wet = (d: number) => pointAt(RAIL_LOOP, d).z > RAIL_SHORE_Z;
+  const spans = (f: (d: number) => boolean): Array<[number, number]> => {
+    const out: Array<[number, number]> = [];
+    let start = -1;
+    const n = Math.ceil(RAIL_LOOP.length * 10);
+    for (let i = 0; i <= n; i++) {
+      const d = Math.min(i / 10, RAIL_LOOP.length);
+      if (f(d) && start < 0) start = d;
+      if ((!f(d) || i === n) && start >= 0) { out.push([Math.round(start * 10) / 10, Math.round(d * 10) / 10]); start = -1; }
+    }
+    return out;
+  };
+  const offBoard = spans(off);
+  const west = offBoard.find(([a, c]) => pointAt(RAIL_LOOP, (a + c) / 2).x < b.minX) ?? [0, 0];
+  return { tunnel: west, bridge: spans(wet)[0] ?? [0, 0], offBoard };
+})();
 
 /** Rail point at a platform centre, the unit normal pointing into town, and the kit's local +x (along the track). */
 function stationFrame(id: StationId): { rail: Vec2; inward: Vec2; along: Vec2 } {
@@ -279,7 +340,9 @@ export const TOWN: TownMap = {
   neighborhoods: NEIGHBORHOODS,
   zones: ZONES,
   roads: { nodes: roadNodes, edges: roadEdges },
-  rail: { loop: RAIL_LOOP, stations: STATIONS, advertisedHeadwayS: 360 },
+  // Advertised train headway (published to passengers): the nominal loop, 234.5 u at DEFAULT_CONFIG.train.speed 1.2 plus
+  // three 45 s dwells ≈ 330 s; delays and crush-load boarding stretch real headways to ~6 min.
+  rail: { loop: RAIL_LOOP, stations: STATIONS, advertisedHeadwayS: RAIL_ADVERTISED_HEADWAY_S },
   stops: STOPS,
   routes: ROUTES,
 };

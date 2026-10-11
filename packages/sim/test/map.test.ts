@@ -3,11 +3,11 @@ import type { RouteId, StationId, StopId, Vec2 } from '../src/contracts';
 import { withConfig } from '../src/config';
 import { distance, nearestDist, pointAt, polyline, projectOnPolyline, roundCorners } from '../src/map/geometry';
 import { deadheadPath, shortestPath } from '../src/map/roadGraph';
-import { nearestAccess, routeById, stationById, stopById, TOWN, zoneById } from '../src/map/town';
+import { nearestAccess, RAIL_SHORE_Z, RAIL_SPANS, routeById, stationById, stopById, TOWN, zoneById } from '../src/map/town';
 
 const STOP_IDS: StopId[] = ['stop_stadium_gate', 'stop_stadium_stn', 'stop_university_stn', 'stop_old_main',
   'stop_downtown', 'stop_central_stn', 'stop_apts_north', 'stop_apts_south'];
-const STATION_IDS: StationId[] = ['stn_stadium', 'stn_university', 'stn_central'];
+const STATION_IDS: StationId[] = ['stn_stadium', 'stn_central', 'stn_university']; // rail travel order
 const ROUTE_IDS: RouteId[] = ['r1', 'r2', 'r3'];
 const off = (poly: ReturnType<typeof polyline>, p: Vec2) => projectOnPolyline(poly, p).d;
 
@@ -133,33 +133,109 @@ describe('route geometry', () => {
 });
 
 describe('rail', () => {
-  it('is one closed loop of 160–200 u with stations in travel order', () => {
-    const { loop, stations, advertisedHeadwayS } = TOWN.rail;
+  const { loop, stations } = TOWN.rail;
+  const L = loop.length;
+  const b = TOWN.bounds;
+  const offBoard = (p: Vec2) => p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ;
+  const inSpan = (d: number, [a, c]: [number, number]) => d >= a && d <= c;
+  it('is one closed regional loop of 220–250 u with stations in travel order Stadium → Central → University', () => {
     expect(loop.closed).toBe(true);
-    expect(loop.length).toBeGreaterThanOrEqual(160);
-    expect(loop.length).toBeLessThanOrEqual(200);
-    expect(advertisedHeadwayS).toBe(360);
+    expect(L).toBeGreaterThanOrEqual(220);
+    expect(L).toBeLessThanOrEqual(250);
     const d = stations.map((s) => s.dist);
+    expect(d[0]!).toBeLessThan(0.01); // the loop starts at Stadium's platform centre
     expect(d[0]!).toBeLessThan(d[1]!);
     expect(d[1]!).toBeLessThan(d[2]!);
-    expect(d[2]!).toBeLessThan(loop.length);
+    expect(d[2]!).toBeLessThan(L);
+    // Stadium → Central is the lakeshore/bridge side; Central → University runs straight across the north
+    expect(d[1]! - d[0]!).toBeLessThan(95);
+    expect(d[2]! - d[1]!).toBeLessThan(65);
   });
-  it('platforms face the town: inside the loop, 0.75–3.15 u from the rail, queue along the track', () => {
-    for (const st of TOWN.rail.stations) {
-      expect(off(TOWN.rail.loop, st.platform)).toBeGreaterThan(0.75);
-      expect(off(TOWN.rail.loop, st.platform)).toBeLessThan(3.15);
+  it('platforms face the town: inside the board, 0.75–3.15 u from the rail, queue along the track', () => {
+    for (const st of stations) {
+      expect(off(loop, st.platform)).toBeGreaterThan(0.75);
+      expect(off(loop, st.platform)).toBeLessThan(3.15);
       expect(Math.abs(st.platform.x)).toBeLessThan(30);
       expect(Math.abs(st.platform.z)).toBeLessThan(22);
       expect(Math.hypot(st.queueDir.x, st.queueDir.z)).toBeCloseTo(1);
-      const centre = pointAt(TOWN.rail.loop, st.dist);
+      const centre = pointAt(loop, st.dist);
       expect(distance(centre, st.platform)).toBeLessThan(4);
+      expect(offBoard(centre)).toBe(false);
     }
   });
-  it('train loop takes about 6–7 min at the default speed and dwell', () => {
+  it('a train loop takes about 5.5–7 min at the default speed and dwell, and the advertised headway matches it', () => {
     const cfg = withConfig();
-    const loopS = TOWN.rail.loop.length / cfg.train.speed + 3 * cfg.train.defaultDwellS;
-    expect(loopS / 60).toBeGreaterThan(5.5);
+    const loopS = L / cfg.train.speed + 3 * cfg.train.defaultDwellS;
+    expect(loopS / 60).toBeGreaterThan(5.25);
     expect(loopS / 60).toBeLessThan(7);
+    expect(Math.abs(TOWN.rail.advertisedHeadwayS - loopS)).toBeLessThan(0.1 * loopS);
+  });
+  it('curves smoothly: no curve radius under 6 u anywhere', () => {
+    let minR = Infinity;
+    for (let d = 0; d < L; d += 0.25) {
+      const p = pointAt(loop, d - 1), q = pointAt(loop, d), r = pointAt(loop, d + 1);
+      const area2 = Math.abs((q.x - p.x) * (r.z - p.z) - (q.z - p.z) * (r.x - p.x));
+      if (area2 > 1e-9) minR = Math.min(minR, (distance(p, q) * distance(q, r) * distance(p, r)) / (2 * area2));
+    }
+    expect(minR).toBeGreaterThanOrEqual(6);
+  });
+  it('every station sits on a straight of at least ±5 u (its platform is 9 u long)', () => {
+    for (const st of stations) {
+      const c = pointAt(loop, st.dist);
+      for (let k = -5; k <= 5; k += 0.5) {
+        const p = pointAt(loop, st.dist + k);
+        const sideways = Math.abs((p.x - c.x) * Math.sin(c.heading) + (p.z - c.z) * Math.cos(c.heading));
+        expect(sideways, `${st.id} ${k}`).toBeLessThan(0.02);
+      }
+    }
+  });
+  it('leaves the board only through the north-west ridge tunnel and the south-east lakeshore + bay bridge', () => {
+    expect(RAIL_SPANS.offBoard).toHaveLength(2);
+    const [south, tunnel] = RAIL_SPANS.offBoard as [[number, number], [number, number]];
+    expect(RAIL_SPANS.tunnel).toEqual(tunnel);
+    for (let d = 0; d < L; d += 0.5) {
+      const p = pointAt(loop, d);
+      const off = inSpan(d, south) || inSpan(d, tunnel);
+      if (!off) expect(offBoard(p), `on board @${d}`).toBe(false);
+      if (inSpan(d + 0.2, tunnel) && inSpan(d - 0.2, tunnel)) expect(p.x < b.minX || p.z < b.minZ, `tunnel @${d}`).toBe(true);
+      if (inSpan(d + 0.2, south) && inSpan(d - 0.2, south)) expect(p.z > b.maxZ || p.x > b.maxX, `south @${d}`).toBe(true);
+      if (inSpan(d + 0.2, RAIL_SPANS.bridge) && inSpan(d - 0.2, RAIL_SPANS.bridge)) expect(p.z, `bridge @${d}`).toBeGreaterThan(RAIL_SHORE_Z);
+    }
+    expect(RAIL_SPANS.bridge[0]).toBeGreaterThan(south[0]);
+    expect(RAIL_SPANS.bridge[1]).toBeLessThan(south[1]);
+    expect(RAIL_SPANS.bridge[1] - RAIL_SPANS.bridge[0]).toBeGreaterThan(20); // a long bridge
+    expect(tunnel[1] - tunnel[0]).toBeGreaterThan(30);
+    for (const st of stations) for (const sp of RAIL_SPANS.offBoard) expect(inSpan(st.dist, sp), st.id).toBe(false);
+  });
+  it('level-crosses roads only square-on and keeps clear of stops, platforms, queue lines and doors', () => {
+    const lp = loop.points;
+    let crossings = 0;
+    for (const e of TOWN.roads.edges) {
+      const pts = e.path.points;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i]!, c = pts[i + 1]!;
+        for (let j = 0; j < lp.length; j++) {
+          const p = lp[j]!, q = lp[(j + 1) % lp.length]!;
+          const ax = c.x - a.x, az = c.z - a.z, bx = q.x - p.x, bz = q.z - p.z;
+          const den = ax * bz - az * bx;
+          if (Math.abs(den) < 1e-12) continue;
+          const t = ((p.x - a.x) * bz - (p.z - a.z) * bx) / den, u = ((p.x - a.x) * az - (p.z - a.z) * ax) / den;
+          if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+          crossings++;
+          const cos = Math.abs(ax * bx + az * bz) / Math.hypot(ax, az) / Math.hypot(bx, bz);
+          expect(cos, `${e.id} crossing`).toBeLessThan(Math.sin((10 * Math.PI) / 180)); // within 10° of square
+        }
+      }
+    }
+    expect(crossings).toBe(2); // Atherton St north exit, South Rd east exit (Atherton's south exit crosses on the beach)
+    for (const s of TOWN.stops) {
+      expect(off(loop, s.p), s.id).toBeGreaterThan(5);
+      for (let k = 0; k <= 4; k += 0.5) expect(off(loop, { x: s.p.x + s.queueDir.x * k, z: s.p.z + s.queueDir.z * k }), `${s.id} queue`).toBeGreaterThan(1.5);
+    }
+    for (const st of stations) for (let k = 0; k <= 4; k += 0.5) {
+      expect(off(loop, { x: st.platform.x + st.queueDir.x * k, z: st.platform.z + st.queueDir.z * k }), `${st.id} queue`).toBeGreaterThan(2);
+    }
+    for (const z of TOWN.zones) expect(off(loop, z.door), z.id).toBeGreaterThan(2);
   });
 });
 
@@ -250,12 +326,12 @@ describe('zones', () => {
 });
 
 describe('bounds', () => {
-  it('all geometry lies inside the board', () => {
+  it('all geometry lies inside the board (the rail closes off the board; see the rail tests)', () => {
     const b = TOWN.bounds;
     expect(b).toEqual({ minX: -36, maxX: 36, minZ: -26, maxZ: 26 });
     const pts: Vec2[] = [
       ...TOWN.roads.nodes.map((n) => n.p), ...TOWN.roads.edges.flatMap((e) => e.path.points),
-      ...TOWN.rail.loop.points, ...TOWN.rail.stations.map((s) => s.platform), ...TOWN.stops.map((s) => s.p),
+      ...TOWN.rail.stations.map((s) => s.platform), ...TOWN.stops.map((s) => s.p),
       ...TOWN.zones.map((z) => z.door), ...TOWN.routes.flatMap((r) => r.path.points),
     ];
     for (const p of pts) {

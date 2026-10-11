@@ -325,7 +325,7 @@ export interface CreateSimArgs { map: TownMap; scenario: ScenarioInstance; confi
 | r2 | Apartments | central_stn → apts_north → apts_south → downtown | 2 |
 | r3 | Stadium | stadium_gate → stadium_stn → old_main → downtown | 2 |
 
-- **Rail loop:** stadium → university → central. Each station pairs with a bus stop: `stn_stadium`↔`stop_stadium_stn`, `stn_university`↔`stop_university_stn` and `stn_central`↔`stop_central_stn`.
+- **Rail line:** travel order stadium → central → university (`rail.stations` lists them in that order; the loop starts at Stadium's platform). It is a regional line, not a ring: the three station runs cross the board (south, east and north sides), and the loop closes off the board, with a long bridge over the bay to the south-east plus a lakeshore run, and a tunnel through the north-west ridge. `RAIL_SPANS` in `map/town.ts` gives the off-board, bridge and tunnel arc spans. Curves have radius ≥ 6 u, and roads level-cross it square-on. Each station pairs with a bus stop: `stn_stadium`↔`stop_stadium_stn`, `stn_university`↔`stop_university_stn` and `stn_central`↔`stop_central_stn`.
 - **Shared stops create transfer choices:** downtown is served by all three routes; central by r1 and r2; old_main by r1 and r3.
 - **Terminals:** r1 and r2 share Central, so reassigning between them needs no deadhead. r3's terminal is Stadium Gate, so a reassignment to or from r3 deadheads along the road graph. This creates the key dispatcher move: pre-staging buses before the advertised closing time.
 
@@ -419,11 +419,15 @@ export interface CreateSimArgs { map: TownMap; scenario: ScenarioInstance; confi
 
 | id | Demand | Advertised |
 |---|---|---|
-| `stadium_exit` | 1,200 from stadium zones, pulse at 600 s (ramp 120 s, decay 420 s), to apartments 45% / downtown 25% / campus 15% / central 15%; plus background 300 uniform across zones | stadium closing at 600 s, clock 21:30 |
+| `stadium_exit` | 1,030 fans, pulse at 600 s (ramp 120 s). **East and North Gates, 600** (decay 420 s): Eastview 24% / Allen Corner 16% / Garden Row 10% / Station Court 10% / Central station 10% / Central Plaza 8% / Parkside 6% / Beaver Ave 6% / Main St Market 5% / campus halls 5%. **South Gate (beside Stadium Station), 430** (decay 600 s): Garden Row 52% / Central station 14% / Parkside 12% / Station Court 8% / University station 8% / downtown shops 6%. Plus background 300, uniform across zones | stadium closing at 600 s, clock 21:30 |
 | `class_change` | 2 pulses × 350 from halls (at 300 s and 1500 s) to downtown / apartments / university station; background 200 | class changes at 300 s and 1500 s, clock 11:45 |
 | `evening_commute` *(stretch)* | 700 piecewise, campus/downtown → apartments, plus train arrivals | none |
 
-The stadium-exit crunch is intentional. About 6 buses × 3.5 loops × 40 + 5 train loops × 160 gives roughly 1.6k seats for about 1.5k riders, so the bus–train coordination is visibly decisive.
+The stadium-exit crunch is intentional. About 1.3k riders (× 0.9–1.1) meet roughly 6 buses × 3.5 loops × 40 seats plus about 6 train loops × 160 seats.
+- The East and North Gate crowd queues at Stadium Gate and Old Main for r3 and r1. This is the crunch a pre-staged bus relieves.
+- The South Gate crowd takes the train to Central, and many continue on r2 to Apartments South. These are the train↔bus transfers that holding at Central protects.
+- Under g0: about 25% of fans ride the train, about 9% transfer between train and bus, about 28% walk, Central and University see 45 or more missed connections per run, and completion is about 88%.
+- Tuning record: `docs/research/sim-tuning.md`.
 
 ## 6. Controllers and the policy format
 

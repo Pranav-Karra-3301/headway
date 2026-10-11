@@ -25,12 +25,12 @@ describe('scenarios', () => {
     const se = scenarioDef('stadium_exit');
     expect(se.clockStart).toBe('21:30');
     expect(se.durationS + se.clearingS).toBe(2700);
-    // total tuned from the spec's 1,200 in Wave 1 integration (g0 completion gate)
-    expect(se.demand.find((d) => d.id === 'stadium_crowd')).toMatchObject({ total: 1000, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 } });
+    // sim tuning (docs/research/sim-tuning.md): East/North Gates 600 + South Gate (the train crowd) 430
+    expect(se.demand.find((d) => d.id === 'stadium_crowd')).toMatchObject({ total: 600, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 420 } });
+    expect(se.demand.find((d) => d.id === 'stadium_rail')).toMatchObject({ total: 430, profile: { kind: 'pulse', at: 600, rampS: 120, decayS: 600 } });
     expect(se.demand.find((d) => d.id === 'background')?.total).toBe(300);
     expect(se.advertised).toEqual([{ kind: 'stadium_closing', t: 600, label: 'Stadium closes' }]);
-    const shares = se.demand[0]!.to.map((t) => t.share);
-    expect(shares.reduce((a, b) => a + b, 0)).toBeCloseTo(1);
+    for (const g of se.demand) expect(g.to.reduce((a, t) => a + t.share, 0), g.id).toBeCloseTo(1);
     const cc = scenarioDef('class_change');
     expect(cc.demand.filter((d) => d.profile.kind === 'pulse').map((d) => [d.total, (d.profile as { at: number }).at])).toEqual([[350, 300], [350, 1500]]);
     expect(SEEDS.train.map((s) => s.seed)).toEqual([1001, 1002, 1003, 1004, 1001, 1002, 1003, 1004]);

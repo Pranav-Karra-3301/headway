@@ -29,9 +29,12 @@ export const G0: Policy = {
 export const REF: Policy = {
   meta: {
     id: 'ref', parent: null, generation: 0, author: 'human', emphasis: 'reference',
-    summary: 'Queue-responsive reference: dispatch at 40+ waiting, move a spare bus to the busiest route, space out bunched buses at stops.',
+    summary: 'Queue-responsive reference: Campus Loop spare on Stadium (1/2/3); dispatch at 40+ waiting, move a spare bus to the busiest route, space out bunched buses.',
   },
-  params: { allocation: { r1: 2, r2: 2, r3: 2 }, maxHoldS: 60, trainDefaultDwellS: 45 },
+  // 1/2/3 (sim tuning): the quiet Campus Loop's second bus starts on the Stadium route (a standing pre-stage). Terminal
+  // rules cannot tell r1 from r2 or the closing from a class change, and r2 carries the train transfers at Central, so
+  // an allocation is the robust way to pre-stage; move-to-busiest still rebalances (it is what wins class_change).
+  params: { allocation: { r1: 1, r2: 2, r3: 3 }, maxHoldS: 60, trainDefaultDwellS: 45 },
   rules: [
     {
       id: 'dispatch-big-queue', on: 'bus_at_terminal', priority: 30,
