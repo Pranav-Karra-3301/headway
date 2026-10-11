@@ -122,7 +122,8 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
   const trace = (sc: number, sr: number, side: Dir, startStreet: string): Edge => {
     const start: End = { kind: 'node', id: nodeId(sc, sr), c: sc, r: sr, side };
     const pts: Vec2[] = [sideMid(g, sc, sr, side)];
-    let street = '';
+    const votes = new Map<string, number>();
+    const vote = (name: string | null | undefined, w = 1) => { if (name) votes.set(name, (votes.get(name) ?? 0) + w); };
     let c = sc + STEP[side].dc, r = sr + STEP[side].dr, enter: Dir = OPPOSITE[side];
     let end: End | null = null;
     for (let guard = 0; guard < 4096 && !end; guard++) {
@@ -137,7 +138,7 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
         break;
       }
       if (pc?.kind === 'curve') {
-        if (!street) street = pc.street;
+        vote(pc.street, 2);
         const other = pc.arms.find((a) => !(a.c === c && a.r === r && a.side === enter))!;
         const to = sideMid(g, other.c, other.r, other.side);
         pts.push(...arc(cornerPoint(g, pc), last, to, 10));
@@ -145,7 +146,7 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
         continue;
       }
       if (pc?.kind === 'connector') {
-        if (!street) street = pc.street;
+        vote(pc.street);
         const from = last, to = pc.board!.p, segs = 10;
         for (let i = 1; i <= segs; i++) {
           const t = i / segs, s = t * t * (3 - 2 * t);
@@ -157,7 +158,7 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
         break;
       }
       // plain 2-link cell
-      if (!street) street = net.streetAt[at(c, r)] ?? '';
+      vote(net.streetAt[at(c, r)]);
       const exits = dirsOf(net.links[at(c, r)]!).filter((d) => d !== enter);
       const exit = exits[0]!;
       const to = sideMid(g, c, r, exit);
@@ -171,7 +172,9 @@ export function buildLanes(g: GridFrame, net: Network): { lanes: Lane[]; ports: 
     }
     if (!end) throw new Error('greater grid: runaway edge trace');
     if (end.kind === 'node') visited.add(vkey(end.c, end.r, end.side));
-    if (!street) street = startStreet;
+    // the street an edge belongs to: the name most of its cells carry (curves count double)
+    let street = startStreet, best = 0;
+    for (const [name, n] of votes) if (n > best) { street = name; best = n; }
     return { id: `e${edges.length}`, street, cls: clsOf(street), pts: simplify(pts), a: start, b: end };
   };
 

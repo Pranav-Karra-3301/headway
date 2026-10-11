@@ -13,7 +13,9 @@ import { KitMaterial } from '../../materials';
 import { Stage } from '../../post';
 import type { FrameContext } from '../../layers';
 import type { LightMode, PaletteId } from '../../types';
+import { preloadKenney } from '../../assets/kenney';
 import { createWorldLayer } from '../index';
+import { WATER_KENNEY_IDS } from './index';
 
 const q = new URLSearchParams(location.search);
 const num = (k: string, d: number) => { const v = Number(q.get(k)); return q.has(k) && Number.isFinite(v) ? v : d; };
@@ -50,6 +52,7 @@ function hideOthers(scene: THREE.Object3D): void {
   world?.children.forEach((c) => { if (c.name !== 'water') c.visible = false; });
 }
 
+if (q.get('kenney') !== '0') await preloadKenney(WATER_KENNEY_IDS);
 let frames = 0;
 const maxFrames = num('frames', Infinity);
 if (q.get('mode') === 'lite') {

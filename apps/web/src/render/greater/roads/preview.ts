@@ -2,6 +2,7 @@
 // look (Stage: lights, sky, post chain). Query flags:
 //   view=<u visible vertically>  tx, tz=<look-at>  palette=a|b|c  light=day|dusk  post=0|1
 //   town=1 (T2.2 static town on the board; 0 = plain board + road strips)   lanes=1 (lane graph)   blocks=1 (zones)
+//   land=0 (hide the preview-only stand-ins for E2's bay and E1's ridge spur)
 import * as THREE from 'three';
 import { TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
     }
   }
   if (!town) stage.scene.add(plainTown());
+  if (q.get('land') !== '0') stage.scene.add(landStandIns(grid));
   if (q.get('lanes') === '1') stage.scene.add(laneDebug(grid.lanes));
   if (q.get('blocks') === '1') stage.scene.add(blockDebug(grid.blocks));
 
@@ -84,6 +86,38 @@ function plainTown(): THREE.Group {
   };
   for (const e of TOWN.roads.edges) strip(e.path.points, false, 1.2, '#F4EBDD', 0.04);
   strip(TOWN.rail.loop.points, true, 0.8, '#C9B79C', 0.03);
+  return g;
+}
+
+/** Preview-only stand-ins: a flat bay (E2 owns the real water) and soft mounds on the ridge-spur cells (E1 terrain). */
+function landStandIns(grid: ReturnType<typeof greaterGrid>): THREE.Group {
+  const g = new THREE.Group();
+  const shape = new THREE.Shape(grid.water.map((p) => new THREE.Vector2(p.x, -p.z)));
+  const wgeo = new THREE.ShapeGeometry(shape);
+  wgeo.rotateX(-Math.PI / 2);
+  const water = new THREE.Mesh(wgeo, new THREE.MeshStandardMaterial({ color: '#7FC6C9', roughness: 0.35 }));
+  water.position.y = -0.3;
+  water.receiveShadow = true;
+  g.add(water);
+  const b = grid.bounds;
+  const sgeo = new THREE.PlaneGeometry(b.maxX - b.minX, b.maxZ - b.minZ);
+  sgeo.rotateX(-Math.PI / 2);
+  const sand = new THREE.Mesh(sgeo, new THREE.MeshStandardMaterial({ color: '#E6D6B4', roughness: 1 }));
+  sand.position.set((b.minX + b.maxX) / 2, -0.6, (b.minZ + b.maxZ) / 2);
+  g.add(sand);
+  const mound = new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const mat = new THREE.MeshStandardMaterial({ color: '#7DBB8A', roughness: 0.95, flatShading: true });
+  for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) {
+    if (grid.use[r]![c] !== 'hill') continue;
+    const p = { x: grid.origin.x + (c + 0.5) * grid.tile, z: grid.origin.z + (r + 0.5) * grid.tile };
+    const m = new THREE.Mesh(mound, mat);
+    const h = 1.6 + ((c * 7 + r * 13) % 5) * 0.35;
+    m.scale.set(3.1, h, 3.1);
+    m.position.set(p.x, -0.2, p.z);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    g.add(m);
+  }
   return g;
 }
 

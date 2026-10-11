@@ -171,7 +171,7 @@ function sweepRoad(acc: Acc, pts: readonly Vec2[], opts: { mark?: boolean } = {}
     const A = line(l0), B = line(l1);
     for (let i = 0; i + 1 < pts.length; i++) {
       // l0 is left of l1 (looking along the path): quad a(l0,i) → b(l1,i) → c(l1,i+1) → d(l0,i+1) faces up
-      acc.quad(role, V(A[i]!.x, y, A[i]!.z), V(A[i + 1]!.x, y, A[i + 1]!.z), V(B[i + 1]!.x, y, B[i + 1]!.z), V(B[i]!.x, y, B[i]!.z));
+      acc.quad(role, V(A[i]!.x, y, A[i]!.z), V(B[i]!.x, y, B[i]!.z), V(B[i + 1]!.x, y, B[i + 1]!.z), V(A[i + 1]!.x, y, A[i + 1]!.z));
     }
   };
   const wall = (lat: number, y0: number, y1: number, facingRight: boolean, role: RoadRole) => {
@@ -204,6 +204,15 @@ function disc(acc: Acc, center: Vec2, r0: number, r1: number, y: number, role: R
 function rectXZ(acc: Acc, x0: number, z0: number, x1: number, z1: number, y: number, role: RoadRole): void {
   if (x1 - x0 < 1e-6 || z1 - z0 < 1e-6) return;
   acc.quad(role, V(x0, y, z0), V(x0, y, z1), V(x1, y, z1), V(x1, y, z0));
+}
+
+/** Axis-aligned box walls (+ optional bottom-less top); `skip` sides are not drawn (they butt onto a neighbour). */
+function box(acc: Acc, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, role: RoadRole, skip: Array<'n' | 'e' | 's' | 'w'> = []): void {
+  rectXZ(acc, x0, z0, x1, z1, y1, role);
+  if (!skip.includes('s')) acc.quad(role, V(x0, y0, z1), V(x1, y0, z1), V(x1, y1, z1), V(x0, y1, z1));
+  if (!skip.includes('n')) acc.quad(role, V(x1, y0, z0), V(x0, y0, z0), V(x0, y1, z0), V(x1, y1, z0));
+  if (!skip.includes('e')) acc.quad(role, V(x1, y0, z1), V(x1, y0, z0), V(x1, y1, z0), V(x1, y1, z1));
+  if (!skip.includes('w')) acc.quad(role, V(x0, y0, z0), V(x0, y0, z1), V(x0, y1, z1), V(x0, y1, z0));
 }
 
 // ---------------------------------------------------------------- the layer
@@ -272,16 +281,40 @@ export function createGreaterRoadsLayer(map: TownMap, opts: GreaterRoadsOptions 
     }
   }
   dome.dispose(); shrub.dispose();
+
+  // causeways: a stone embankment under every road tile over the bay (top hidden under the tile)
+  for (const t of grid.roads) {
+    if (!t.bridge) continue;
+    const ns = t.open.includes('n') || t.open.includes('s');
+    const hw = TILE / 2 + 0.35, hl = TILE / 2, c = t.center, y0 = -1.1, y1 = -0.004;
+    const x0 = c.x - (ns ? hw : hl), x1 = c.x + (ns ? hw : hl), z0 = c.z - (ns ? hl : hw), z1 = c.z + (ns ? hl : hw);
+    box(isl, x0, y0, z0, x1, y1, z1, 'stone', ns ? ['e', 'w'] : ['n', 's']);
+  }
   const islandsGeo = isl.build(palette);
 
-  // ground: the ring around the board (a hole under the board, tucked 0.6 u beneath its edge)
+  // ground: the land around the board (the grid cut by the shoreline; a hole under the board, tucked 0.6 u beneath
+  // its edge so no seam shows)
   let groundGeo: THREE.BufferGeometry | null = null;
   if (opts.ground !== false) {
     const gr = new Acc(), b = grid.bounds, B = map.bounds, t = 0.6, y = -0.012;
-    rectXZ(gr, b.minX, b.minZ, b.maxX, B.minZ + t, y, 'ground');
-    rectXZ(gr, b.minX, B.maxZ - t, b.maxX, b.maxZ, y, 'ground');
-    rectXZ(gr, b.minX, B.minZ + t, B.minX + t, B.maxZ - t, y, 'ground');
-    rectXZ(gr, B.maxX - t, B.minZ + t, b.maxX, B.maxZ - t, y, 'ground');
+    const contour = [new THREE.Vector2(b.minX, b.minZ), new THREE.Vector2(b.maxX, b.minZ), ...grid.shore.map((p) => new THREE.Vector2(p.x, p.z))];
+    const hole = [
+      new THREE.Vector2(B.minX + t, B.minZ + t), new THREE.Vector2(B.minX + t, B.maxZ - t),
+      new THREE.Vector2(B.maxX - t, B.maxZ - t), new THREE.Vector2(B.maxX - t, B.minZ + t),
+    ];
+    if (THREE.ShapeUtils.isClockWise(contour)) contour.reverse();
+    if (!THREE.ShapeUtils.isClockWise(hole)) hole.reverse();
+    const tris = THREE.ShapeUtils.triangulateShape(contour, [hole]);
+    const pts = [...contour, ...hole];
+    const k = gr.bucket('ground');
+    const up = { x: 0, y: 1, z: 0 };
+    for (const p of pts) gr.vert('ground', { x: p.x, y, z: p.y }, up);
+    for (const [a, c2, d] of tris) {
+      const A = pts[a]!, C = pts[c2]!, D = pts[d]!;
+      // keep +y facing: (C − A) × (D − A) in x/z (z = vector2.y) must point up
+      const cy = (D.x - A.x) * (C.y - A.y) - (C.x - A.x) * (D.y - A.y);
+      if (cy >= 0) k.idx.push(a, c2, d); else k.idx.push(a, d, c2);
+    }
     groundGeo = gr.build(palette);
   }
 

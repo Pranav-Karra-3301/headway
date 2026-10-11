@@ -62,6 +62,37 @@ export const CATALOG: CatalogEntry[] = [
   e('st.flag', 'street', 0.3, 0.3, 2.8, 'flagpole with flag (flag sways)'),
   e('st.kiosk', 'street', 1.2, 1.2, 1.6, 'news/coffee kiosk'),
   e('st.fountain', 'street', 2.5, 2.5, 1.2, 'plaza fountain'),
+  // Kenney vehicles + boats (K2, families/kenney-vehicles.ts). Front/bow faces +z (length along z).
+  // kn.car.*: wheels on y = 0, palette `car` paint per placement (params.paint, -1 = Kenney colour).
+  // kn.boat.*: origin = waterline, so place them at the water level. *.random picks a model per placement (params.model).
+  e('kn.car.sedan', 'street', 1.0, 1.7, 0.95, 'Kenney sedan, palette paint'),
+  e('kn.car.hatchback', 'street', 0.9, 1.9, 0.8, 'Kenney hatchback, palette paint'),
+  e('kn.car.sports', 'street', 0.9, 1.7, 0.8, 'Kenney sports coupe, palette paint'),
+  e('kn.car.suv', 'street', 1.0, 1.7, 0.9, 'Kenney SUV, palette paint'),
+  e('kn.car.suvLuxury', 'street', 1.0, 1.9, 0.95, 'Kenney large SUV, palette paint'),
+  e('kn.car.van', 'street', 1.0, 1.8, 0.95, 'Kenney minivan, palette paint'),
+  e('kn.car.pickup', 'street', 1.0, 1.95, 0.95, 'Kenney pickup truck, palette paint'),
+  e('kn.car.flatbed', 'street', 1.0, 1.8, 0.95, 'Kenney flatbed truck, palette paint'),
+  e('kn.car.taxi', 'street', 1.0, 1.8, 1.05, 'Kenney taxi (keeps yellow)'),
+  e('kn.car.delivery', 'street', 1.0, 2.15, 1.65, 'Kenney box delivery truck, palette paint'),
+  e('kn.car.police', 'street', 1.0, 1.9, 0.9, 'Kenney police car'),
+  e('kn.car.ambulance', 'street', 1.0, 2.15, 1.25, 'Kenney ambulance'),
+  e('kn.car.firetruck', 'street', 1.0, 2.15, 1.2, 'Kenney fire truck'),
+  e('kn.car.garbage', 'street', 1.05, 2.25, 1.15, 'Kenney garbage truck'),
+  e('kn.car.tractor', 'street', 0.9, 1.3, 1.25, 'Kenney farm tractor (outskirts fields)'),
+  e('kn.car.random', 'street', 1.0, 1.95, 1.05, 'random everyday car per placement (parking lots, driveways)'),
+  e('kn.boat.sail', 'street', 1.2, 2.5, 2.55, 'sailboat, tall mast (moored: place at water level)'),
+  e('kn.boat.sailLarge', 'street', 1.2, 2.65, 2.1, 'longer sailboat with cabin'),
+  e('kn.boat.speed', 'street', 1.2, 2.2, 1.0, 'speedboat with windscreen'),
+  e('kn.boat.runabout', 'street', 1.2, 2.1, 0.85, 'small open runabout'),
+  e('kn.boat.fishing', 'street', 1.2, 2.55, 1.7, 'small fishing boat with wheelhouse'),
+  e('kn.boat.row', 'street', 1.8, 1.55, 0.55, 'rowing boat with oars'),
+  e('kn.boat.rowLarge', 'street', 1.8, 1.9, 0.55, 'larger rowing boat with oars'),
+  e('kn.boat.tug', 'street', 1.2, 1.9, 1.5, 'harbour tug'),
+  e('kn.boat.house', 'street', 1.75, 3.05, 1.45, 'house boat'),
+  e('kn.boat.buoy', 'street', 0.6, 0.6, 1.2, 'channel buoy'),
+  e('kn.boat.cargoShip', 'street', 2.55, 6.9, 2.2, 'coastal cargo ship (far out in the bay)'),
+  e('kn.boat.random', 'street', 1.8, 2.65, 2.55, 'random marina boat per placement (moorings)'),
 ];
 
 export const CATALOG_BY_KIND = new Map(CATALOG.map((c) => [c.kind, c] as const));

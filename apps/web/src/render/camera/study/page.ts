@@ -1,6 +1,6 @@
 // Owner: C1 (camera study). /camera-study.html — the measured comparison of default-camera candidates.
 //   /camera-study.html                     3×2 screenshot grid + table (fit computed for a 1600×1000 viewport)
-//   /camera-study.html?view=e-iso-a45      one view, full window (or ?elev=35.26&az=45), HUD ghosts + hidden samples
+//   /camera-study.html?view=eiso-a45       one view, full window (or ?elev=35.26&az=45), HUD ghosts + hidden samples
 // Params: light=day|dusk · w,h (viewport the fit is computed for) · inspector=1 · hud=watch|play · t=<stub sim s>
 //         overlay=0 (no HUD ghosts / markers) · world=0 (town only)
 // Exposes window.__cameraStudy = { table, places, results } and window.__studyReady = true when drawn.
@@ -16,11 +16,13 @@ import type { LightMode } from '../../types';
 import { worldLayout } from '../../world/layout';
 import { fitView, hudBoxes, screenOf, type Fit, type HudOptions } from './fit';
 import { buildHeightField, heightFieldHit } from './heightfield';
-import { measureView, rankViews, visibilityOf, type ViewResult } from './measure';
+import { culprits, measureView, rankViews, visibilityOf, type ViewResult } from './measure';
+import type { Box } from './occlusion';
 import { placeTable, studyTable } from './report';
 import { studySamples } from './samples';
 import { buildStudyScene } from './scene';
 import { composeStudyTown, studyBoxes } from './town';
+import { sweepTable, sweepViews, type SweepCell } from './sweep';
 import { CURRENT_RIG_VIEW, ISO_ELEV, STUDY_VIEWS, toImage, viewBasis, viewId, viewLabel, type V3, type ViewSpec } from './views';
 
 const q = new URLSearchParams(location.search);
@@ -183,15 +185,16 @@ function tableHtml(rs: ViewResult[]): string {
     `<th>px / u</th><th>person<br>px</th><th>network<br>% screen</th><th>queue gap<br>px</th><th>marker<br>clashes</th><th>px / u<br>inspector</th><th>px / u<br>1280×720</th><th>visible<br>(weighted)</th><th>score</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+let sweep = '';
 const GRID: Array<[string, string]> = [
   [viewId(30, 45), 'elevation sweep · az 45°'], [viewId(ISO_ELEV, 45), ''], [viewId(45, 45), ''],
   [viewId(ISO_ELEV, 35), 'azimuth sweep at 35.26°'], [viewId(ISO_ELEV, 55), ''], [CURRENT_RIG_VIEW.id, 'reference: today’s rig'],
 ];
 
-async function frame(): Promise<void> { await new Promise((res) => requestAnimationFrame(() => res(null))); }
 
 async function runGrid(): Promise<void> {
   document.body.classList.add('grid');
+  await document.fonts.load('19px GumballRounded').catch(() => undefined); // canvas captions need the face loaded
   const root = document.getElementById('app')!;
   const cols = 3, tileW = Math.floor((Math.min(innerWidth, 1600) - 48 - 2 * 12) / cols), tileH = Math.round((tileW * VH) / VW);
   root.innerHTML = `<header><h1>Camera study</h1><p>Default Overview framing (bible §1.4 HUD-safe rect, 4 % pad) of the real town on a ${VW}×${VH} screen: ${town.sources.districtItems} district items + ${town.sources.baseItems} base-scenery items as catalog-sized occluder boxes, the world layer as a height field, stub-sim queues at t = ${Math.round(snap.t)} s; x-ray off. <span class="key"><i class="dot"></i> hidden queue slot / stop / platform edge</span> <span class="key"><i class="dot small"></i> hidden route / rail</span> <span class="key"><i class="dash"></i> HUD-safe rect</span></p></header>` +
@@ -208,8 +211,7 @@ async function runGrid(): Promise<void> {
     const r = byId.get(id)!;
     const f = fitView(r.view, TOWN, { w: VW, h: VH }, hud);
     const x = (i % cols) * (tileW + gap), y = Math.floor(i / cols) * (tileH + capH + gap);
-    setMsg(`rendering ${r.view.label}…`);
-    await frame();
+    // no awaits between tiles: headless --virtual-time-budget only stops between tasks, so the whole grid renders in one
     const src = draw(r.view, f, tileW * ss, tileH * ss, 1);
     ctx.save(); roundRect(ctx, x, y, tileW, tileH, 14); ctx.clip();
     ctx.drawImage(src, x, y, tileW, tileH);
@@ -232,23 +234,62 @@ async function runGrid(): Promise<void> {
   }
   document.getElementById('table')!.innerHTML = tableHtml(results);
   const iso45 = byId.get(viewId(ISO_ELEV, 45))!, e30 = byId.get(viewId(30, 45))!, e45 = byId.get(viewId(45, 45))!, rig = byId.get(CURRENT_RIG_VIEW.id)!;
-  document.getElementById('notes')!.innerHTML = notesHtml(pick, { iso45, e30, e45, rig });
+  const grid = sweepViews(input);
+  sweep = sweepTable(grid);
+  // what-if: the pick with the placements that hide its queues/stops/platforms moved away
+  const removed = culprits(pick);
+  const fixedRaw = measureView({ ...pick.view, id: `${pick.view.id}-fixed` }, { ...input, boxes: boxes.filter((b) => !removed.includes(b)) });
+  const fixed = rankViews([...results, fixedRaw]).find((r) => r.view.id === fixedRaw.view.id)!;
+  // …and with the 10 placements that hide the most route samples moved too
+  const routeTop = topRouteOccluders(pick, 10);
+  const routeFixed = measureView({ ...pick.view, id: `${pick.view.id}-routes` }, { ...input, boxes: boxes.filter((b) => !removed.includes(b) && !routeTop.includes(b)) });
+  document.getElementById('notes')!.innerHTML = notesHtml(pick, { iso45, e30, e45, rig }, { result: fixed, removed, routeTop, routeFixed }) + sweepHtml(grid, removed.length);
   setMsg('');
 }
 
-function notesHtml(top: ViewResult, v: { iso45: ViewResult; e30: ViewResult; e45: ViewResult; rig: ViewResult }): string {
+function topRouteOccluders(r: ViewResult, n: number): Box[] {
+  const occ = new Map<Box, number>();
+  for (const h of r.hiddenPoints) if (h.cls === 'route' && h.box) occ.set(h.box, (occ.get(h.box) ?? 0) + 1);
+  return [...occ.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([b]) => b);
+}
+const fmtBox = (b: Box) => `<code>${b.kind}</code> (${b.cx.toFixed(0)}, ${b.cz.toFixed(0)})`;
+
+function notesHtml(top: ViewResult, v: { iso45: ViewResult; e30: ViewResult; e45: ViewResult; rig: ViewResult }, fixed: { result: ViewResult; removed: Box[]; routeTop: Box[]; routeFixed: ViewResult }): string {
   const worst = [...top.perPlace].sort((a, b) => b.queueHidden + b.spotHidden - (a.queueHidden + a.spotHidden)).filter((p) => p.queueHidden + p.spotHidden > 0).slice(0, 4);
   const places = worst.map((p) => `<li><b>${p.name}</b> — ${p.queueHidden}/${p.queueN} queue slots, ${p.spotHidden}/${p.spotN} ${p.kind === 'stop' ? 'stop' : 'edge'} samples, by ${p.by.map((b) => `<code>${b}</code>`).join(', ')}</li>`).join('');
-  const occ = new Map<string, number>();
-  for (const h of top.hiddenPoints) if (h.cls === 'route') occ.set(h.by, (occ.get(h.by) ?? 0) + 1);
-  const routeTop = [...occ.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `<code>${k}</code> ${n}`).join(', ');
+  // route occluders per object (with plan position), so district owners know exactly what to move
+  const occ = new Map<Box, number>();
+  for (const h of top.hiddenPoints) if (h.cls === 'route' && h.box) occ.set(h.box, (occ.get(h.box) ?? 0) + 1);
+  const routeTop = [...occ.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([b, n]) => `${fmtBox(b)} ${n}`).join(', ');
   const px = (r: ViewResult) => `${r.fit.scale.toFixed(1)} px/u, people ${r.screen.personPx.toFixed(0)} px`;
+  const f = fixed.result;
   return `<div class="card"><h2>Why 35.26° · az 45°</h2><ul>` +
     `<li>A building of height h hides ground <b>1.22 h</b> deep at 30°, <b>1.0 h</b> at 35.26°, <b>0.71 h</b> at 45° (per axis). Measured: stop queues ${pct(v.e30.hidden.queue.frac)} → ${pct(v.iso45.hidden.queue.frac)} → ${pct(v.e45.hidden.queue.frac)}, routes ${pct(v.e30.hidden.route.frac)} → ${pct(v.iso45.hidden.route.frac)} → ${pct(v.e45.hidden.route.frac)}.</li>` +
-    `<li>Size at Overview: 30° ${px(v.e30)} · 35.26° ${px(v.iso45)} · 45° ${px(v.e45)} — 45° drops people under the bible’s 10 px floor; 30° buys ~10 % size for double the hidden queues.</li>` +
-    `<li>az 45° keeps E–W and N–S streets equally legible (35°/55° skew one family) and is what the districts were composed for; today’s 32° rig hides ${pct(v.rig.hidden.queue.frac)} of stop queues vs ${pct(v.iso45.hidden.queue.frac)}.</li>` +
+    `<li>Size at Overview: 30° ${px(v.e30)} · 35.26° ${px(v.iso45)} · 45° ${px(v.e45)}. 45° drops people under the bible’s 10 px floor; 30° buys ${pct(v.e30.fit.scale / v.iso45.fit.scale - 1)} more size for ${v.iso45.hidden.queue.hidden ? `${(v.e30.hidden.queue.hidden / v.iso45.hidden.queue.hidden).toFixed(1)}×` : 'many more'} the hidden queue slots (${v.e30.hidden.queue.hidden} vs ${v.iso45.hidden.queue.hidden}).</li>` +
+    `<li>The raw score’s leaders win on pixels (30°) or by slipping past ${fixed.removed.length} placements (az 35–40°). Move those placements and 35.26° · az 45° measures <b>${pct(f.hidden.queue.frac)} queues · ${pct(f.hidden.stop.frac)} stops · ${pct(f.hidden.route.frac)} routes</b> (score ${f.score.toFixed(1)}), with E–W and N–S streets equally legible, the 30°/30° iso ground lines, and the key light tuned for it. Today’s 32° rig hides ${pct(v.rig.hidden.queue.frac)} of stop queues.</li>` +
     `</ul></div><div class="card"><h2>Still hidden at 35.26° · az 45° (fix in layout, then x-ray)</h2><ul>${places || '<li>no stop, queue or platform hidden</li>'}` +
-    `<li>Routes are hidden mostly by ${routeTop || '—'} — tall camera-side buildings (bible §2.2).</li></ul></div>`;
+    `<li>Move ${fixed.removed.map(fmtBox).join(', ') || 'nothing'} off the camera side (S/E) of those stops.</li>` +
+    `<li>Bus routes are ${pct(v.iso45.hidden.route.frac)} hidden vs the bible’s ≤ 8 % target, by ${routeTop || '—'}: tall buildings on the camera side of streets (bible §2.2 amphitheatre rule). Even 45° leaves ${pct(v.e45.hidden.route.frac)}. Moving the ${fixed.routeTop.length} worst route occluders measures <b>${pct(fixed.routeFixed.hidden.route.frac)}</b> at 35.26°; x-ray on moving buses covers the rest.</li></ul></div>`;
+}
+
+/** Elevation × azimuth sensitivity: hidden stop queues / routes per cell, tinted by weighted visibility. */
+function sweepHtml(grid: SweepCell[][], nCulprits: number): string {
+  const p = (x: number) => Math.round(100 * x);
+  const azs = grid[0]!.map((c) => c.az);
+  const head = `<tr><th style="text-align:left">elev \\ az</th>${azs.map((a) => `<th style="text-align:center">${a}°</th>`).join('')}</tr>`;
+  const rows = grid.map((row) => {
+    const e = row[0]!.elev, iso = Math.abs(e - ISO_ELEV) < 1e-6;
+    return `<tr><td class="v">${iso ? '35.26' : e}°</td>` + row.map((c) => {
+      const bad = Math.min(1, 1.6 * c.queue + 0.6 * c.stop + 0.5 * c.route);
+      const bg = `rgba(229,72,77,${(0.06 + 0.4 * bad).toFixed(2)})`;
+      const ring = iso && c.az === 45 ? ';box-shadow: 0 0 0 2.5px #F2C14E' : '';
+      return `<td style="text-align:center"><span style="background:${bg};border-radius:8px;padding:2px 8px;display:inline-block;min-width:110px${ring}">` +
+        `<b>${p(c.queue)}</b> / ${p(c.stop)} / ${p(c.route)} <small style="opacity:.6">· ${c.scale.toFixed(1)}</small></span></td>`;
+    }).join('') + '</tr>';
+  }).join('');
+  return `<div class="card" style="grid-column: 1 / -1"><h2>Sensitivity sweep</h2>` +
+    `<p style="margin:0 0 6px">Hidden % of <b>stop queues</b> / stops / bus routes · px/u at the default fit; redder = less readable. The queue and stop hits come from ${nCulprits} placements, so they flip within ±5° of azimuth: layout owns them, not the angle. Routes only drop once the camera climbs to 45°, where people shrink below 10 px.</p>` +
+    `<table style="margin-top:6px"><thead>${head}</thead><tbody>${rows}</tbody></table></div>`;
 }
 
 async function runSingle(view: ViewSpec): Promise<void> {
@@ -262,22 +303,22 @@ async function runSingle(view: ViewSpec): Promise<void> {
   canvas.width = innerWidth * ss; canvas.height = innerHeight * ss;
   canvas.style.width = `${innerWidth}px`; canvas.style.height = `${innerHeight}px`;
   const ctx = canvas.getContext('2d')!;
-  await frame();
   const k = innerWidth / VW;
   ctx.drawImage(draw(view, f, innerWidth * ss, Math.round((innerWidth * VH * ss) / VW), 1), 0, 0, canvas.width, Math.round((innerWidth * VH * ss) / VW));
   if (overlay) drawOverlay(ctx, r, f, 0, 0, k * ss);
   const card = document.getElementById('card')!;
   card.innerHTML = `<h2>${r.view.label}</h2><p>${caption(r)}</p><p>score ${r.score.toFixed(1)} · visible ${pct(visibilityOf(r))} · ${study.stats.triangles.toLocaleString()} static tris</p>`;
   card.style.display = overlay ? '' : 'none';
+  setMsg('');
 }
 
 const done = single ? runSingle(single) : runGrid();
 done.then(() => {
   const strip = (r: ViewResult) => ({ ...r, hiddenPoints: r.hiddenPoints.length });
   (window as unknown as { __cameraStudy: unknown }).__cameraStudy = {
-    table: studyTable(results), places: placeTable(best), results: results.map(strip), town: town.sources, snapshotT: snap.t, stats: study.stats,
+    table: studyTable(results), places: placeTable(pick), sweep, results: results.map(strip), town: town.sources, snapshotT: snap.t, stats: study.stats,
   };
-  const pre = document.createElement('pre'); pre.id = 'dump'; pre.textContent = studyTable(results) + '\n\n' + placeTable(best); pre.style.display = 'none';
+  const pre = document.createElement('pre'); pre.id = 'dump'; pre.textContent = studyTable(results) + '\n\n' + placeTable(pick) + '\n\n' + sweep; pre.style.display = 'none';
   document.body.append(pre);
   (window as unknown as { __studyReady: boolean }).__studyReady = true;
 }).catch((err: unknown) => { setMsg(`camera study failed: ${String(err)}`); console.error(err); });

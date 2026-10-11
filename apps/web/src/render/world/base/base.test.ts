@@ -7,7 +7,7 @@ import { TOWN } from '@headway/sim';
 import type { SimSnapshot } from '@headway/sim';
 import type { FrameContext } from '../../layers';
 import { worldLayout } from '../layout';
-import { buildBaseGeometry } from './geometry';
+import { buildBaseGeometry, KIND } from './geometry';
 import { createBaseLayer } from './index';
 import { adaptProfile, BASE, defaultProfile, floorAt, groundAt, isWater, modeLevel, samplePoints, sampleTops } from './profile';
 
@@ -172,6 +172,45 @@ describe('buildBaseGeometry', () => {
     };
     expect(top((p) => Math.abs(p.z - E.maxZ) < 1e-4 && Math.abs(p.x) < 3)).toBeCloseTo(BASE.waterLevel, 4);
     expect(top((p) => Math.abs(p.z - E.minZ) < 1e-4 && Math.abs(p.x) < 3)).toBeCloseTo(BASE.landY, 4);
+  });
+
+  it('reads as a chunky slice: a 5.5–6 u cut whose lake sides are mostly banded water over a sand + soil foot', () => {
+    expect(-BASE.bottom).toBeGreaterThanOrEqual(5.5);
+    expect(-BASE.bottom).toBeLessThanOrEqual(6);
+    const kind = g.getAttribute('aKind');
+    const pos = g.getAttribute('position');
+    let waterLo = Infinity, strataHi = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getZ(i) - E.maxZ) > 1e-4 || Math.abs(pos.getX(i)) > 3) continue;
+      if (kind.getX(i) === KIND.water) waterLo = Math.min(waterLo, pos.getY(i));
+      if (kind.getX(i) === KIND.strata) strataHi = Math.max(strataHi, pos.getY(i));
+    }
+    const column = BASE.waterLevel - waterLo, foot = waterLo - BASE.bottom;
+    expect(column).toBeGreaterThanOrEqual(2.6); // three readable water bands
+    expect(foot).toBeGreaterThanOrEqual(1.5); // sand lip + soil strata under the lake
+    expect(column).toBeGreaterThan(foot);
+    expect(strataHi).toBeCloseTo(waterLo, 4); // strata meet the water column exactly
+  });
+
+  it('deepens the lake cut gradually away from the shore (no cliff in the water column)', () => {
+    // a profile whose south edge turns from dry headland to lake halfway along
+    const sides = defaultProfile(layout).map((s) => s.side !== 'south' ? s : {
+      ...s,
+      samples: s.samples.map((p, i) => (i < s.samples.length / 2 ? p : { ...p, ground: 2, water: null })),
+    });
+    const geo = buildBaseGeometry(layout, sides);
+    const kind = geo.getAttribute('aKind'), pos = geo.getAttribute('position');
+    const lo = new Map<number, number>();
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getZ(i) - E.maxZ) > 1e-4 || kind.getX(i) !== KIND.water) continue;
+      const x = Math.round(pos.getX(i));
+      lo.set(x, Math.min(lo.get(x) ?? Infinity, pos.getY(i)));
+    }
+    const xs = [...lo.keys()].filter((x) => lo.get(x)! < BASE.waterLevel - 0.05).sort((a, b) => a - b);
+    expect(xs.length).toBeGreaterThan(20);
+    for (let i = 1; i < xs.length; i++) expect(Math.abs(lo.get(xs[i]!)! - lo.get(xs[i - 1]!)!)).toBeLessThan(0.8);
+    expect(Math.min(...xs.map((x) => lo.get(x)!))).toBeLessThan(BASE.waterLevel - 2.6); // still reaches full depth
+    geo.dispose();
   });
 });
 

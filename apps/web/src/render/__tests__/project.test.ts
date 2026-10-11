@@ -5,6 +5,7 @@ import { approach, lerpDist, queueSlot, simTimeAt, stopFrame, walkAt } from '../
 import { composeScenery, inRegion } from '../town/compose';
 import { SCENERY } from '../scenery';
 import type { DistrictScenery } from '../districts/types';
+import { createStaticTown } from '../town/index';
 
 describe('lerpDist', () => {
   it('interpolates forward along a path', () => {
@@ -142,5 +143,22 @@ describe('composeScenery', () => {
     const sq = { polygon: [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: 10 }, { x: 0, z: 10 }] };
     expect(inRegion(sq, { x: 5, z: 5 })).toBe(true);
     expect(inRegion(sq, { x: 15, z: 5 })).toBe(false);
+  });
+});
+
+describe('createStaticTown (geometry only, no WebGL)', () => {
+  it('composes the whole static town within the draw-call budget with a pickable mesh per stop', () => {
+    const town = createStaticTown(TOWN, { palette: 'a', detail: 'toy' });
+    let draws = 0;
+    town.object.traverse((o) => { if ((o as { isMesh?: boolean }).isMesh) draws++; });
+    expect(draws).toBeLessThan(80);
+    expect(town.stops.map((s) => s.id).sort()).toEqual(TOWN.stops.map((s) => s.id).sort());
+    for (const s of town.stops) expect(s.mesh.userData.pick).toEqual({ kind: 'stop', id: s.id });
+    expect(town.stats.items).toBeGreaterThan(100);
+    town.setPalette('c');
+    town.setHighlight('r1');
+    town.update(1);
+    expect(town.stops.find((s) => !s.routes.includes('r1'))!.material.fade.value).toBeGreaterThan(0.3);
+    town.dispose();
   });
 });

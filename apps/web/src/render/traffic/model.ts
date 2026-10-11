@@ -113,6 +113,8 @@ export interface TrafficModel {
   /** Target number of cars at a sim time (base + stadium surge). */
   target(simT: number): number;
   step(dtS: number, env: TrafficEnv): void;
+  /** Swap the car models (e.g. kit → Kenney once loaded): existing cars keep their place and take the new lengths. */
+  setVariants(specs: CarVariantSpec[]): void;
 }
 
 /** Project bus poses onto lanes (by heading) and mark junctions with a bus in the box. */
@@ -164,7 +166,7 @@ function laneS(l: Lane, p: Vec2): number {
 
 export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions): TrafficModel {
   const rand = mulberry32((opts.seed ^ 0x7ea1f1c) >>> 0);
-  const variants = opts.variants?.length ? opts.variants : KIT_VARIANTS;
+  let variants = opts.variants?.length ? opts.variants : KIT_VARIANTS;
   const colors = Math.max(1, opts.colors ?? 6);
   const base = Math.min(MAX_CARS, Math.max(MIN_CARS, Math.round(opts.carCount ?? DEFAULT_CARS)));
   const cars: TrafficCar[] = [];
@@ -194,6 +196,14 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
     closingT: opts.closingT ?? null,
     target,
     step,
+    setVariants(specs) {
+      if (!specs.length) return;
+      variants = specs;
+      for (const c of cars) {
+        c.variant %= variants.length;
+        c.halfLen = variants[c.variant]!.length / 2;
+      }
+    },
   };
 
   function inSurge(t: number): boolean {

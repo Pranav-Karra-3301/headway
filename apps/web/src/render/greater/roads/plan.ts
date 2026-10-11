@@ -1,13 +1,15 @@
-// Owner: G0. The greater-town street plan: authored relative to the grid frame and the town's board exits, then
-// rasterised into Kenney road tiles (pure data; see ../grid.ts for the overview).
+// Owner: G0. The greater-town street plan: authored relative to the grid frame, the town's board exits, the rail and
+// the bay (./land), then rasterised into Kenney road tiles (pure data; see ../grid.ts for the overview and the map).
 //
-// Plan (TOWN: board cols 7–24 × rows 7–19, exits N x=−2, W z=0, S x=−2, E z=14.6):
-//   Ring Road        rows 5 / 21, cols 5 / 27 (east one cell further out: the east exit needs an S-bend connector)
-//   exit roundabouts on the ring where each exit road leaves the board; the north one's north arm feeds G1's highway
-//   Foothill Rd      col 1 (west), curving into the ring's north side and into the parkway in the south-west
-//   Lakeshore Pkwy   row 24 (south) + col 30 (east), joining the ring's north side; waterfront strip beyond it
-//   radials          Main St west (via Foothill Circle into the mountains), Atherton St south, South Rd east
-//   locals           Hillside Ave, Quarry Rd (west), Mill St, Harbor St (south), Bayview Ave (east), Pier Rd
+// TOWN (board cols 7–24 × rows 7–19; exits N x=−2, W z=0, S x=−2, E z=14.6; rail beach/bridge S, ridge tunnel W):
+//   Ring Rd          row 5 (north, under G1's highway band) → NE curve → col 27 down to Lakeside Circle (east exit)
+//   Foothill Rd      col 1 (west, beyond the ridge spur over the rail tunnel) via Foothill Circle (Main St's roundabout,
+//                    its west arm runs off the grid into the mountains) down to the SW curve
+//   Lakeshore Pkwy   row 23 along the south-west shore to South Gate Circle (Atherton St, which level-crosses the rail
+//                    on the beach first)
+//   causeways        Atherton St south and South Rd east over the bay, off the grid (bridges: cars enter/leave there)
+//   locals           Hillside Ave, Quarry Rd, Stadium Way (+ its bend down to the parkway), Mill St, Harbor St,
+//                    Marina Rd, Bayview Ave
 import { STREET_NAMES } from '@headway/sim';
 import type { TownMap, Vec2 } from '@headway/sim';
 import type { KenneyId } from '../../assets/kenney/index';
@@ -16,6 +18,7 @@ import {
   DIR_VEC, DIRS, HIGHWAY_ROWS, KERB, OPPOSITE, STEP, cellCenter, inGrid, inRect, sideMid,
   type CellRect, type Dir, type GridFrame,
 } from './cells';
+import { buildLand, landMasks, type Land } from './land';
 
 export type Corner = 'sw' | 'se' | 'ne' | 'nw';
 export interface Arm { c: number; r: number; side: Dir }
@@ -54,6 +57,9 @@ export interface Network {
   /** Per cell: street name. */
   streetAt: Array<string | null>;
   streetClass: Map<string, RoadClass>;
+  land: Land;
+  /** Per cell: 1 = causeway road over the bay. */
+  bridge: Uint8Array;
 }
 
 export const BIT: Readonly<Record<Dir, number>> = { n: 1, e: 2, s: 4, w: 8 };
@@ -111,13 +117,16 @@ export function boardExits(map: TownMap): Exit[] {
   return out;
 }
 
-const RB_NAMES: Record<Dir, string> = { n: 'North Gate Circle', w: 'Main Street Circle', s: 'South Gate Circle', e: 'Lakeside Circle' };
+const RB_NAMES: Record<Dir, string> = { n: 'North Gate Circle', w: 'Foothill Circle', s: 'South Gate Circle', e: 'Lakeside Circle' };
 
 export function planNetwork(map: TownMap, g: GridFrame): Network {
   const { cols, rows, board: B } = g;
   const N = cols * rows;
   const at = (c: number, r: number) => r * cols + c;
   const c0 = B.c, c1 = B.c + B.w - 1, r0 = B.r, r1 = B.r + B.h - 1;
+  const land = buildLand(map, g);
+  const masks = landMasks(map, g, land);
+  const inNet = (c: number, r: number) => inGrid(g, c, r) && !inRect(B, c, r) && r >= HIGHWAY_ROWS;
 
   // ---- exits → exit roundabouts (+ connector when the exit road is off the cell centre)
   const exits = boardExits(map);
@@ -127,10 +136,10 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     const ctr = cellCenter(g, colOf(e.p.x), rowOf(e.p.z));
     return e.side === 'n' || e.side === 's' ? e.p.x - ctr.x : e.p.z - ctr.z;
   };
-  const push: Record<Dir, number> = { n: 0, e: 0, s: 0, w: 0 };
-  for (const e of exits) if (Math.abs(offCentre(e)) > 0.01 && e.side !== 'n') push[e.side] = 1;
-  const ringN = r0 - 2, ringW = c0 - 2, ringS = r1 + 2 + push.s, ringE = c1 + 2 + push.e;
-  if (push.w) throw new Error('greater grid: a misaligned west exit is not supported');
+  const ringN = r0 - 2;             // Ring Rd (north), between G1's highway band and the board
+  const fw = 1;                     // Foothill Rd column (west of the ridge spur)
+  const parkS = r1 + 4;             // Lakeshore Pkwy row (south-west), South Gate Circle on it
+  const ringE = c1 + 3;             // Ring Rd (east) column, Lakeside Circle on it
 
   const pieces: Piece[] = [];
   const rbAt: Partial<Record<Dir, { c: number; r: number }>> = {};
@@ -140,28 +149,28 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
   const addRoundabout = (id: string, name: string, c: number, r: number, street: string) => {
     pieces.push({ id, kind: 'roundabout', name, street, cells: { c: c - 1, r: r - 1, w: 3, h: 3 }, arms: rbArms(c, r) });
   };
+  const exitStreet: Partial<Record<Dir, string>> = {};
   for (const e of exits) {
+    exitStreet[e.side] = e.street;
     const misaligned = Math.abs(offCentre(e)) > 0.01;
     let c: number, r: number;
     if (e.side === 'n') { c = colOf(e.p.x); r = ringN; }
-    else if (e.side === 's') { c = colOf(e.p.x); r = ringS; }
-    else if (e.side === 'w') { c = ringW; r = rowOf(e.p.z); }
+    else if (e.side === 's') { c = colOf(e.p.x); r = parkS; }
+    else if (e.side === 'w') { c = fw; r = rowOf(e.p.z); }
     else { c = ringE; r = rowOf(e.p.z); }
     if (misaligned) {
+      if (e.side !== 'e') throw new Error(`greater grid: a misaligned ${e.side} exit is not supported`);
       // the connector cell sits between the board edge and the roundabout's inner arm; its S-bend (sidewalks
       // ±KERB.walk wide) may reach into the neighbouring cell on the side the town road is offset to
-      const inward = OPPOSITE[e.side];
-      const cc = e.side === 'e' ? c1 + 1 : c;
-      const cr = e.side === 's' ? r1 + 1 : r;
+      const cc = c1 + 1, cr = r;
       const lateral = offCentre(e), reach = Math.abs(lateral) + KERB.walk > g.tile / 2;
       const ext = reach ? Math.sign(lateral) : 0;
-      const cells = e.side === 'e' || e.side === 'w'
-        ? { c: cc, r: Math.min(cr, cr + ext), w: 1, h: 1 + Math.abs(ext) }
-        : { c: Math.min(cc, cc + ext), r: cr, w: 1 + Math.abs(ext), h: 1 };
       pieces.push({
-        id: `conn-${e.side}`, kind: 'connector', street: e.street, cells,
-        arms: [{ c: cc, r: cr, side: e.side }], board: { p: e.p, side: inward },
+        id: `conn-${e.side}`, kind: 'connector', street: e.street,
+        cells: { c: cc, r: Math.min(cr, cr + ext), w: 1, h: 1 + Math.abs(ext) },
+        arms: [{ c: cc, r: cr, side: e.side }], board: { p: e.p, side: OPPOSITE[e.side] },
       });
+      if (c !== cc + 2) throw new Error('greater grid: the east connector must sit right next to Lakeside Circle');
     }
     rbAt[e.side] = { c, r };
     addRoundabout(`rb-${e.side}`, RB_NAMES[e.side], c, r, e.street);
@@ -169,14 +178,6 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
   const need = (d: Dir) => rbAt[d] ?? (() => { throw new Error(`greater grid: no ${d} exit`); })();
   const rbW = need('w'), rbS = need('s'), rbE = need('e');
   need('n');
-
-  // ---- outer lines
-  const fw = 1;                     // Foothill Rd column
-  const parkS = rows - 3;           // parkway row (south), waterfront rows beyond
-  const parkE = cols - 2;           // parkway column (east), waterfront column beyond
-  addRoundabout('rb-foothill', 'Foothill Circle', fw, rbW.r, 'Main St');
-  const harbourC = Math.round((rbS.c + ringE) / 2);
-  addRoundabout('rb-harbour', 'Harbour Circle', harbourC, parkS, 'Lakeshore Pkwy');
 
   const curve = (id: string, k: [number, number], inSide: Dir, outSide: Dir, street: string) => {
     const [kc, kr] = k;
@@ -190,30 +191,31 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     });
   };
   // corner cell, side the road arrives from, side it leaves through
-  curve('cv-outer-nw', [fw, ringN], 'e', 's', 'Foothill Rd');
-  curve('cv-outer-sw', [fw, parkS], 'n', 'e', 'Lakeshore Pkwy');
-  curve('cv-outer-se', [parkE, parkS], 'w', 'n', 'Lakeshore Pkwy');
-  curve('cv-outer-ne', [parkE, ringN], 's', 'w', 'Lakeshore Pkwy');
-  curve('cv-ring-sw', [ringW, ringS], 'e', 'n', 'Ring Rd');
-  curve('cv-ring-se', [ringE, ringS], 'n', 'w', 'Ring Rd');
+  curve('cv-nw', [fw, ringN], 'e', 's', 'Foothill Rd');
+  curve('cv-ne', [ringE, ringN], 'w', 's', 'Ring Rd');
+  curve('cv-sw', [fw, parkS], 'n', 'e', 'Lakeshore Pkwy');
 
-  const midR = (a: number, b: number) => Math.round((a + b) / 2);
-  const ns = exits.find((e) => e.side === 's')?.street ?? 'Atherton St';
-  const ws = exits.find((e) => e.side === 'w')?.street ?? 'Main St';
-  const es = exits.find((e) => e.side === 'e')?.street ?? 'South Rd';
+  const ws = exitStreet.w ?? 'Main St', ss = exitStreet.s ?? 'Atherton St', es = exitStreet.e ?? 'South Rd';
+  const stadiumC = rbS.c - 4;       // Stadium Way's bend down to the parkway (clear of the rail's S-curve)
+  const millC = c0 + 1;
+  const bayR = Math.round((ringN + rbE.r) / 2) - 1;
   const streets: StreetDef[] = [
-    { name: 'Ring Rd', cls: 'ring', path: [[ringW, ringN], [ringE, ringN], [ringE, ringS], [ringW, ringS], [ringW, ringN]] },
-    { name: 'Foothill Rd', cls: 'avenue', path: [[ringW, ringN], [fw, ringN], [fw, parkS]] },
-    { name: 'Lakeshore Pkwy', cls: 'parkway', path: [[fw, parkS], [parkE, parkS], [parkE, ringN], [ringE, ringN]] },
-    { name: ws, cls: 'radial', path: [[rbW.c - 1, rbW.r], [fw + 1, rbW.r]] },
-    { name: ns, cls: 'radial', path: [[rbS.c, rbS.r + 1], [rbS.c, parkS]] },
-    { name: es, cls: 'radial', path: [[rbE.c + 1, rbE.r], [parkE, rbE.r]] },
-    { name: 'Hillside Ave', cls: 'local', path: [[fw, midR(ringN, rbW.r)], [ringW, midR(ringN, rbW.r)]] },
-    { name: 'Quarry Rd', cls: 'local', path: [[fw, midR(rbW.r, ringS)], [ringW, midR(rbW.r, ringS)]] },
-    { name: 'Mill St', cls: 'local', path: [[midR(ringW, rbS.c), ringS], [midR(ringW, rbS.c), parkS]] },
-    { name: 'Harbor St', cls: 'local', path: [[harbourC, ringS], [harbourC, parkS - 1]] },
-    { name: 'Bayview Ave', cls: 'local', path: [[ringE, midR(ringN, rbE.r)], [parkE, midR(ringN, rbE.r)]] },
-    { name: 'Pier Rd', cls: 'local', path: [[harbourC, parkS + 1], [harbourC, parkS + 2]] },
+    { name: 'Ring Rd', cls: 'ring', path: [[fw, ringN], [ringE, ringN], [ringE, rbE.r - 1]] },
+    { name: 'Foothill Rd', cls: 'avenue', path: [[fw, ringN], [fw, parkS]] },
+    { name: 'Lakeshore Pkwy', cls: 'parkway', path: [[fw, parkS], [rbS.c - 1, parkS]] },
+    // radials: board edge → roundabout, roundabout → off the grid (causeways over the bay)
+    { name: ws, cls: 'radial', path: [[rbW.c + 1, rbW.r], [c0, rbW.r]] },
+    { name: ss, cls: 'radial', path: [[rbS.c, r1], [rbS.c, rbS.r - 1]] },
+    { name: ss, cls: 'radial', path: [[rbS.c, rbS.r + 1], [rbS.c, rows]] },
+    { name: es, cls: 'radial', path: [[rbE.c + 1, rbE.r], [cols, rbE.r]] },
+    // locals
+    { name: 'Hillside Ave', cls: 'local', path: [[fw, ringN + 4], [fw + 2, ringN + 4]] },
+    { name: 'Quarry Rd', cls: 'local', path: [[fw, rbW.r + 4], [fw + 2, rbW.r + 4]] },
+    { name: 'Stadium Way', cls: 'local', path: [[fw, r1 + 1], [stadiumC, r1 + 1], [stadiumC, parkS]] },
+    { name: 'Mill St', cls: 'local', path: [[millC, parkS], [millC, parkS + 2]] },
+    { name: 'Harbor St', cls: 'local', path: [[rbS.c + 1, rbS.r], [rbS.c + 2, rbS.r]] },
+    { name: 'Marina Rd', cls: 'local', path: [[rbE.c, rbE.r + 1], [rbE.c, rbE.r + 2]] },
+    { name: 'Bayview Ave', cls: 'local', path: [[ringE, bayR], [ringE + 2, bayR]] },
   ];
   const streetClass = new Map(streets.map((s) => [s.name, s.cls] as const));
   for (const p of pieces) if (!streetClass.has(p.street)) streetClass.set(p.street, 'radial');
@@ -222,7 +224,7 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
   const pieceAt = new Int16Array(N).fill(-1);
   pieces.forEach((p, i) => {
     for (let r = p.cells.r; r < p.cells.r + p.cells.h; r++) for (let c = p.cells.c; c < p.cells.c + p.cells.w; c++) {
-      if (!inGrid(g, c, r)) throw new Error(`greater grid: piece ${p.id} leaves the grid`);
+      if (!inNet(c, r)) throw new Error(`greater grid: piece ${p.id} leaves the network area at ${c},${r}`);
       if (pieceAt[at(c, r)]! >= 0) throw new Error(`greater grid: pieces ${pieces[pieceAt[at(c, r)]!]!.id} and ${p.id} overlap`);
       pieceAt[at(c, r)] = i;
     }
@@ -236,27 +238,41 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
       if (c !== tc && r !== tr) throw new Error(`greater grid: ${s.name} waypoints must share a row or column`);
       const dc = Math.sign(tc - c), dr = Math.sign(tr - r);
       const d: Dir = dc > 0 ? 'e' : dc < 0 ? 'w' : dr > 0 ? 's' : 'n';
-      if (streetAt[at(c, r)] === null) streetAt[at(c, r)] = s.name;
+      if (inNet(c, r) && streetAt[at(c, r)] === null) streetAt[at(c, r)] = s.name;
       while (c !== tc || r !== tr) {
         const nc = c + dc, nr = r + dr;
-        links[at(c, r)] |= BIT[d];
-        links[at(nc, nr)] |= BIT[OPPOSITE[d]];
-        if (streetAt[at(nc, nr)] === null) streetAt[at(nc, nr)] = s.name;
+        // a waypoint beyond the network (board, highway band, off the grid) only opens the last network cell
+        if (inNet(c, r)) links[at(c, r)] |= BIT[d];
+        if (inNet(nc, nr)) {
+          links[at(nc, nr)] |= BIT[OPPOSITE[d]];
+          if (streetAt[at(nc, nr)] === null) streetAt[at(nc, nr)] = s.name;
+        }
         c = nc; r = nr;
       }
     }
   }
   for (let i = 0; i < N; i++) if (pieceAt[i]! >= 0) links[i] = 0;
 
-  // ---- use map
+  // ---- use map + water / rail / hill checks (roads may cross water only as causeways, the rail only square-on)
+  const centreWet = (c: number, r: number) => land.isWater(cellCenter(g, c, r));
   const use: CellUse[][] = [];
+  const bridge = new Uint8Array(N);
   for (let r = 0; r < rows; r++) {
     const row: CellUse[] = [];
     for (let c = 0; c < cols; c++) {
       const i = at(c, r);
+      const road = pieceAt[i]! >= 0 || links[i]! > 0;
       if (inRect(B, c, r)) row.push('board');
-      else if (pieceAt[i]! >= 0 || links[i]) row.push('road');
-      else if (r < HIGHWAY_ROWS) row.push('highway');
+      else if (road) {
+        row.push('road');
+        if (centreWet(c, r)) {
+          if (pieceAt[i]! >= 0) throw new Error(`greater grid: piece ${pieces[pieceAt[i]!]!.id} stands in the bay`);
+          bridge[i] = 1;
+        }
+      } else if (r < HIGHWAY_ROWS) row.push('highway');
+      else if (masks.hill[i]) row.push('hill');
+      else if (masks.rail[i]) row.push('rail');
+      else if (centreWet(c, r)) row.push('water');
       else row.push('free');
     }
     use.push(row);
@@ -271,21 +287,21 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
   const roads: RoadCell[] = [];
   const junctions: Junction[] = [];
   const roundabouts: Roundabout[] = [];
-  const isZebraJunction = (c: number, r: number) => r === ringS || r === parkS || c === parkE;
+  const isZebraJunction = (_c: number, r: number) => r === parkS;
   const crossingCells = new Set<number>();
-  // zebra crossings on the radial cell next to every exit-side roundabout arm, and mid-way along the parkway
+  // zebra crossings on the radial / local cell next to every roundabout arm (not on causeways), and along the parkway
   for (const p of pieces) {
     if (p.kind !== 'roundabout') continue;
     for (const a of p.arms) {
       const s = STEP[a.side], nc = a.c + s.dc, nr = a.r + s.dr;
-      if (!inGrid(g, nc, nr) || pieceAt[at(nc, nr)]! >= 0) continue;
+      if (!inNet(nc, nr) || pieceAt[at(nc, nr)]! >= 0 || bridge[at(nc, nr)] || masks.rail[at(nc, nr)]) continue;
       const m = links[at(nc, nr)]!;
       const cls = streetClass.get(streetAt[at(nc, nr)] ?? '') ?? 'local';
       if ((m === (BIT.e | BIT.w) || m === (BIT.n | BIT.s)) && (cls === 'radial' || cls === 'local')) crossingCells.add(at(nc, nr));
     }
   }
-  for (const c of [Math.round((fw + midR(ringW, rbS.c)) / 2), Math.round((rbS.c + harbourC) / 2), Math.round((harbourC + parkE) / 2)]) {
-    if (links[at(c, parkS)] === (BIT.e | BIT.w)) crossingCells.add(at(c, parkS));
+  for (const c of [Math.round((fw + stadiumC) / 2) - 1, Math.round((stadiumC + rbS.c) / 2)]) {
+    if (inNet(c, parkS) && links[at(c, parkS)] === (BIT.e | BIT.w)) crossingCells.add(at(c, parkS));
   }
 
   const streetOfArm = (c: number, r: number, d: Dir): string => {
@@ -301,6 +317,9 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
   const major = (names: string[]): string =>
     names.reduce((best, n) => ((CLASS_RANK[streetClass.get(n) ?? 'local'] ?? 0) > (CLASS_RANK[streetClass.get(best) ?? 'local'] ?? 0) ? n : best), names[0] ?? '');
 
+  // streets that end in a cul-de-sac never get traffic lights
+  const deadEnd = new Set<string>();
+  for (let i = 0; i < N; i++) if (dirsOf(links[i]!).length === 1 && streetAt[i]) deadEnd.add(streetAt[i]!);
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const i = at(c, r), m = links[i]!;
     if (!m) continue;
@@ -318,15 +337,19 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     const k = solveRot(TILE_DEFS[def].open, m);
     if (k < 0) throw new Error(`greater grid: no rotation for ${def} at ${c},${r}`);
     const armStreets = open.map((d) => streetOfArm(c, r, d));
-    roads.push({
+    const cell: RoadCell = {
       id: `t${c}-${r}`, kind, cells: { c, r, w: 1, h: 1 }, center: cellCenter(g, c, r), rot: (k * Math.PI) / 2,
       model: `city-kit-roads/${TILE_DEFS[def].model}` as KenneyId, open, street: n >= 3 ? major(armStreets) : streetAt[i] ?? '',
-    });
+    };
+    if (bridge[i]) cell.bridge = true;
+    if (masks.rail[i]) cell.railCrossing = true;
+    roads.push(cell);
     if (n === 1 || n >= 3) {
       const arms: JunctionArm[] = open.map((d, j) => ({ dir: DIR_VEC[d], p: sideMid(g, c, r, d), street: armStreets[j]! }));
       const names = [...new Set(armStreets)];
       const cls = (s: string) => streetClass.get(s) ?? 'local';
-      const signals = n >= 3 && names.some((a) => (cls(a) === 'ring' || cls(a) === 'parkway') && names.some((b) => b !== a && cls(b) !== 'local'));
+      const big = (a: string) => cls(a) === 'ring' || cls(a) === 'parkway' || cls(a) === 'avenue';
+      const signals = n >= 3 && names.some((a) => big(a) && names.some((b) => b !== a && !deadEnd.has(b)));
       junctions.push({ id: `j${c}-${r}`, kind: n === 1 ? 'end' : n === 3 ? 'tee' : 'cross', center: cellCenter(g, c, r), arms, signals });
     }
   }
@@ -351,7 +374,7 @@ export function planNetwork(map: TownMap, g: GridFrame): Network {
     }
   }
 
-  return { use, roads, junctions, roundabouts, pieces, streets, links, pieceAt, streetAt, streetClass };
+  return { use, roads, junctions, roundabouts, pieces, streets, links, pieceAt, streetAt, streetClass, land, bridge };
 }
 
 /** Where a piece arm or a 1×1 link leads: another road cell (with a matching link/arm), or a port. */

@@ -6,17 +6,16 @@
 // base SCENERY (outside district regions) and district items.
 import * as THREE from 'three';
 import { stationPlacement, TOWN } from '@headway/sim';
-import type { Vec2 } from '@headway/sim';
 import { createRegistry } from '../assets';
 import { createBasicKit } from '../assets/basicKit';
 import { DISTRICTS } from '../districts';
 import {
-  at, bakeGeometry, box, detail, makeBoard, makeBuilding, makeClockTower, makeStadium, makeStation, makeStop,
-  makeTrack, makeTree, rbox, type BuildingType,
+  at, bakeGeometry, makeBoard, makeBuilding, makeClockTower, makeStadium, makeStation, makeStop, makeTree, type BuildingType,
 } from '../kit';
 import { KitMaterial } from '../materials';
 import { Stage } from '../post';
 import { SCENERY } from '../scenery';
+import { makeRail, makeRoads } from '../town/network';
 import type { LightMode, PaletteId } from '../types';
 import { DEMO } from './demo';
 import { createStreetscapeLayer, STREETSCAPE } from './index';
@@ -39,33 +38,9 @@ const districts = useDemo ? [...DISTRICTS, DEMO] : DISTRICTS;
 // ---------------------------------------------------------------- stand-in statics (what T2.2 will draw)
 const statics = new THREE.Group();
 statics.add(at(makeBoard(b.maxX - b.minX, b.maxZ - b.minZ), (b.minX + b.maxX) / 2, 0, (b.minZ + b.maxZ) / 2));
-const along = (a: Vec2, c: Vec2) => ({ len: Math.hypot(c.x - a.x, c.z - a.z), rot: -Math.atan2(c.z - a.z, c.x - a.x), mx: (a.x + c.x) / 2, mz: (a.z + c.z) / 2 });
-// rail
-const rp = TOWN.rail.loop.points;
-for (let i = 0; i < rp.length; i++) {
-  const s = along(rp[i]!, rp[(i + 1) % rp.length]!);
-  if (s.len < 1e-3) continue;
-  const t = makeTrack(s.len + 0.02);
-  t.position.set(s.mx, 0, s.mz); t.rotation.y = s.rot; statics.add(t);
-}
-// roads: one rounded strip per segment (top 0.06) + centre dashes away from junctions
-const nodes = TOWN.roads.nodes.map((n) => n.p);
-if (q.get('roads') !== '0') {
-  for (const e of TOWN.roads.edges) {
-    const pts = e.path.points;
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const s = along(pts[i]!, pts[i + 1]!);
-      const g = new THREE.Group();
-      g.add(at(rbox(s.len + 0.04, 0.06, 2.4, 0.03, 'road'), 0, 0.03, 0));
-      for (let x = -s.len / 2 + 0.8; x < s.len / 2 - 0.4; x += 1.6) {
-        const wx = s.mx + Math.cos(s.rot) * (x + 0.4), wz = s.mz - Math.sin(s.rot) * (x + 0.4);
-        if (nodes.some((n) => Math.hypot(n.x - wx, n.z - wz) < 2.2)) continue;
-        g.add(detail(at(box(0.8, 0.02, 0.1, 'mark'), x + 0.4, 0.07, 0)));
-      }
-      g.position.set(s.mx, 0, s.mz); g.rotation.y = s.rot; statics.add(g);
-    }
-  }
-}
+// rail + roads: T2.2's real builders (same heights as the game: road top 0.04, dashes just above)
+statics.add(makeRail(TOWN));
+if (q.get('roads') !== '0') statics.add(makeRoads(TOWN));
 // stops: platform road-side edge on the curb, shelter away from the road
 for (const s of TOWN.stops) {
   const st = makeStop(s.servedRoutes.map((r) => Number(r.slice(1)) - 1));

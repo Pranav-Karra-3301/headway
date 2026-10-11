@@ -6,6 +6,7 @@
 //   emissive — twinkling sun glints by day; at dusk the lake holds the sky's indigo, a warm band along the lit shore
 //              and wobbly vertical streaks under every lamp / the lighthouse (reflections offset toward the camera).
 import * as THREE from 'three';
+import { clayTweak } from '../../materials';
 import type { ShoreField } from './field';
 import type { Box2 } from './plan';
 
@@ -41,9 +42,9 @@ const VERT_MAIN = /* glsl */ `
 vHwW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
 `;
 
+// uDusk is declared by the shared clay tweak (the layer binds its own eased value to it).
 const FRAG_PARS = /* glsl */ `
 uniform float uTime;
-uniform float uDusk;
 uniform float uTideShift;
 uniform float uWaterY;
 uniform sampler2D uField;
@@ -86,17 +87,17 @@ float hwN2 = hwNoise( hwP * 0.31 + vec2( -uTime * 0.02, uTime * 0.016 ) );
 // depth tint (wobbled so the bands are organic)
 float hwD = hwShore + ( hwN1 - 0.5 ) * 2.2;
 vec3 hwCol = mix( uShallow, uMid, smoothstep( 0.1, 3.6, hwD ) );
-hwCol = mix( hwCol, uDeep, smoothstep( 3.0, 17.0, hwD ) );
+hwCol = mix( hwCol, uDeep, smoothstep( 5.0, 26.0, hwD ) );
 hwCol *= 0.975 + 0.05 * hwN2;
 // ripple strokes: short pale dashes drifting across open water
 {
 	vec2 q = vec2( hwP.x * 0.7071 - hwP.y * 0.7071, hwP.x * 0.7071 + hwP.y * 0.7071 );
 	float warp = hwNoise( hwP * 0.21 + vec2( uTime * 0.025, 0.0 ) ) * 2.4;
 	float band = abs( fract( q.y * 0.62 + warp + uTime * 0.035 ) - 0.5 );
-	float dash = smoothstep( 0.52, 0.7, hwNoise( vec2( q.x * 0.55, floor( q.y * 0.62 + warp + uTime * 0.035 ) * 3.1 ) + uTime * 0.04 ) );
+	float dash = smoothstep( 0.58, 0.76, hwNoise( vec2( q.x * 0.95, floor( q.y * 0.62 + warp + uTime * 0.035 ) * 3.1 ) + uTime * 0.04 ) );
 	float stroke = ( 1.0 - smoothstep( 0.035, 0.075, band ) ) * dash;
 	stroke *= smoothstep( 1.8, 4.5, hwShore ) * smoothstep( 0.35, 0.65, hwN1 + 0.15 );
-	hwCol = mix( hwCol, mix( hwCol, uFoam, 0.55 ), stroke * 0.55 );
+	hwCol = mix( hwCol, uFoam, stroke * 0.26 );
 }
 // shore foam: a soft lapping edge + two wave lines rolling in
 float hwFoam = 0.0;
@@ -117,7 +118,7 @@ float hwFoam = 0.0;
 	float rw = 0.13 + 0.06 * sin( uTime * 1.7 + hwP.x * 2.1 + hwP.y * 1.3 );
 	float ring = 1.0 - smoothstep( rw * 0.45, rw, hwObj );
 	float ph2 = fract( uTime * 0.22 + hwP.x * 0.05 );
-	float ring2 = ( 1.0 - smoothstep( 0.025, 0.07, abs( hwObj - ( 0.22 + 0.5 * ph2 ) ) ) ) * ( 1.0 - ph2 ) * 0.6;
+	float ring2 = ( 1.0 - smoothstep( 0.025, 0.07, abs( hwObj - ( 0.22 + 0.5 * ph2 ) ) ) ) * ( 1.0 - ph2 ) * 0.35;
 	hwFoam = max( hwFoam, max( ring * 0.9, ring2 ) );
 }
 // moving boats: hull foam, V-wake arms, a churned trail, and a soft shade under the hull
@@ -155,13 +156,13 @@ vec3 hwEmit = vec3( 0.0 );
 	vec2 f = fract( sp ) - ( 0.2 + 0.6 * rnd );
 	float tw = pow( max( sin( uTime * ( 1.1 + 2.0 * rnd.x ) + rnd.y * 6.2831 ), 0.0 ), 16.0 );
 	float dotS = 1.0 - smoothstep( 0.02, 0.075, length( f * vec2( 0.75, 1.7 ) ) );
-	float msk = smoothstep( 1.4, 4.0, hwShore ) * ( 1.0 - hwFoam );
-	hwEmit += vec3( 1.0, 0.97, 0.88 ) * dotS * tw * msk * ( 1.3 - 1.0 * uDusk );
+	float msk = smoothstep( 1.4, 4.0, hwShore ) * ( 1.0 - hwFoam ) * step( 0.6, hwHash( id + 5.71 ) );
+	hwEmit += vec3( 1.0, 0.97, 0.88 ) * dotS * tw * msk * ( 1.0 - 0.85 * uDusk );
 }
 if ( uDusk > 0.001 ) {
 	float far = smoothstep( 1.0, 24.0, hwShore + ( hwN1 - 0.5 ) * 3.0 );
 	vec3 sky = mix( uDuskNear, uDuskFar, far );
-	hwEmit += sky * ( 0.42 + 0.08 * hwN2 ) * uDusk * ( 1.0 - 0.7 * hwFoam );
+	hwEmit += sky * ( 0.34 + 0.07 * hwN2 ) * uDusk * ( 1.0 - 0.7 * hwFoam );
 	hwEmit += uFoam * hwFoam * 0.16 * uDusk;
 	hwEmit += uGlow * uDusk * 0.1 * ( 1.0 - smoothstep( 0.0, 6.0, hwShore ) );
 	vec2 v = uView, vp = vec2( -uView.y, uView.x );
@@ -249,6 +250,7 @@ export function buildSurface(regions: Box2[], field: ShoreField, waterY: number)
 
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
+    clayTweak(shader); // the town's clay lighting (wrap, rim), so the lake's lit colours match the palette like the board
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_PARS}`)

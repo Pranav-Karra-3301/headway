@@ -11,8 +11,9 @@ import { KitMaterial, shared } from '../../materials';
 import { DEFAULT_PALETTE } from '../../palettes';
 import type { LightMode, PaletteId } from '../../types';
 import type { WorldLayout } from '../layout';
+import { preloadKenney } from '../../assets/kenney';
 import { createTerrainField } from '../terrain/field';
-import { buildBoats, boatSize, type BoatUniforms } from './boats';
+import { buildBoats, boatSize, WATER_KENNEY_IDS, type BoatUniforms } from './boats';
 import { WATER_COLORS } from './colors';
 import { buildShoreField, type FieldOptions } from './field';
 import { BEACH_Y, boatPose, planWater, WATER_Y, type WaterPlan } from './plan';
@@ -24,11 +25,15 @@ export const WATER_LEVEL = WATER_Y;
 export { WATER_COLORS } from './colors';
 export { planWater, BEACH_Y, LAKE_BED_Y, DECK_Y } from './plan';
 export type { WaterPlan } from './plan';
+/** Kenney watercraft the marina + sailing boats use (preload for an instant upgrade; the layer also self-upgrades). */
+export { WATER_KENNEY_IDS } from './boats';
 
 export interface WaterOptions extends FieldOptions {
   palette?: PaletteId;
   /** Use the terrain's headland coastline for foam + shallows (default true; `landDist` overrides). */
   terrainCoast?: boolean;
+  /** Swap the kit boats for Kenney watercraft as soon as WATER_KENNEY_IDS load (default: in the browser). */
+  kenney?: boolean;
 }
 
 /** The terrain headlands' coastline (E1), so foam and shallows wrap around them too. */
@@ -69,6 +74,11 @@ export function createWaterLayer(map: TownMap, layout: WorldLayout, opts: WaterO
   staticMesh.castShadow = true;
   staticMesh.receiveShadow = true;
   const boats = buildBoats(plan.boats, palette, dusk);
+  let disposed = false;
+  if (opts.kenney ?? typeof window !== 'undefined') {
+    // Kenney-first (v5/v7): kit boats until the watercraft load, then re-bake the one boats mesh in place.
+    void preloadKenney(WATER_KENNEY_IDS).then(() => { if (!disposed) boats.rebuild(palette); });
+  }
 
   const object = new THREE.Group();
   object.name = 'water';
@@ -145,13 +155,14 @@ export function createWaterLayer(map: TownMap, layout: WorldLayout, opts: WaterO
       palette = p;
       applyPalette();
       statics.recolor(p);
-      boats.recolor(p);
+      boats.rebuild(p);
     },
     setLight(l: LightMode) {
       goal = l === 'dusk' ? 1 : 0;
       if (!started) { duskT = goal; started = true; }
     },
     dispose() {
+      disposed = true;
       for (const m of [surface.mesh, staticMesh, boats.mesh]) {
         m.geometry.dispose();
         (m.material as THREE.Material).dispose();

@@ -5,10 +5,11 @@
 //   block (3,3) flat  #8e95b3 lane markings, zebras          block (3,2) gradient  sidewalk top + curb + base faces
 // Triangles are classified by UV centroid + face normal (bottom faces are dropped: they lie on the ground).
 import { colorOf, PALETTES, type Palette } from '../../palettes';
+import { SS_ROLES } from '../../streetscape/roles';
 import type { PaletteId } from '../../types';
 
-export type RoadRole = 'lane' | 'gutter' | 'mark' | 'walk' | 'curb' | 'roadSide' | 'island' | 'islandEdge' | 'shrub' | 'ground';
-export const ROAD_ROLES: readonly RoadRole[] = ['lane', 'gutter', 'mark', 'walk', 'curb', 'roadSide', 'island', 'islandEdge', 'shrub', 'ground'];
+export type RoadRole = 'lane' | 'gutter' | 'mark' | 'walk' | 'curb' | 'roadSide' | 'island' | 'islandEdge' | 'shrub' | 'ground' | 'stone';
+export const ROAD_ROLES: readonly RoadRole[] = ['lane', 'gutter', 'mark', 'walk', 'curb', 'roadSide', 'island', 'islandEdge', 'shrub', 'ground', 'stone'];
 
 /** Role of one Kenney road triangle, or null to drop it. `ny` = world-space face normal y. */
 export function classifyRoadTri(u: number, v: number, ny: number): RoadRole | null {
@@ -24,9 +25,15 @@ export function classifyRoadTri(u: number, v: number, ny: number): RoadRole | nu
   return up ? 'lane' : 'roadSide';
 }
 
-/** Sidewalk + curb colours shared with the town streetscape (S1), per palette. */
-const WALK: Record<PaletteId, string> = { a: '#E9DECB', b: '#CBBDA4', c: '#D2CDC2' };
-const CURB: Record<PaletteId, string> = { a: '#FBF5EA', b: '#E4D9C4', c: '#ECEAE4' };
+/** Sidewalk + curb colours: the town streetscape's (S1 `ssWalk` / `ssCurb`) so both towns share one kerb. */
+const PI: Record<PaletteId, 0 | 1 | 2> = { a: 0, b: 1, c: 2 };
+const FALLBACK_WALK: Record<PaletteId, string> = { a: '#D8D2C6', b: '#BDB3A2', c: '#C6C1B6' };
+const FALLBACK_CURB: Record<PaletteId, string> = { a: '#FBF5EA', b: '#E4D9C4', c: '#ECEAE4' };
+const STONE: Record<PaletteId, string> = { a: '#B9AE9B', b: '#A39684', c: '#AFA99C' };
+const ssColor = (role: string, p: PaletteId, fb: string): string => {
+  const v = SS_ROLES[role]?.[PI[p]];
+  return typeof v === 'string' ? v : Array.isArray(v) && typeof v[0] === 'string' ? v[0] : fb;
+};
 
 function mix(a: string, b: string, t: number): string {
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
@@ -35,20 +42,23 @@ function mix(a: string, b: string, t: number): string {
   return `#${((m(16) << 16) | (m(8) << 8) | m(0)).toString(16).padStart(6, '0')}`;
 }
 
-/** Hex colour of every road role in a palette (roads match the town's cream streets). */
+/** Hex colour of every road role in a palette: Kenney asphalt (the palette's `road`, a darker gutter strip by the
+ *  curb), white markings, the streetscape's stone sidewalks and pale curbs. */
 export function roadColors(p: PaletteId): Record<RoadRole, string> {
   const P: Palette = PALETTES[p];
-  const walk = WALK[p], road = P.road;
+  const walk = ssColor('ssWalk', p, FALLBACK_WALK[p]), curb = ssColor('ssCurb', p, FALLBACK_CURB[p]);
+  const road = P.road;
   return {
     lane: road,
-    gutter: mix(road, walk, 0.5),
+    gutter: mix(road, '#000000', 0.12),
     mark: P.mark,
     walk,
-    curb: CURB[p],
-    roadSide: mix(road, walk, 0.7),
+    curb,
+    roadSide: mix(road, '#000000', 0.2),
     island: P.lawn,
-    islandEdge: mix(walk, CURB[p], 0.5),
+    islandEdge: curb,
     shrub: colorOf(P, 'leaf', 0),
     ground: P.board,
+    stone: STONE[p],
   };
 }

@@ -163,6 +163,23 @@ describe('campus district', () => {
     expect([...bad]).toEqual([]);
   });
 
+  it('plants no tree crown where it hides a bus route from the iso camera (camera-side planting stays low)', () => {
+    const built = builtItems().filter(({ it }) => TREES.has(it.kind));
+    const bad = new Set<string>();
+    for (const r of TOWN.routes) {
+      const pts = r.path.points;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i]!, b = pts[i + 1]!, L = Math.hypot(b.x - a.x, b.z - a.z);
+        for (let s = 0; s < L; s += 0.5) {
+          const q = { x: a.x + ((b.x - a.x) * s) / L, z: a.z + ((b.z - a.z) * s) / L };
+          if (q.x > 2 || q.z > 3 || q.z < -18) continue; // only the streets around the campus
+          for (const elev of [30, 35.26]) for (const t of hiders(built, q, elev)) bad.add(`${t.kind} @ ${t.x.toFixed(2)},${t.z.toFixed(2)} hides ${r.id}`);
+        }
+      }
+    }
+    expect([...bad]).toEqual([]);
+  });
+
   it('keeps zone doors outside buildings, each next to one', () => {
     const buildings = items.filter(isBuilding);
     const inside = TOWN.zones.flatMap((z) => buildings.filter((b) => inBox(z.door, boxOf(b, 0.05))).map((b) => `${z.id} inside ${b.kind}`));
@@ -173,18 +190,20 @@ describe('campus district', () => {
     }
   });
 
+  // The two blocks are saturated at the kit's footprints (a grid search finds no free 0.6 u spot clear of buildings,
+  // paths and the 2 u queue clearance), so the programme counts track what fits with breathing room.
   it('has the campus programme: clock tower focal point, halls/library/chapel/dorm, many trees, furniture, flags', () => {
-    expect(items.length).toBeGreaterThanOrEqual(45);
+    expect(items.length).toBeGreaterThanOrEqual(36);
     const tower = items.filter((a) => a.kind === 'lm.clockTower');
     expect(tower).toHaveLength(1);
     const tallest = Math.max(...items.map((a) => CATALOG_BY_KIND.get(a.kind)!.h * (a.scale ?? 1)));
     expect(CATALOG_BY_KIND.get('lm.clockTower')!.h).toBe(tallest);
     for (const kind of ['cp.hall', 'cp.library', 'cp.chapel', 'cp.dorm', 'cp.gate']) expect(count((a) => a.kind === kind), kind).toBeGreaterThanOrEqual(1);
-    expect(count((a) => TREES.has(a.kind))).toBeGreaterThanOrEqual(14);
-    expect(count((a) => a.kind.startsWith('veg.'))).toBeGreaterThanOrEqual(22);
+    expect(count((a) => TREES.has(a.kind))).toBeGreaterThanOrEqual(10);
+    expect(count((a) => a.kind.startsWith('veg.'))).toBeGreaterThanOrEqual(15);
     expect(new Set(items.filter((a) => TREES.has(a.kind)).map((a) => a.kind)).size).toBeGreaterThanOrEqual(4);
     expect(count((a) => a.kind === 'st.bench')).toBeGreaterThanOrEqual(6);
-    expect(count((a) => a.kind === 'st.lamp')).toBeGreaterThanOrEqual(8);
+    expect(count((a) => a.kind === 'st.lamp')).toBeGreaterThanOrEqual(7);
     expect(count((a) => a.kind === 'st.flag')).toBeGreaterThanOrEqual(2);
   });
 

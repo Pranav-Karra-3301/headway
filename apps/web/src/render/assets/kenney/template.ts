@@ -64,6 +64,8 @@ export interface TemplateOptions {
    *  through `upRole` (building kits: dark flat roofs → warm roof colour). */
   splitUp?: boolean;
   upRole?: Readonly<Record<string, string>>;
+  /** Role overrides for this model, applied last (`modelRoleMap`, e.g. suburban green roofs → palette `roof`). */
+  roleMap?: Readonly<Record<string, string>>;
 }
 
 const fa = new THREE.Vector3(), fb = new THREE.Vector3(), fc = new THREE.Vector3();
@@ -153,6 +155,7 @@ export function buildTemplate(id: string, root: THREE.Object3D, scale: number, c
       const black = acc.flat === '#000000';
       acc.role = swatchRole(black ? mean : acc.flat);
       if (acc.up) acc.role = opts.upRole?.[acc.role] ?? acc.role;
+      acc.role = opts.roleMap?.[acc.role] ?? acc.role;
       acc.shade = black ? 0 : quantizeShade(lightness(mean) - lightness(acc.flat));
     } else {
       const ref = NATURE_REMAP[acc.source] ?? { role: 'knStone', idx: 0 };

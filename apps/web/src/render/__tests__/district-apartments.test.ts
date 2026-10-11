@@ -160,7 +160,8 @@ describe('apartments district: placements', () => {
     expect(n('res.parking')).toBeGreaterThanOrEqual(1);
     expect(n('res.playground')).toBeGreaterThanOrEqual(1);
     expect(n('veg.hedge')).toBeGreaterThanOrEqual(3);
-    expect(D.items.filter((i) => TREES.has(i.kind)).length).toBeGreaterThanOrEqual(14);
+    expect(D.items.filter((i) => TREES.has(i.kind)).length).toBeGreaterThanOrEqual(12);
+    expect(n('veg.bush') + n('veg.flowerbed')).toBeGreaterThanOrEqual(6);
     expect(n('st.lamp')).toBeGreaterThanOrEqual(4);
     expect(n('st.bench')).toBeGreaterThanOrEqual(2);
   });
@@ -215,10 +216,26 @@ describe('apartments district: placements', () => {
     }
   });
 
+  // Art bible (docs/research/iso-art-direction.md §2.1–2.2): heights rise away from the camera. Station Rd and South Rd
+  // carry route r2 past both apartment stops, so their camera sides (east of Station Rd, south of South Rd) hold only
+  // cottages and townhouses; towers stand on the far side, and nothing over 2 storeys crowds Atherton St (also r2).
+  it('keeps tall buildings off the camera side of the bus streets and stops', () => {
+    const node = (id: string) => TOWN.roads.nodes.find((n) => n.id === id)!.p;
+    const XS = node('j_south_east').x, ZS = node('j_south_allen').z, XA = node('j_main_atherton').x;
+    const LOW = new Set(['res.house', 'res.townhouses']);
+    for (const it of D.items.filter((i) => BUILDINGS.has(i.kind))) {
+      const r = rectOf(it), tag = `${it.kind} at ${it.x},${it.z}`;
+      if (r.x1 > XS || r.z1 > ZS) expect(LOW.has(it.kind), `${tag} on the camera side`).toBe(true);
+      if (!LOW.has(it.kind)) expect(r.x0 - XA, `${tag} crowds Atherton St`).toBeGreaterThanOrEqual(it.kind === 'res.tower' ? 7 : 2.2);
+    }
+    // the front (south-east) of the board stays low: towers only toward the back of the district
+    for (const it of D.items.filter((i) => i.kind === 'res.tower')) expect(it.x + it.z, `res.tower at ${it.x},${it.z}`).toBeLessThanOrEqual(26.5);
+  });
+
   it('gives buildings breathing room from each other', () => {
     const b = D.items.filter((i) => BUILDINGS.has(i.kind) || i.kind === 'res.parking' || i.kind === 'res.playground');
     for (let i = 0; i < b.length; i++) for (let j = i + 1; j < b.length; j++)
-      expect(rectGap(rectOf(b[i]!), rectOf(b[j]!)), `${b[i]!.kind}@${b[i]!.x} vs ${b[j]!.kind}@${b[j]!.x}`).toBeGreaterThanOrEqual(0.8);
+      expect(rectGap(rectOf(b[i]!), rectOf(b[j]!)), `${b[i]!.kind}@${b[i]!.x} vs ${b[j]!.kind}@${b[j]!.x}`).toBeGreaterThanOrEqual(0.8 - 1e-6);
   });
 
   it('leaves room for a 3 × 3 level crossing wherever a road crosses the rail', () => {

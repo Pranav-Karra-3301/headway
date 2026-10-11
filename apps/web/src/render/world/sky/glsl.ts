@@ -3,7 +3,7 @@
 // crosses the farthest ridge curtain (north plane, the arc round the NW corner, west plane). The backdrop paints
 // `hwSky(t)` from it, and the ridges/clouds blend toward the same colour for aerial perspective, so misty feet melt
 // exactly into the sky behind them and the lightest haze band hugs the ridge line at any pan, zoom or azimuth.
-import { SKY_T } from './colors';
+import { MIST_FOOT, MIST_T, SKY_T } from './colors';
 
 const f = (x: number) => x.toFixed(2);
 
@@ -158,7 +158,8 @@ varying float vCrest;
 varying float vVis;
 varying vec2 vMist;
 void main() {
-  vec3 sky = hwSky( hwHorizonT( vW, uViewDir ) );
+  float ht = hwHorizonT( vW, uViewDir );
+  vec3 sky = hwSky( ht );
   vec3 col;
   float haze;
   if ( vLayer < 2.5 ) {
@@ -167,6 +168,10 @@ void main() {
     float rim = 1.0 - smoothstep( 0.0, 0.32 + aa, vCrest - vW.y );
     col = mix( col, uRim, rim * uRimAmt * ( 0.35 + 0.325 * vLayer ) );
     haze = 1.0 - smoothstep( vMist.x, vMist.y, vW.y );
+    // valley mist between the layers glows like the horizon band (at dusk the void far below is dark, and misting
+    // the feet into it would read inverted); deep down the curtain it settles into the true backdrop, seamlessly
+    vec3 glow = hwSky( max( ht, ${f(MIST_T)} ) );
+    sky = mix( sky, glow, smoothstep( ${f(MIST_FOOT[0])}, ${f(MIST_FOOT[1])}, vW.y ) * vVis );
   } else {
     vec3 n = normalize( vN );
     float l = clamp( dot( n, uLightDir ) * 0.55 + 0.5, 0.0, 1.0 );

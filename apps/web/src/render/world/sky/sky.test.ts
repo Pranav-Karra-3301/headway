@@ -9,10 +9,10 @@ import { PALETTES } from '../../palettes';
 import type { PaletteId } from '../../types';
 import { BASE } from '../base/profile';
 import { worldLayout } from '../layout';
-import { mixSky, skyAt } from './colors';
+import { MIST_T, mixSky, ridgeMist, skyAt } from './colors';
 import { cloudOffset, cloudSpecs } from './clouds';
 import { createSkyLayer } from './index';
-import { RIDGE_LAYERS, ridgeBand } from './ridges';
+import { RIDGE_FOOT_Y, RIDGE_LAYERS, ridgeBand } from './ridges';
 
 const layout = worldLayout(TOWN);
 const E = layout.extent;
@@ -64,9 +64,38 @@ describe('sky colours (bible §6.5)', () => {
     for (let t = 30; t >= 0; t -= 1) { const l = lum(skyAt(dusk, t)); expect(l).toBeGreaterThan(prev - 1e-6); prev = l; }
   });
 
-  it('ridges haze progressively: each farther layer is closer to the sky', () => {
+  it.each(PALS)('palette %s at dusk: the void around the base is a deep dusky haze, so gameplay stays the brightest layer', (p) => {
+    const dusk = mixSky(p, 1);
+    const horizon = lum(skyAt(dusk, 0));
+    for (const t of [-20, -30, -45, -60]) {
+      const c = skyAt(dusk, t);
+      expect(lum(c)).toBeLessThan(0.45 * horizon);
+      expect(lum(c)).toBeLessThan(0.12);
+      expect(c.b).toBeGreaterThan(c.g); // cool indigo / plum, not salmon
+    }
+    // the warm glow still hugs the ridge line from just below it
+    expect(lum(skyAt(dusk, -4))).toBeGreaterThan(0.6 * horizon);
+  });
+
+  it.each(PALS)('palette %s: ridge feet mist into a glowing valley haze, settling into the backdrop down the curtain', (p) => {
+    for (const k of [0, 1]) {
+      const m = mixSky(p, k);
+      const void_ = skyAt(m, -55);
+      // feet just under the crest band glow at least like the sky just below the horizon (never the dark void)
+      expect(lum(ridgeMist(m, -55, -4))).toBeGreaterThanOrEqual(lum(skyAt(m, MIST_T)) - 1e-6);
+      if (k === 1) expect(lum(ridgeMist(m, -55, -4))).toBeGreaterThan(2 * lum(void_));
+      // at the curtain's foot it is exactly the backdrop behind it (no seam where the curtain ends)
+      const foot = ridgeMist(m, -55, RIDGE_FOOT_Y);
+      expect(Math.abs(foot.r - void_.r) + Math.abs(foot.g - void_.g) + Math.abs(foot.b - void_.b)).toBeLessThan(1e-6);
+      // above the horizon the mist is just the sky
+      const hi = ridgeMist(m, 6, 2), sky = skyAt(m, 6);
+      expect(Math.abs(hi.r - sky.r) + Math.abs(hi.g - sky.g) + Math.abs(hi.b - sky.b)).toBeLessThan(1e-6);
+    }
+  });
+
+  it('ridges haze progressively: each farther layer is closer to the sky at the ridge line', () => {
     for (const p of PALS) for (const k of [0, 1]) {
-      const m = mixSky(p, k), haze = skyAt(m, -14);
+      const m = mixSky(p, k), haze = skyAt(m, 0);
       const dist = (c: THREE.Color) => Math.abs(c.r - haze.r) + Math.abs(c.g - haze.g) + Math.abs(c.b - haze.b);
       expect(dist(m.ridges[1])).toBeLessThan(dist(m.ridges[0]));
       expect(dist(m.ridges[2])).toBeLessThan(dist(m.ridges[1]));

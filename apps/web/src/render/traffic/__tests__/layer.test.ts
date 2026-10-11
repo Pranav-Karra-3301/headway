@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { TOWN, pointAt } from '@headway/sim';
 import type { SimSnapshot, VehicleView } from '@headway/sim';
 import type { SimRunner } from '../../../sim/runner';
+import type { SessionSpec } from '../../../sim/session';
 import { frame } from '../../../state/frame';
+import { useApp } from '../../../state/store';
 import type { FrameContext } from '../../layers';
 import { PALETTES } from '../../palettes';
 import { MAX_CARS, ROAD_TOP, createTrafficLayer, vehiclePoses } from '../index';
@@ -102,6 +104,37 @@ describe('createTrafficLayer', () => {
     expect(layer.model.cars.map((c) => `${c.x},${c.z}`).join('|')).not.toBe(before);
     for (let i = 0; i < 60; i++) layer.update(ctx(b, b, 1));
     expect(mat.fade.value).toBeLessThan(0.05);
+    layer.dispose();
+  });
+
+  it('reseeds from the running session scenario seed (renderer-local, deterministic per crowd)', () => {
+    const layer = createTrafficLayer(TOWN, { seed: 1, kenney: false });
+    const s0 = snap(0, []), s1 = snap(1, []);
+    layer.update(ctx(s0, s1, 1));
+    expect(layer.seed).toBe(1);
+    const sim = { observe: () => { throw new Error('no observation'); } };
+    const session = { key: 'k', scenario: { scenarioId: 'stadium_exit', seed: 4242, split: 'showcase' } } as unknown as SessionSpec;
+    useApp.setState({ session });
+    frame.runner = { paused: false, sim } as unknown as SimRunner;
+    try {
+      layer.update(ctx(s0, s1, 1));
+      expect(layer.seed).toBe(4242);
+      const fresh = createTrafficLayer(TOWN, { seed: 4242, kenney: false });
+      fresh.update(ctx(s0, s1, 1));
+      const ids = (l: typeof layer) => l.model.cars.map((c) => `${c.x.toFixed(3)},${c.z.toFixed(3)}`).join('|');
+      expect(ids(layer)).toBe(ids(fresh));
+      const before = layer.model;
+      layer.update(ctx(s1, snap(2, []), 1));
+      expect(layer.model).toBe(before); // same sim: no reset
+      frame.runner = { paused: false, sim: { ...sim } } as unknown as SimRunner;
+      layer.update(ctx(s0, s1, 1));
+      expect(layer.model).not.toBe(before); // new run of the crowd: fresh traffic, same seed
+      expect(layer.seed).toBe(4242);
+      fresh.dispose();
+    } finally {
+      frame.runner = null;
+      useApp.setState({ session: null });
+    }
     layer.dispose();
   });
 

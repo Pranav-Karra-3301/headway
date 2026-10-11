@@ -1,9 +1,10 @@
 // Owner: E1. Terrain preview: /src/render/world/terrain/preview.html?elev=35&az=45&view=100&x=-4&z=-6&light=day|dusk
-// &palette=a|b|c&train=30,40&post=1&clean=1&shadow=board|world&frames=N — the town blockout (board, roads, rail, stations,
+// &palette=a|b|c&train=30,40&post=1&clean=1&shadow=board|world&world=0|1&frames=N — the town blockout (board, roads, rail, stations,
 // base scenery) baked into one mesh, a stand-in lake + beach, and the terrain layer, through the real Stage look.
 import * as THREE from 'three';
 import { pointAt, stationPlacement, TOWN } from '@headway/sim';
-import type { Vec2 } from '@headway/sim';
+import type { SimSnapshot, Vec2 } from '@headway/sim';
+import type { FrameContext, RenderLayer } from '../../layers';
 import { bakeGeometry, box, createForest, makeBuilding, makeClockTower, makeStadium, makeStation, makeTrain, TRAIN, type BuildingType, type TreePlacement } from '../../kit';
 import { KitMaterial } from '../../materials';
 import { PALETTES } from '../../palettes';
@@ -90,25 +91,41 @@ stage.scene.add(town);
 const forest = createForest(trees, { palette, seed: 5 });
 stage.scene.add(forest.object);
 
-// ---------------------------------------------------------------- stand-in lake + beach (E2 owns the real ones)
+// ---------------------------------------------------------------- the rest of the world: E2 water, E3 sky + base when they
+// load (?world=0 forces the stand-ins), else a stand-in lake + beach
 const E = layout.extent;
+const siblings: RenderLayer[] = [];
+if (q.get('world') !== '0') {
+  try {
+    const [w, sk, ba] = await Promise.all([import('../water/index'), import('../sky/index'), import('../base/index')]);
+    siblings.push(ba.createBaseLayer(TOWN, layout), w.createWaterLayer(TOWN, layout), sk.createSkyLayer(TOWN, layout));
+  } catch (err) {
+    console.warn('[terrain] world siblings unavailable, using stand-ins', err);
+  }
+}
+const standIns = new THREE.Group();
+if (!siblings.length) stage.scene.add(standIns);
 const lake = new THREE.Mesh(new THREE.PlaneGeometry(E.maxX - E.minX, E.maxZ - E.minZ), new THREE.MeshStandardMaterial({ color: '#7CC6D6', roughness: 0.35 }));
 lake.rotation.x = -Math.PI / 2;
 lake.position.set((E.minX + E.maxX) / 2, WATER_LEVEL, (E.minZ + E.maxZ) / 2);
-stage.scene.add(lake);
+standIns.add(lake);
 const sandMat = new THREE.MeshStandardMaterial({ color: '#EFE3C6', roughness: 0.95 });
 const south = new THREE.Mesh(new THREE.BoxGeometry(B.maxX - B.minX + 12, 0.8, 4), sandMat);
 south.position.set((B.minX + B.maxX) / 2 + 2, -0.44, B.maxZ + 2);
 const east = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, B.maxZ - B.minZ + 12), sandMat);
 east.position.set(B.maxX + 2, -0.44, (B.minZ + B.maxZ) / 2 - 2);
-stage.scene.add(south, east);
+standIns.add(south, east);
 
 // ---------------------------------------------------------------- the terrain layer
 const t0 = performance.now();
 const terrain = createTerrainLayer(TOWN, layout);
 terrain.setPalette?.(palette);
 const buildMs = performance.now() - t0;
-stage.scene.add(terrain.object);
+const world = new THREE.Group();
+world.name = 'world';
+world.add(terrain.object);
+for (const l of siblings) { l.setPalette?.(palette); l.setLight?.(light); world.add(l.object); }
+stage.scene.add(world);
 let calls = 0;
 terrain.object.traverse((o) => { if ((o as THREE.Mesh).isMesh) calls++; });
 console.info(`[terrain] built in ${buildMs.toFixed(0)} ms, ${calls} draw calls`);
@@ -117,8 +134,16 @@ console.info(`[terrain] built in ${buildMs.toFixed(0)} ms, ${calls} draw calls`)
 const maxFrames = num('frames', Infinity);
 const clock = new THREE.Clock();
 let frames = 0;
+const empty = {
+  t: 0, phase: 'running', vehicles: [], people: [], queues: [], events: [],
+  running: { spawned: 0, completed: 0, waitingNow: 0, ridingNow: 0, meanWaitS: 0, missedConnections: 0, leftBehind: 0, jSoFar: 0 },
+} as unknown as SimSnapshot;
 const loop = () => {
-  stage.render(Math.min(clock.getDelta(), 1 / 30), 0);
+  const dt = Math.min(clock.getDelta(), 1 / 30);
+  const ctx: FrameContext = { prev: empty, next: empty, alpha: 1, simT: 0, dtS: dt, timeS: clock.elapsedTime + 1, map: TOWN, camera: cam, light, highlightedRoute: null };
+  terrain.update(ctx);
+  for (const l of siblings) l.update(ctx);
+  stage.render(dt, 0);
   frames++;
   if (frames === Math.min(30, maxFrames)) (window as unknown as { __terrainReady: boolean }).__terrainReady = true;
   if (frames < maxFrames) requestAnimationFrame(loop);

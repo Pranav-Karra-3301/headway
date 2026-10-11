@@ -124,11 +124,12 @@ const PEAKS: ReadonlyArray<readonly [number, number, number, number]> = [
 ];
 /** Rocky islets off the headland points: x, z, height, radius (they ignore the coastal fade). */
 const STACKS: ReadonlyArray<readonly [number, number, number, number]> = [
-  [57.5, -36.5, 2.6, 1.5],
-  [-48.5, 49, 2.2, 1.3],
+  [57.5, -36.5, 0.5, 2.1],
+  [-48.5, 49, 0.4, 1.9],
 ];
 const SPUR = { top: 3.7, edge: 4.9, gap: 1.7, minLen: 2.4, sidewalk: 0.6, maxIn: 2.6, wing: 2.6 } as const;
 const MOUND = { top: 3.75, reach: 8.5, behind: 14 } as const;
+const COVER = { top: 4.6, flat: 2.4, fall: 6 } as const;
 
 interface Span {
   from: number;
@@ -140,6 +141,8 @@ interface Span {
   win: number;
   /** Track → board edge along the outward normal. */
   edgeDist: number;
+  /** Off the board (a tunnel under the mountain band, covered by `cover`) rather than an on-board spur. */
+  band: boolean;
 }
 
 export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainField {
@@ -176,6 +179,20 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
   if (layout.railTunnel) {
     let from = layout.railTunnel.fromDist, to = layout.railTunnel.toDist;
     if (to < from) to += loop.length;
+    // An end that lies off the board (in the mountains) grows to the board edge, so the whole off-board run is
+    // underground and both portals stand at the board edge, facing the town (and the camera).
+    const off = (d: number) => { const p = pointAt(loop, d); return p.x < B.minX || p.z < B.minZ; };
+    const grow = (d: number, dir: 1 | -1): number => {
+      if (!off(d)) return d;
+      let a = d;
+      for (let k = 0; k < 2000 && off(a + dir * 0.1); k++) a += dir * 0.1;
+      let b = a + dir * 0.1; // first on-board sample: bisect to the board edge
+      for (let i = 0; i < 24; i++) { const m = (a + b) / 2; if (off(m)) a = m; else b = m; }
+      return a;
+    };
+    from = grow(from, -1);
+    to = grow(to, 1);
+    if (from < 0) { from += loop.length; to += loop.length; }
     const need = ROAD_HALF + SPUR.gap;
     const free = (d: number) => { const p = pointAt(loop, d); return roadDist(p.x, p.z) >= need; };
     const edge = (a: number, b: number) => { // a free, b blocked (or vice versa): bisect to the boundary
@@ -220,12 +237,27 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     const ox = -nIn.x, oz = -nIn.z;
     const tx = ox < -1e-9 ? (mid.x - B.minX) / -ox : ox > 1e-9 ? (B.maxX - mid.x) / ox : Infinity;
     const tz = oz < -1e-9 ? (mid.z - B.minZ) / -oz : oz > 1e-9 ? (B.maxZ - mid.z) / oz : Infinity;
-    return { from, to, poly, side, win, edgeDist: Math.min(tx, tz) };
+    const band = mid.x < B.minX || mid.z < B.minZ;
+    return { from, to, poly, side, win, edgeDist: Math.max(0, Math.min(tx, tz)), band };
   }
 
+  /** Rail portal at one end of a span (0 = from, 1 = to): faces out along the track, except where a band tunnel
+   *  ends on the board edge — there the facade lines up with the edge and faces the town (a skew portal), so it
+   *  stands wholly off the board with the hill right behind it. */
+  function railFace(s: Span, end: 0 | 1): { p: Vec2; face: Vec2 } {
+    const d = end === 0 ? 0 : s.poly.length, sign = end === 0 ? -1 : 1;
+    const p = pointAt(s.poly, d), t = tangent(s.poly, d);
+    const face = { x: t.x * sign, z: t.z * sign };
+    if (s.band) {
+      if (Math.abs(p.x - B.minX) < 0.05 && face.x > 0.3) return { p: { x: B.minX, z: p.z }, face: { x: 1, z: 0 } };
+      if (Math.abs(p.z - B.minZ) < 0.05 && face.z > 0.3) return { p: { x: p.x, z: B.minZ }, face: { x: 0, z: 1 } };
+    }
+    return { p: { x: p.x, z: p.z }, face };
+  }
+  const spurSpans = spans.filter((s) => !s.band), bandSpans = spans.filter((s) => s.band);
   // spur bounding box (quick reject)
   const sb = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
-  for (const s of spans) for (const p of s.poly.points) {
+  for (const s of spurSpans) for (const p of s.poly.points) {
     const r = s.edgeDist + 10;
     sb.minX = Math.min(sb.minX, p.x - r); sb.maxX = Math.max(sb.maxX, p.x + r);
     sb.minZ = Math.min(sb.minZ, p.z - r); sb.maxZ = Math.max(sb.maxZ, p.z + r);
@@ -238,7 +270,7 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     spurOut.cut = false;
     if (x < sb.minX || x > sb.maxX || z < sb.minZ || z > sb.maxZ) return spurOut;
     let h = 0;
-    for (const s of spans) {
+    for (const s of spurSpans) {
       const pr = projectOnPolyline(s.poly, { x, z });
       const t = tangent(s.poly, pr.dist);
       const rx = x - pr.x, rz = z - pr.z;
@@ -258,16 +290,44 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     return spurOut;
   }
 
-  // ---- road portals (mountain-side exits)
+  /** Roof over the off-board (band) tunnels: a broad loaf along the buried track, so the mountains never dip low
+   *  enough over it to show the train. Applied only beyond the board edge, and never in front of a portal. */
+  const cb = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  for (const s of bandSpans) for (const p of s.poly.points) {
+    const r = COVER.flat + COVER.fall + 1;
+    cb.minX = Math.min(cb.minX, p.x - r); cb.maxX = Math.max(cb.maxX, p.x + r);
+    cb.minZ = Math.min(cb.minZ, p.z - r); cb.maxZ = Math.max(cb.maxZ, p.z + r);
+  }
+  function cover(x: number, z: number): number {
+    if (x < cb.minX || x > cb.maxX || z < cb.minZ || z > cb.maxZ) return 0;
+    let h = 0;
+    for (const s of bandSpans) {
+      const pr = projectOnPolyline(s.poly, { x, z });
+      const t = tangent(s.poly, pr.dist);
+      const rx = x - pr.x, rz = z - pr.z;
+      if (pr.dist <= 1e-6 && rx * t.x + rz * t.z < -1e-6) continue;
+      if (pr.dist >= s.poly.length - 1e-6 && rx * t.x + rz * t.z > 1e-6) continue;
+      const u = Math.abs(rx * -t.z + rz * t.x);
+      h = Math.max(h, COVER.top * (1 - smooth(COVER.flat, COVER.flat + COVER.fall, u)));
+    }
+    return h;
+  }
+
+  // ---- portal mounds: road exits on the mountain sides, and band tunnels whose portals stand at the board edge
   const exits = layout.exits.filter((e) => e.kind === 'tunnel');
+  const moundSites: Array<{ p: Vec2; dir: Vec2; half: number }> = exits.map((e) => ({ p: e.p, dir: e.dir, half: ROAD_PORTAL.half }));
+  for (const s of bandSpans) for (const end of [0, 1] as const) {
+    const f = railFace(s, end);
+    moundSites.push({ p: f.p, dir: { x: -f.face.x, z: -f.face.z }, half: RAIL_PORTAL.half });
+  }
   function mound(x: number, z: number): number {
     let m = 0;
-    for (const e of exits) {
+    for (const e of moundSites) {
       const rx = x - e.p.x, rz = z - e.p.z;
       const o = rx * e.dir.x + rz * e.dir.z;
       if (o < 0) continue;
       const a = Math.abs(-rx * e.dir.z + rz * e.dir.x);
-      const along = a <= ROAD_PORTAL.half + 0.4 ? 1 : smooth(MOUND.reach, ROAD_PORTAL.half + 0.4, a);
+      const along = a <= e.half + 0.4 ? 1 : smooth(MOUND.reach, e.half + 0.4, a);
       if (along <= 0) continue;
       m = Math.max(m, MOUND.top * along * (1 + 0.3 * smooth(0, 6, o)) * smooth(MOUND.behind, 7, o));
     }
@@ -311,13 +371,13 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
   function ridge(x: number, z: number, d: number): number {
     // three layers (foothills → mid ridge → crest), each broken into a chain of hills by an along-band
     // modulation, with real valleys between the layers so the iso view reads them as stacked silhouettes
-    const t = d + 2.2 * fbm(x / 21, z / 21, 11);
+    const t = d + 3.4 * fbm(x / 17, z / 17, 11);
     const a1 = 0.55 + 0.45 * fbm(x / 8.5, z / 8.5, 21), a2 = 0.6 + 0.4 * fbm(x / 12, z / 12, 31), a3 = 0.7 + 0.3 * fbm(x / 17, z / 17, 41);
     let pk = 0;
     for (const [px, pz, ph, pr] of PEAKS) { const dx = x - px, dz = z - pz; pk += ph * Math.exp(-(dx * dx + dz * dz) / (pr * pr)); }
     const r1 = 5.4 * a1 * bump((t - 6.6) / 4.8);
     const r2 = (10.8 * a2 + 0.35 * pk) * bump((t - 15.6) / 6);
-    const r3 = (15 * a3 + pk) * bump((t - 26) / 7.6);
+    const r3 = (15 * a3 + pk) * bump((t - 26.5) / 9.2);
     let h = sunion(sunion(r1, r2, 1.6), r3, 2.2) + 1.1 * smooth(0, 12, t);
     h += (0.42 * fbm(x / 5, z / 5, 51) + 0.14 * fbm(x / 2.2, z / 2.2, 61)) * smooth(0.5, 5, h);
     return Math.max(0, h) * smooth(0, 2.6, d);
@@ -331,6 +391,7 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     let h = ridge(x, z, d);
     h = sunion(h, mound(x, z), 1.2);
     h = sunion(h, spur(x, z).h, 1.5);
+    h = sunion(h, cover(x, z), 1.5);
     const L = coast(x, z);
     const land = Math.pow(smooth(0, 9, L), 0.7);
     // Where E2's beach strips run on past the board corners, stay a hair above its sand (BEACH_Y = -0.04) so the
@@ -356,7 +417,7 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
   function forest(x: number, z: number, hh?: number): number {
     const h = hh ?? height(x, z);
     const n = fbm(x / 14, z / 14, 71) + 0.3 * fbm(x / 4.5, z / 4.5, 81);
-    return smooth(-0.2, 0.12, n) * smooth(0.4, 1.4, h) * (1 - smooth(14, 17.5, h));
+    return smooth(-0.32, 0.02, n) * smooth(0.4, 1.4, h) * (1 - smooth(14.5, 18, h));
   }
 
   function slope(x: number, z: number): number {
@@ -369,10 +430,9 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
   const portals: PortalSite[] = [];
   for (const e of exits) portals.push({ kind: 'road', id: e.edgeId, x: e.p.x, z: e.p.z, face: { x: -e.dir.x, z: -e.dir.z }, half: ROAD_PORTAL.half, top: ROAD_PORTAL.top });
   for (const s of spans) {
-    const L = s.poly.length;
-    for (const [d, sign, end] of [[0, -1, 'from'], [L, 1, 'to']] as const) {
-      const p = pointAt(s.poly, d), t = tangent(s.poly, d);
-      portals.push({ kind: 'rail', id: `rail:${s.from.toFixed(2)}:${end}`, x: p.x, z: p.z, face: { x: t.x * sign, z: t.z * sign }, half: RAIL_PORTAL.half, top: RAIL_PORTAL.top });
+    for (const end of [0, 1] as const) {
+      const { p, face } = railFace(s, end);
+      portals.push({ kind: 'rail', id: `rail:${s.from.toFixed(2)}:${end ? 'to' : 'from'}`, x: p.x, z: p.z, face, half: RAIL_PORTAL.half, top: RAIL_PORTAL.top });
     }
   }
 

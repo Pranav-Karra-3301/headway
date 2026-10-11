@@ -90,17 +90,26 @@ export function ridgeBand(layout: WorldLayout, spec: RidgeSpec): BandPoint[] {
   const hill = (u: number) =>
     0.5 * Math.sin((u / W) * 6.283 + ph[0]!) + 0.3 * Math.sin((u / (W * 0.53)) * 6.283 + ph[1]!) + 0.2 * Math.sin((u / (W * 0.29)) * 6.283 + ph[2]!);
   const taper = Math.min(spec.overrun + 20, total / 3);
-  const step = spec.trees ? 0.55 : 1.2;
+  const step = spec.trees ? 0.5 : 1.2;
   const n = Math.max(16, Math.round(total / step));
+  // tree line: pines of irregular width (2–4 samples) and height, with the odd gap, so it never reads as a comb
+  const tree = new Float32Array(n + 1);
+  if (spec.trees) {
+    for (let i = 0; i <= n;) {
+      const w = 2 + Math.floor(rnd() * 3), tall = rnd() < 0.14 ? 0 : 0.45 + rnd() * rnd() * 1.4;
+      for (let k = 0; k < w && i + k <= n; k++) tree[i + k] = tall * (1 - Math.abs((2 * k) / w - 1)) + 0.08;
+      i += w;
+    }
+  }
   const out: BandPoint[] = [];
   for (let i = 0; i <= n; i++) {
     const u = (i / n) * total;
     const p = at(u);
     let h = spec.base + spec.amp * (0.65 * hill(u) + 0.7 * (massing(u) - 0.5));
     if (spec.trees) {
-      // patches of little pine bumps along the crest
+      // patches of little pines along the crest
       const patch = smooth((Math.sin((u / 23) * 6.283 + ph[3]!) + 0.15) * 3);
-      h += patch * (i % 2 === 0 ? 0.9 + 0.5 * rnd() : 0.1);
+      h += patch * tree[i]!;
     }
     const end = Math.min(u, total - u);
     h *= Math.pow(smooth(end / taper), 0.7);

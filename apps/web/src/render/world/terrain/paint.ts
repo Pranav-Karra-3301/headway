@@ -23,14 +23,14 @@ export function paintTerrain(info: Float32Array, count: number, out: Float32Arra
       c.lerp(R.forest, smooth(0.22, 0.55, forest) * 0.9);
       c.lerp(R.upper, smooth(9, 15, h) * 0.55);
       // bare rock: crags (steep, unforested) and the summit caps
-      const crag = smooth(1.3, 1.75, slope) * (1 - 0.7 * smooth(0.3, 0.6, forest));
+      const crag = smooth(1.8, 2.25, slope) * (1 - 0.75 * smooth(0.3, 0.6, forest));
       const cap = smooth(16.8, 19.2, h + 0.8 * n);
       c.lerp(R.rock, Math.max(crag, cap));
       // shores: rocky where steep, sandy coves where flat; darker below the waterline
       const shore = smooth(2.4, 0.6, L) * smooth(1.6, 0.3, h);
       if (shore > 0) c.lerp(slope > 0.55 ? R.cliff : R.sand, shore * (slope > 0.55 ? 0.85 : 1));
       if (h < WATER_LEVEL + 0.2) c.lerp(R.cliff, smooth(WATER_LEVEL + 0.2, WATER_LEVEL - 0.9, h) * 0.6);
-      c.lerp(R.haze, smooth(10, 34, d) * 0.4);
+      c.lerp(R.haze, smooth(10, 34, d) * 0.3);
       c.multiplyScalar(1 + 0.04 * n);
     } else if (kind === KIND.stone) {
       const row = info[o + 1]!, r = info[o + 5]!;

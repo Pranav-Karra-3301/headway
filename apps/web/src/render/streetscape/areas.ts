@@ -10,11 +10,13 @@ import { roleCount } from './roles';
 export type PartFn = (role: string, idx?: number, detail?: boolean) => Mesher;
 
 export interface AreaHeights { lawn: number; plaza: number; parking: number; sports: number; garden: number }
-export interface AreaStats { parkingBays: number; sportsLines: number }
+export interface AreaStats { parkingBays: number; sportsLines: number; plazaFlags: number; gardenRows: number }
 /** Outline of a built area (for walking-surface height queries). */
 export interface AreaOutline { kind: GroundArea['kind']; loop: Loop; top: number }
 
 const PAINT = 0.006;
+/** Gardens up to this area (u²) are flowerbeds; bigger ones are allotment rows. */
+export const GARDEN_FLOWERBED_MAX = 14;
 
 /** Counter-clockwise copy of a polygon with rounded corners. */
 function soften(poly: Vec2[], r: number): Loop {
@@ -56,7 +58,7 @@ export function hash2(x: number, z: number, k = 0): number {
 }
 
 export function buildAreas(areas: GroundArea[], H: AreaHeights, part: PartFn): { stats: AreaStats; outlines: AreaOutline[] } {
-  const stats: AreaStats = { parkingBays: 0, sportsLines: 0 };
+  const stats: AreaStats = { parkingBays: 0, sportsLines: 0, plazaFlags: 0, gardenRows: 0 };
   const outlines: AreaOutline[] = [];
   for (const a of areas) {
     if (a.polygon.length < 3 || Math.abs(loopArea(a.polygon)) < 0.5) continue;
@@ -73,7 +75,8 @@ export function buildAreas(areas: GroundArea[], H: AreaHeights, part: PartFn): {
         slab([{ outer: loop, holes: [] }], { top: H.plaza, bevel: 0.016 }, part('ssPlazaEdge'), part('ssCurb'));
         const inner = offsetLoop(loop, 0.3);
         slab([{ outer: inner, holes: [] }], { top: H.plaza + 0.004, base: H.plaza }, part('ssPlaza'), part('ssPlaza'));
-        outlines.push({ kind: a.kind, loop, top: H.plaza });
+        stats.plazaFlags += flagstones(inner, H.plaza + 0.0055, part('ssPlaza', 1));
+        outlines.push({ kind: a.kind, loop, top: H.plaza + 0.004 });
         break;
       }
       case 'parking': {
@@ -95,14 +98,85 @@ export function buildAreas(areas: GroundArea[], H: AreaHeights, part: PartFn): {
         const inner = offsetLoop(loop, 0.13);
         const rimTop = H.garden + 0.025;
         slab([{ outer: loop, holes: [[...inner].reverse()] }], { top: rimTop, bevel: 0.015 }, part('ssRim'), part('ssRim'));
-        slab([{ outer: inner, holes: [] }], { top: H.garden }, part('ssBed'), part('ssRim'));
-        flowers(inner, H.garden + PAINT, part);
+        if (Math.abs(loopArea(raw)) <= GARDEN_FLOWERBED_MAX) {
+          // a small flowerbed: planted bed with scattered flowers
+          slab([{ outer: inner, holes: [] }], { top: H.garden }, part('ssBed'), part('ssRim'));
+          flowers(inner, H.garden + PAINT, part);
+        } else {
+          // a big garden reads as allotments: soil bed with planted rows (calm at the overview, no speckle)
+          slab([{ outer: inner, holes: [] }], { top: H.garden }, part('ssSoil'), part('ssRim'));
+          stats.gardenRows += gardenRows(inner, H.garden, part);
+        }
         outlines.push({ kind: a.kind, loop, top: H.garden });
         break;
       }
     }
   }
   return { stats, outlines };
+}
+
+/** Checkerboard flagstones over a plaza's inner paving: every other ~1.1 u flag (fitted to the plaza's long edge)
+ *  in the lighter tone, inset a hair so the joints show. Only whole flags inside the paving are drawn. */
+function flagstones(poly: Loop, y: number, m: Mesher): number {
+  const f = frameOf(poly);
+  const T = 1.1, gap = 0.05;
+  const nu = Math.max(1, Math.round((f.u1 - f.u0) / T)), nv = Math.max(1, Math.round((f.v1 - f.v0) / T));
+  const tu = (f.u1 - f.u0) / nu, tv = (f.v1 - f.v0) / nv;
+  let n = 0;
+  for (let j = 0; j < nv; j++) {
+    for (let i = (j % 2); i < nu; i += 2) {
+      const pu0 = f.u0 + i * tu, pv0 = f.v0 + j * tv;
+      const corners = [at(f, pu0 + gap, pv0 + gap), at(f, pu0 + tu - gap, pv0 + gap), at(f, pu0 + tu - gap, pv0 + tv - gap), at(f, pu0 + gap, pv0 + tv - gap)];
+      if (!corners.every((c) => pointInLoop(c, poly))) continue;
+      const c = at(f, pu0 + tu / 2, pv0 + tv / 2);
+      paintQuad(m, c.x, c.z, f.u, tu - 2 * gap, tv - 2 * gap, y);
+      n++;
+    }
+  }
+  return n;
+}
+
+/** Planted rows along a big garden's long edge: rounded green rows (every fourth one a flower row in one soft
+ *  colour), a soil gap between them, inset from the kerb. Returns the row count. */
+function gardenRows(bed: Loop, y: number, part: PartFn): number {
+  const f = frameOf(bed);
+  const PITCH = 0.62, ROW = 0.36, M = 0.22, H = 0.05;
+  const depth = f.v1 - f.v0 - 2 * M;
+  const n = Math.floor((depth + (PITCH - ROW)) / PITCH);
+  if (n < 1) return 0;
+  const v0 = f.v0 + M + (depth - (n * PITCH - (PITCH - ROW))) / 2 + ROW / 2;
+  const ROW_FLOWERS = [0, 2, 3]; // pink, white, lavender: soft, clear of the reserved gameplay hues
+  let rows = 0;
+  for (let r = 0; r < n; r++) {
+    const pv = v0 + r * PITCH;
+    // the row's extent along u: where the centre line stays inside the bed (polygons need not be rectangles)
+    let ua = Infinity, ub = -Infinity;
+    for (let pu = f.u0; pu <= f.u1; pu += 0.1) {
+      if (pointInLoop(at(f, pu, pv - ROW / 2), bed) && pointInLoop(at(f, pu, pv + ROW / 2), bed)) { ua = Math.min(ua, pu); ub = Math.max(ub, pu); }
+    }
+    ua += M; ub -= M;
+    if (ub - ua < 0.6) continue;
+    const flower = r % 4 === 2;
+    const m = flower ? part('ssFlower', ROW_FLOWERS[Math.floor(hash2(f.o.x, f.o.z, r) * ROW_FLOWERS.length) % ROW_FLOWERS.length]) : part('ssBed', r % 2);
+    const c = at(f, (ua + ub) / 2, pv);
+    slab([{ outer: rowLoop(c, f.u, ub - ua, ROW), holes: [] }], { top: y + H, base: y - 0.002, bevel: 0.03 }, m, m);
+    rows++;
+  }
+  return rows;
+}
+
+/** A stadium-shaped loop (rectangle with round ends), CCW, centred at c along unit u. */
+function rowLoop(c: Vec2, u: Vec2, len: number, wid: number): Loop {
+  const r = wid / 2, half = Math.max(0, len / 2 - r), v = { x: -u.z, z: u.x };
+  const out: Vec2[] = [];
+  for (const [s, a0] of [[1, -Math.PI / 2], [-1, Math.PI / 2]] as const) {
+    const e = { x: c.x + u.x * half * s, z: c.z + u.z * half * s };
+    for (let k = 0; k <= 6; k++) {
+      const a = a0 + (k / 6) * Math.PI;
+      out.push({ x: e.x + (u.x * Math.cos(a) + v.x * Math.sin(a)) * r, z: e.z + (u.z * Math.cos(a) + v.z * Math.sin(a)) * r });
+    }
+  }
+  return loopArea(out) < 0 ? out.reverse() : out;
 }
 
 /** Bays along the long side (two rows facing an aisle when the lot is deep enough). Returns the bay count. */

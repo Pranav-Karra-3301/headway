@@ -4,6 +4,7 @@
 // water shader read from it, and the tests check it (nothing on the board, nothing tall hiding gameplay).
 //
 // Frame: board top y = 0, x east, z south; the camera looks from +x/+z, so the lake (south + east) is the foreground.
+import { pointAt } from '@headway/sim';
 import type { TownMap, Vec2 } from '@headway/sim';
 import type { Side, WorldLayout } from '../layout';
 
@@ -56,11 +57,25 @@ export interface Bridge {
   /** Pier centres (distance along `dir`). */
   piers: number[];
   lamps: Array<{ at: number; side: 1 | -1 }>;
+  /** Distance ranges along `dir` with no parapets (level crossings where the rail runs across the causeway). */
+  gaps: Array<[number, number]>;
+}
+
+/** One stretch of the off-board rail: on a deck over the water, or on a ballast berm across the beach. */
+export interface RailRun { kind: 'deck' | 'berm'; pts: Vec2[] }
+/** The rail where the loop leaves the board over the beach and the bay: track runs, piers (with unit tangent). */
+export interface Viaduct {
+  runs: RailRun[];
+  piers: Array<{ x: number; z: number; dx: number; dz: number }>;
+  /** Deck top (the track's ballast sits on it at y = 0) and overall deck width incl. parapets. */
+  deckTop: number;
+  width: number;
 }
 
 export type PropKind =
   | 'hut' | 'umbrella' | 'towel' | 'lifeguard' | 'rowboat' | 'castle' | 'rock' | 'grass' | 'driftwood'
-  | 'boathouse' | 'lamp' | 'flag' | 'bench' | 'lighthouse' | 'cottage' | 'pierDeck' | 'pile' | 'bollard' | 'lifering' | 'crates';
+  | 'boathouse' | 'lamp' | 'flag' | 'bench' | 'lighthouse' | 'cottage' | 'pierDeck' | 'pile' | 'bollard' | 'lifering' | 'crates'
+  | 'xsign';
 
 /** One static thing. y = base height; w × d footprint (x × z before `rot`), h = height above the base. */
 export interface Prop { kind: PropKind; x: number; z: number; y: number; rot: number; v: number; w: number; d: number; h: number }
@@ -97,6 +112,8 @@ export interface WaterPlan {
   point: Capsule;
   marina: Marina;
   bridges: Bridge[];
+  /** The rail loop's lakeshore + bay crossing (empty when the loop stays on the board). */
+  viaduct: Viaduct;
   props: Prop[];
   boats: Boat[];
   lights: LightSpot[];
@@ -165,6 +182,67 @@ export function makeShore(board: Box2, mean: number): Shore {
   return { sMin: minX - 8, sMax: maxX + arc + (maxZ - (minZ - 8)), mean, boardDist, along, width, ground, at };
 }
 
+// ---------------------------------------------------------------- the rail over the beach + bay
+/** Deck top: a hair under the track's ballast (base y = 0). */
+export const RAIL_DECK_Y = -0.01;
+const RAIL_STEP = 0.5;
+
+/** Where the rail loop leaves the board on the lake side (south / east, not the west tunnel): sample it every 0.5 u,
+ *  split it into beach runs (a ballast berm) and water runs (a deck on piers), overlapping by one sample. */
+export function planViaduct(map: TownMap, board: Box2, shore: Shore): Viaduct {
+  const loop = map.rail.loop;
+  const L = loop.length;
+  const n = Math.max(1, Math.floor(L / RAIL_STEP));
+  const step = L / n;
+  const off = (p: Vec2) => shore.boardDist(p.x, p.z) > 0.01 && p.x > board.minX && p.z > board.minZ;
+  const pts = Array.from({ length: n }, (_, i) => pointAt(loop, i * step));
+  const runs: RailRun[] = [];
+  const piers: Viaduct['piers'] = [];
+  const result: Viaduct = { runs, piers, deckTop: RAIL_DECK_Y, width: 2.7 };
+  const start = pts.findIndex((p) => !off(p));
+  if (start < 0) return result;
+  // walk the loop once from an on-board sample, collecting contiguous off-board stretches
+  let cur: number[] | null = null;
+  const stretches: number[][] = [];
+  for (let k = 1; k <= n; k++) {
+    const i = (start + k) % n;
+    if (off(pts[i]!)) (cur ??= []).push(i);
+    else if (cur) { stretches.push(cur); cur = null; }
+  }
+  const wet = (p: Vec2) => shore.ground(p.x, p.z) < WATER_Y + 0.25;
+  for (const st of stretches) {
+    // one sample back onto the board at each end so the berm meets the board edge
+    const idx = [(st[0]! - 1 + n) % n, ...st, (st[st.length - 1]! + 1) % n];
+    let run: RailRun | null = null;
+    idx.forEach((i) => {
+      const p = pts[i]!;
+      const kind: RailRun['kind'] = wet(p) ? 'deck' : 'berm';
+      if (!run || run.kind !== kind) {
+        const prev: Vec2 | undefined = run?.pts[run.pts.length - 1];
+        run = { kind, pts: prev ? [prev] : [] };
+        runs.push(run);
+      }
+      run.pts.push(p);
+    });
+  }
+  // piers under the decks, every ~4.4 u of arc, only where the water is deep enough
+  for (const run of runs) {
+    if (run.kind !== 'deck') continue;
+    let acc = 0, next = 1.4;
+    for (let k = 1; k < run.pts.length; k++) {
+      const a = run.pts[k - 1]!, b = run.pts[k]!;
+      acc += Math.hypot(b.x - a.x, b.z - a.z);
+      if (acc < next) continue;
+      if (shore.ground(b.x, b.z) >= WATER_Y - 0.35) { next = acc + 0.5; continue; }
+      const c = run.pts[Math.min(run.pts.length - 1, k + 1)]!, o = run.pts[Math.max(0, k - 1)]!;
+      const tl = Math.hypot(c.x - o.x, c.z - o.z) || 1;
+      piers.push({ x: b.x, z: b.z, dx: (c.x - o.x) / tl, dz: (c.z - o.z) / tl });
+      next = acc + 4.4;
+    }
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------- plan
 export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
   const board: Box2 = { ...map.bounds };
@@ -192,6 +270,29 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
   };
   const disc = (x: number, z: number, r: number) => foam.push({ a: { x, z }, b: { x, z }, r });
 
+  // ---- the rail loop off the board's south edge: a ballast berm across the beach, a viaduct over the bay
+  const viaduct = planViaduct(map, board, shore);
+  const loop = map.rail.loop;
+  const railPts: Vec2[] = [];
+  for (let d = 0; d < loop.length; d += 0.25) {
+    const p = pointAt(loop, d);
+    if (p.z > board.maxZ - 8 || p.x > board.maxX - 8) railPts.push(p); // only the stretches near the lake matter
+  }
+  /** Distance to the rail centreline (near the lake). */
+  const railDist = (x: number, z: number): number => {
+    let m = Infinity;
+    for (const p of railPts) { const d = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z); if (d < m) m = d; }
+    return Math.sqrt(m);
+  };
+  for (const pr of viaduct.piers) {
+    const nx = -pr.dz, nz = pr.dx, hw = viaduct.width / 2 - 0.3;
+    foam.push({ a: { x: pr.x - nx * hw, z: pr.z - nz * hw }, b: { x: pr.x + nx * hw, z: pr.z + nz * hw }, r: 0.42 });
+  }
+  for (const run of viaduct.runs) {
+    if (run.kind !== 'deck') continue;
+    for (const p of [run.pts[0]!, run.pts[run.pts.length - 1]!]) if (shore.ground(p.x, p.z) < WATER_Y + 0.1) disc(p.x, p.z, 1.2);
+  }
+
   // ---- causeways: one per water-side road exit, from the board edge to the diorama edge
   const bridges: Bridge[] = [];
   for (const e of layout.exits) {
@@ -208,12 +309,33 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
     shoreAt += 0.7; // the abutment's toe stands in the shallows
     const piers: number[] = [];
     for (let at = shoreAt + 3.1; at < len - 1.6; at += 4.6) piers.push(at);
+    // level crossings: where the rail runs across the causeway, open the parapets (±2 u) and keep lamps away
+    const gaps: Array<[number, number]> = [];
+    for (let at = 0; at <= len; at += 0.05) {
+      if (railDist(e.p.x + dir.x * at, e.p.z + dir.z * at) > 1.6) continue;
+      const last = gaps[gaps.length - 1];
+      if (last && at - 0.4 <= last[1] + 0.1) last[1] = at + 0.4;
+      else gaps.push([Math.max(0, at - 0.4), at + 0.4]);
+    }
     const lamps: Bridge['lamps'] = [];
     let side: 1 | -1 = 1;
-    for (let at = 1.8; at < len - 2.5; at += 8.6) { lamps.push({ at, side }); side = side === 1 ? -1 : 1; }
-    const br: Bridge = { edgeId: e.edgeId, side: e.side, from: { x: e.p.x, z: e.p.z }, dir, len, width: 3.5, shoreAt, piers, lamps };
+    for (let at = 1.8; at < len - 2.5; at += 8.6) {
+      let a = at;
+      while (a < len - 2.5 && railDist(e.p.x + dir.x * a, e.p.z + dir.z * a) < 2.4) a += 0.5;
+      if (a >= len - 2.5) continue;
+      lamps.push({ at: a, side });
+      side = side === 1 ? -1 : 1;
+    }
+    const br: Bridge = { edgeId: e.edgeId, side: e.side, from: { x: e.p.x, z: e.p.z }, dir, len, width: 3.5, shoreAt, piers, lamps, gaps };
     bridges.push(br);
     const nx = -dir.z, nz = dir.x;
+    // a level-crossing sign past each crossing, on the camera-side sidewalk (so it never hides the track)
+    for (const [, c] of gaps) {
+      const off = br.width / 2 - 0.3, at = c + 0.35;
+      const cands = [1, -1].map((sd) => ({ x: e.p.x + dir.x * at + nx * off * sd, z: e.p.z + dir.z * at + nz * off * sd }));
+      const q = cands[0]!.x + cands[0]!.z > cands[1]!.x + cands[1]!.z ? cands[0]! : cands[1]!;
+      if (at < len - 1) add({ kind: 'xsign', x: q.x, z: q.z, y: DECK_Y + 0.07, rot: Math.atan2(dir.x, dir.z) + Math.PI, w: 0.5, d: 0.2, h: 1.45 });
+    }
     for (const at of piers) {
       const cx = e.p.x + dir.x * at, cz = e.p.z + dir.z * at, hw = br.width / 2 - 0.25;
       foam.push({ a: { x: cx - nx * hw, z: cz - nz * hw }, b: { x: cx + nx * hw, z: cz + nz * hw }, r: 0.42 });
@@ -245,8 +367,8 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
       return along > -pad && along < br.len + pad && across < br.width / 2 + pad;
     });
 
-  // ---- marina: a boardwalk from the south beach near the SE corner, two finger rows and a T head
-  const MX = 22.5;
+  // ---- marina: a boardwalk from the south-west beach (the rail viaduct owns the south-east), two finger rows, a T head
+  const MX = -14.5;
   const zw = board.maxZ + shore.width(MX);
   const marina: Marina = { x: MX, root: board.maxZ + 1.3, waterline: zw, rows: [zw + 3.1, zw + 6.2], head: zw + 9.2, finger: 4.3 };
   {
@@ -306,34 +428,34 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
     boats.push({ kind: 'buoy', v: 1, x: MX + 7.4, z: marina.rows[0]! + 0.4, heading: 0, bob: 0.8, seed: 12.7 });
   }
 
-  // ---- beach life on the south beach, west of the causeway: huts, umbrellas, a lifeguard chair
+  // ---- beach huts on the south-west beach, with a swim-zone float line off them
   const hutZ = (x: number) => board.maxZ + 1.25 + (shore.width(x) - mean) * 0.2;
   for (let i = 0; i < 5; i++) {
-    const x = -29.6 + i * 2.05;
+    const x = -31.2 + i * 2.05;
     add({ kind: 'hut', x, z: hutZ(x), v: i, w: 1.5, d: 1.3, h: 2.05 });
   }
-  const umbrellas: Array<[number, number, number]> = [[-17.6, 2.05, 0], [-14.2, 2.35, 1], [-10.9, 1.95, 2]];
+  for (let k = 0; k < 5; k++) {
+    const x = -33 + k * 2.2;
+    boats.push({ kind: 'float', v: k % 2, x, z: board.maxZ + shore.width(x) + 1.7 + Math.sin(k * 1.3) * 0.15, heading: 0, bob: 0.6, seed: 31 + k });
+  }
+  // ---- the lagoon beach: sheltered behind the rail viaduct (south-east): umbrellas, towels, a lifeguard chair, a
+  //      sandcastle, a beached rowboat, driftwood, and a duck family paddling in the lagoon
+  const umbrellas: Array<[number, number, number]> = [[12.4, 2.0, 0], [15.9, 2.35, 1], [19.3, 1.95, 2]];
   for (const [x, d, v] of umbrellas) {
     add({ kind: 'umbrella', x, z: board.maxZ + d, v, w: 1.4, d: 1.4, h: 1.55 });
     add({ kind: 'towel', x: x + 0.55, z: board.maxZ + d + 0.55, v: v + 1, rot: 0.25 - v * 0.2, w: 0.6, d: 1.1, h: 0.02 });
   }
-  add({ kind: 'lifeguard', x: -6.9, z: board.maxZ + 1.7, w: 1.0, d: 1.0, h: 2.3 });
-  // a duck family paddling off the huts and a swim-zone float line
+  add({ kind: 'lifeguard', x: 22.6, z: board.maxZ + 1.7, w: 1.0, d: 1.0, h: 2.3 });
+  add({ kind: 'castle', x: 14.1, z: board.maxZ + 2.75, w: 0.7, d: 0.7, h: 0.5 });
+  add({ kind: 'rowboat', x: 24.9, z: board.maxZ + 2.4, rot: 0.35, w: 1.5, d: 0.7, h: 0.45 });
+  add({ kind: 'driftwood', x: 10.4, z: board.maxZ + 2.7, rot: -0.4, w: 1.6, d: 0.3, h: 0.2 });
+  add({ kind: 'bench', x: 10.2, z: board.maxZ + 0.9, rot: 0, w: 1.3, d: 0.5, h: 0.6 });
   {
     const lead = boats.length;
-    const cz = board.maxZ + mean + 3.3;
-    boats.push({ kind: 'duck', v: 0, x: -18, z: cz, heading: 0, bob: 0.5, seed: 21.3, loop: { cx: -17.5, cz, rx: 3.4, rz: 1.1, period: 74, phase: 0.4, cw: false } });
-    for (let k = 1; k <= 3; k++) boats.push({ kind: 'duckling', v: 0, x: -18, z: cz, heading: 0, bob: 0.5, seed: 21.3 + k, follow: { lead, lag: k * 1.55 } });
-    for (let k = 0; k < 6; k++) {
-      const x = -30.5 + k * 2.2;
-      boats.push({ kind: 'float', v: k % 2, x, z: board.maxZ + shore.width(x) + 1.7 + Math.sin(k * 1.3) * 0.15, heading: 0, bob: 0.6, seed: 31 + k });
-    }
+    const cz = board.maxZ + mean + 2.35;
+    boats.push({ kind: 'duck', v: 0, x: 17, z: cz, heading: 0, bob: 0.5, seed: 21.3, loop: { cx: 17.2, cz, rx: 3.2, rz: 0.6, period: 74, phase: 0.4, cw: false } });
+    for (let k = 1; k <= 3; k++) boats.push({ kind: 'duckling', v: 0, x: 17, z: cz, heading: 0, bob: 0.5, seed: 21.3 + k, follow: { lead, lag: k * 1.55 } });
   }
-  // the beach east of the causeway: a beached rowboat, a sandcastle, driftwood
-  add({ kind: 'rowboat', x: 7.2, z: board.maxZ + 2.25, rot: 0.35, w: 1.5, d: 0.7, h: 0.45 });
-  add({ kind: 'castle', x: 10.6, z: board.maxZ + 2.3, w: 0.7, d: 0.7, h: 0.5 });
-  add({ kind: 'driftwood', x: 14.4, z: board.maxZ + 2.55, rot: -0.4, w: 1.6, d: 0.3, h: 0.2 });
-  add({ kind: 'bench', x: 3.6, z: board.maxZ + 1.0, rot: 0, w: 1.3, d: 0.5, h: 0.6 });
 
   // ---- the lighthouse point
   {
@@ -382,6 +504,7 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
   // ---- dune grass along the dry sand (skipping props, the causeways and the point's root)
   const blocked = (x: number, z: number, r: number) =>
     inBridgeCorridor(x, z, r + 0.4) ||
+    railDist(x, z) < r + 1.5 ||
     capsuleDist({ x, z }, point) < r + 0.6 ||
     props.some((p) => p.kind !== 'grass' && p.kind !== 'pile' && Math.hypot(p.x - x, p.z - z) < r + Math.max(p.w, p.d) / 2 + 0.25);
   for (let s = board.minX + 1.2; s < shore.sMax - 10; s += 1.15 + rnd() * 1.4) {
@@ -397,14 +520,14 @@ export function planWater(map: TownMap, layout: WorldLayout): WaterPlan {
   // ---- sailing: two yachts tacking slow loops on open water
   boats.push({ kind: 'sail', v: 3, x: 0, z: 0, heading: 0, bob: 1.1, seed: 41.5, loop: { cx: 10.5, cz: board.maxZ + 20.5, rx: 6.2, rz: 3.3, period: 88, phase: 0.6, cw: false } });
   boats.push({ kind: 'sail', v: 4, x: 0, z: 0, heading: 0, bob: 1.1, seed: 47.9, loop: { cx: board.maxX + 19.5, cz: -14.0, rx: 4.0, rz: 6.3, period: 96, phase: 2.4, cw: true } });
-  boats.push({ kind: 'motor', v: 2, x: 0, z: 0, heading: 0, bob: 0.9, seed: 53.1, loop: { cx: -21, cz: board.maxZ + 17.5, rx: 8.5, rz: 3.2, period: 72, phase: 3.9, cw: true } });
+  boats.push({ kind: 'motor', v: 2, x: 0, z: 0, heading: 0, bob: 0.9, seed: 53.1, loop: { cx: -25, cz: board.maxZ + 20, rx: 7, rz: 3, period: 72, phase: 3.9, cw: true } });
   for (const bt of boats) if (bt.loop && !bt.follow) { const p = boatPose({ boats } as WaterPlan, bt, 0); bt.x = p.x; bt.z = p.z; bt.heading = p.heading; }
 
   const regions: Box2[] = [
     { minX: extent.minX, maxX: extent.maxX, minZ: board.maxZ - 0.5, maxZ: extent.maxZ },
     { minX: board.maxX - 0.5, maxX: extent.maxX, minZ: extent.minZ, maxZ: board.maxZ - 0.5 },
   ];
-  return { board, extent, shore, point, marina, bridges, props, boats, lights, foam, regions, waterDist };
+  return { board, extent, shore, point, marina, bridges, viaduct, props, boats, lights, foam, regions, waterDist };
 }
 
 // ---------------------------------------------------------------- motion

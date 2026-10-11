@@ -5,11 +5,13 @@
 //   top at STREETSCAPE.roadTop, just below the composer's road top, so its strips + centre dashes stay on top.
 // - Zebra crossings on every arm of the junctions nearest the stops, and a painted bay at every bus stop.
 // - District `paths` as gravel footpaths (smooth unions where paths meet, flared where they join a sidewalk) and
-//   plaza-edge bands; district `areas` as lawn / plaza / parking (painted bays) / sports (pitch lines) / garden.
+//   plaza-edge bands; district `areas` as lawn / plaza (flagstone checker) / parking (painted bays) / sports (pitch
+//   lines) / garden (small: flowerbed; big: allotment rows). Paving joints groove the sidewalks (detail).
+// - Colours adapt to the palette's road value (roles.ts): light stone + white zebras on asphalt, darker on cream.
 // Everything is baked into ONE kit geometry (vertex colours by palette role) drawn with one KitMaterial.
 // `heightAt(x, z)` (also on `layer.object.userData.heightAt`) gives the walking-surface height for people/props.
 import * as THREE from 'three';
-import { ROAD_WIDTH } from '@headway/sim';
+import { pointAt, ROAD_WIDTH } from '@headway/sim';
 import type { TownMap, Vec2 } from '@headway/sim';
 import type { DistrictScenery, FootPath, GroundArea } from '../districts/types';
 import { bakeGeometry, recolorBaked, type Baked } from '../kit/bake';
@@ -63,7 +65,7 @@ export interface StreetscapeBuild {
   bays: Bay[];
   /** Walking-surface height at (x, z): sidewalk / path / area top, 0 on the bare board and on the carriageway. */
   heightAt(x: number, z: number): number;
-  stats: { triangles: number; ms: number; parkingBays: number; sportsLines: number };
+  stats: { triangles: number; ms: number; parkingBays: number; sportsLines: number; plazaFlags: number; gardenRows: number; joints: number };
 }
 
 class Parts {
@@ -122,6 +124,7 @@ export function buildStreetscape(map: TownMap, districts: DistrictScenery[], pal
   // ---- corner road fill + sidewalks
   slab(regions(g, bed, undefined, 0.002, 0.0005), { top: S.roadTop }, parts.get('road'), parts.get('road'));
   slab(regions(g, walk), { top: S.walkTop, bevel: S.bevel }, parts.get('ssWalk'), parts.get('ssCurb'));
+  const joints = sidewalkJoints(map, g, walk, parts.get('ssJoint', 0, true));
 
   // ---- bus-stop bays and zebra crossings (skipping any crossing that would overlap a bay)
   const bays = stopBays(map, h, BAY.len, BAY.wid);
@@ -192,7 +195,42 @@ export function buildStreetscape(map: TownMap, districts: DistrictScenery[], pal
   const triangles = (index ? index.count : baked.geometry.getAttribute('position').count) / 3;
 
   const heightAt = (x: number, z: number): number => surfaceHeight(map, corners, outlines, pathFields, x, z);
-  return { baked, crossings, bays, heightAt, stats: { triangles, ms: now() - t0, ...areaStats } };
+  return { baked, crossings, bays, heightAt, stats: { triangles, ms: now() - t0, ...areaStats, joints } };
+}
+
+/** Paving joints: a thin groove across both sidewalks every JOINT u along each road edge, only where the whole
+ *  joint lies on sidewalk (so none cross a junction corner, the rail gap or the board edge). */
+const JOINT = { pitch: 1.2, wid: 0.05, inset: 0.1 } as const;
+function sidewalkJoints(map: TownMap, g: ReturnType<typeof makeGrid>, walk: Float32Array, m: Mesher): number {
+  const S = STREETSCAPE, h = S.roadHalf, w = S.walk;
+  let count = 0;
+  const at = (x: number, z: number) => {
+    const i = Math.round((x - g.x0) / g.c), j = Math.round((z - g.z0) / g.c);
+    return i < 0 || j < 0 || i >= g.nx || j >= g.nz ? 1 : walk[j * g.nx + i]!;
+  };
+  const nodes = map.roads.nodes.map((n) => n.p);
+  for (const e of map.roads.edges) {
+    const n0 = Math.floor((e.path.length - 1.2) / JOINT.pitch);
+    if (n0 < 1) continue;
+    const start = (e.path.length - n0 * JOINT.pitch) / 2;
+    for (let k = 0; k <= n0; k++) {
+      const d = start + k * JOINT.pitch;
+      const p = pointAt(e.path, d), q = pointAt(e.path, Math.min(e.path.length, d + 0.05));
+      const L = Math.hypot(q.x - p.x, q.z - p.z);
+      if (L < 1e-6) continue;
+      const n = { x: -(q.z - p.z) / L, z: (q.x - p.x) / L };
+      if (nodes.some((o) => Math.hypot(o.x - p.x, o.z - p.z) < h + w + 0.4)) continue;
+      for (const side of [-1, 1]) {
+        const r0 = h + JOINT.inset, r1 = h + w - JOINT.inset * 0.6;
+        const a = { x: p.x + n.x * side * r0, z: p.z + n.z * side * r0 }, b = { x: p.x + n.x * side * r1, z: p.z + n.z * side * r1 };
+        const c = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        if (at(a.x, a.z) > -0.03 || at(b.x, b.z) > -0.03 || at(c.x, c.z) > -0.03) continue;
+        paintQuad(m, c.x, c.z, { x: n.x * side, z: n.z * side }, r1 - r0, JOINT.wid, S.walkTop + 0.004);
+        count++;
+      }
+    }
+  }
+  return count;
 }
 
 /** Painted bay: an open box along the kerb (long line on the road side, two end ticks) + corner ticks. */

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { pointAt, TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
-import { cellCenter, cellOf, greaterGrid, inGrid, KERB, linkLanes, roadAt, useAt, type Lane } from '../../grid';
+import { cellCenter, cellOf, cellRect, greaterGrid, inGrid, isWater, KERB, linkLanes, roadAt, useAt, type Lane } from '../../grid';
 import { across, boardExits, planNetwork } from '../plan';
 import { gridFrame } from '../cells';
 
@@ -70,23 +70,25 @@ describe('greater road network', () => {
     }
   });
 
-  it('puts a roundabout on every road leaving the board, plus the foothill and harbour circles', () => {
+  it('puts a roundabout on every road leaving the board (Foothill Circle beyond the ridge spur for Main St)', () => {
     const exits = boardExits(TOWN);
     expect(exits.length).toBe(4);
-    expect(g.roundabouts.length).toBe(6);
+    expect(g.roundabouts.length).toBe(4);
     for (const e of exits) {
-      const rb = g.roundabouts.filter((r) => dist(r.center, e.p) < 13);
-      expect(rb.length, `roundabout near ${e.side} exit`).toBeGreaterThanOrEqual(1);
+      const axis = e.side === 'n' || e.side === 's' ? 'x' : 'z';
+      const rb = g.roundabouts.filter((r) => Math.abs(r.center[axis] - e.p[axis]) < 2 && dist(r.center, e.p) < 24);
+      expect(rb.length, `roundabout on the ${e.side} exit axis`).toBe(1);
       const port = g.ports.find((p) => p.kind === 'board' && dist(p.p, e.p) < 0.01);
       expect(port, `board port at ${e.side} exit`).toBeDefined();
       expect(port!.inLane && port!.outLane).toBeTruthy();
+      expect(port!.townEdge, `town edge for ${e.side}`).toBeTruthy();
     }
     for (const r of g.roundabouts) expect(r.islandR).toBeLessThan(r.laneR);
   });
 
   it('has the named streets with centrelines inside the grid', () => {
     const names = g.streets.map((s) => s.name);
-    for (const n of ['Ring Rd', 'Foothill Rd', 'Lakeshore Pkwy', 'Bayview Ave', 'Mill St', 'Harbor St']) expect(names).toContain(n);
+    for (const n of ['Ring Rd', 'Foothill Rd', 'Lakeshore Pkwy', 'Stadium Way', 'Main St', 'Atherton St']) expect(names).toContain(n);
     for (const s of g.streets) for (const p of s.paths) for (const q of p.points) {
       expect(q.x).toBeGreaterThanOrEqual(g.bounds.minX - 1e-9);
       expect(q.x).toBeLessThanOrEqual(g.bounds.maxX + 1e-9);
@@ -94,6 +96,65 @@ describe('greater road network', () => {
       expect(q.z).toBeLessThanOrEqual(g.bounds.maxZ + 1e-9);
     }
     expect(g.junctions.some((j) => j.kind === 'tee' && j.signals)).toBe(true);
+  });
+});
+
+describe('greater land: rail, ridge spur, bay (v9)', () => {
+  const b = TOWN.bounds;
+  const off = (p: Vec2) => p.x < b.minX || p.x > b.maxX || p.z < b.minZ || p.z > b.maxZ;
+  const rail: Vec2[] = [];
+  for (let d = 0; d < TOWN.rail.loop.length; d += 0.5) rail.push(pointAt(TOWN.rail.loop, d));
+
+  it('keeps every road tile clear of the off-board rail except square-on level crossings', () => {
+    const crossings = g.roads.filter((t) => t.railCrossing);
+    expect(crossings.length).toBeGreaterThanOrEqual(1);
+    for (const t of g.roads) {
+      const R = cellRect(g, t.cells.c, t.cells.r, t.cells.w, t.cells.h);
+      const near = rail.filter((p) => off(p) && p.x >= b.minX && p.x > R.minX - 1.2 && p.x < R.maxX + 1.2 && p.z > R.minZ - 1.2 && p.z < R.maxZ + 1.2);
+      if (!t.railCrossing) { expect(near.length, `${t.id} touches the rail`).toBe(0); continue; }
+      expect(t.kind === 'straight' || t.kind === 'crossing').toBe(true);
+      // square-on: the rail runs across the road axis
+      const along = t.open.includes('n') ? { x: 0, z: 1 } : { x: 1, z: 0 };
+      const i = rail.indexOf(near[0]!), a = rail[Math.max(0, i - 1)]!, c = rail[Math.min(rail.length - 1, i + 1)]!;
+      const L = dist(a, c);
+      expect(Math.abs(((c.x - a.x) * along.x + (c.z - a.z) * along.z) / L)).toBeLessThan(0.35);
+    }
+  });
+
+  it('puts the rail bridge over the bay and the beach run on land', () => {
+    let wet = 0;
+    for (const p of rail) {
+      if (!off(p) || p.x < b.minX || p.x > g.bounds.maxX || p.z > g.bounds.maxZ) continue;
+      if (p.z > b.maxZ + 4 + 0.5) { expect(isWater(g, p.x, p.z), `bridge ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBe(true); wet++; }
+      if (p.z < b.maxZ + 4 - 0.5) expect(isWater(g, p.x, p.z), `beach ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBe(false);
+    }
+    expect(wet).toBeGreaterThan(20);
+    expect(isWater(g, 0, -40)).toBe(false);
+    expect(isWater(g, 50, 45)).toBe(true);
+  });
+
+  it('raises the ridge spur over the whole off-board tunnel run (Main St cuts through it)', () => {
+    let n = 0;
+    for (const p of rail) {
+      if (p.x >= b.minX - 0.5) continue;
+      const { c, r } = cellOf(g, p.x, p.z);
+      expect(['hill', 'road'], `tunnel at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toContain(g.use[r]![c]);
+      n++;
+    }
+    expect(n).toBeGreaterThan(20);
+  });
+
+  it('never stands a roundabout or curve in the bay; causeways are bridges that leave the grid', () => {
+    for (const t of g.roads) {
+      for (let r = t.cells.r; r < t.cells.r + t.cells.h; r++) for (let c = t.cells.c; c < t.cells.c + t.cells.w; c++) {
+        const p = cellCenter(g, c, r);
+        if (t.kind === 'roundabout' || t.kind === 'curve' || t.kind === 'connector') expect(isWater(g, p.x, p.z), `${t.id}`).toBe(false);
+        else expect(!!t.bridge, `${t.id} bridge flag`).toBe(isWater(g, p.x, p.z));
+      }
+    }
+    const edges = g.ports.filter((p) => p.kind === 'edge').map((p) => p.side).sort();
+    expect(edges).toEqual(['e', 's', 'w']);
+    expect(g.ports.filter((p) => p.kind === 'highway').length).toBe(1);
   });
 });
 
@@ -177,7 +238,7 @@ describe('greater lanes', () => {
       expect(cross).toBeLessThan(0); // angle decreasing in x/z = anticlockwise with north up
       expect(Math.abs(dist(a, rb.center) - rb.laneR)).toBeLessThan(1e-6);
     }
-    expect(g.lanes.filter((l) => l.yield).length).toBe(6 * 4);
+    expect(g.lanes.filter((l) => l.yield).length).toBe(g.roundabouts.length * 4);
   });
 
   it('linkLanes joins foreign lanes by geometry', () => {
@@ -208,5 +269,12 @@ describe('greater blocks', () => {
     const zones = new Set(g.blocks.map((b) => b.zone));
     for (const z of ['suburb', 'commercial', 'industrial', 'frontage', 'waterfront', 'verge'] as const) expect(zones.has(z), z).toBe(true);
     for (const b of g.blocks) if (b.zone === 'suburb' || b.zone === 'commercial' || b.zone === 'industrial') expect(b.frontage.length, b.id).toBeGreaterThan(0);
+    for (const b of g.blocks) {
+      expect(b.density).toBeGreaterThanOrEqual(0);
+      expect(b.density).toBeLessThanOrEqual(1);
+    }
+    const ds = g.blocks.map((b) => b.density);
+    expect(Math.max(...ds) - Math.min(...ds)).toBeGreaterThan(0.5); // thins out: organic edges
+    expect(g.blocks.some((b) => b.shore)).toBe(true);
   });
 });

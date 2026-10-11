@@ -63,10 +63,11 @@ describe('terrain field: the board stays playable', () => {
       const nx = -Math.sin(p.heading), nz = -Math.cos(p.heading); // perpendicular to the heading (cos h, -sin h)
       for (const o of [-1.1, -0.68, 0, 0.68, 1.1]) {
         const x = p.x + nx * o, z = p.z + nz * o;
-        if (inside(d, -0.3) && Math.abs(o) <= 0.7) {
+        // margins: a skew portal (facade along the board edge, track at an angle) moves the mouth by up to ~1 u
+        if (inside(d, -1.5) && Math.abs(o) <= 0.7) {
           roofs++;
           expect(f.height(x, z), `tunnel roof at d=${d.toFixed(2)} o=${o}`).toBeGreaterThan(2.4);
-        } else if (!inside(d, 0.05)) {
+        } else if (!inside(d, 1.2)) {
           expect(covered(x, z), `open rail at d=${d.toFixed(2)} o=${o}`).toBe(false);
         }
       }
@@ -76,19 +77,28 @@ describe('terrain field: the board stays playable', () => {
 });
 
 describe('terrain field: tunnels and portals', () => {
-  it('splits the rail tunnel around road crossings and keeps it inside the layout span', () => {
+  it('covers the layout span, growing only over off-board ground (the whole run through the ridge is underground)', () => {
     const rt = layout.railTunnel!;
     expect(f.tunnels.length).toBeGreaterThanOrEqual(1);
     const total = f.tunnels.reduce((a, t) => a + (t.toDist - t.fromDist), 0);
     expect(total).toBeGreaterThan(0.5 * (rt.toDist - rt.fromDist));
     for (const t of f.tunnels) {
-      expect(t.fromDist).toBeGreaterThanOrEqual(rt.fromDist - 1e-6);
-      expect(t.toDist).toBeLessThanOrEqual(rt.toDist + 1e-6);
       expect(t.toDist - t.fromDist).toBeGreaterThanOrEqual(2.4);
+      for (let d = t.fromDist + 0.05; d < t.toDist; d += 0.25) {
+        if (d >= rt.fromDist && d <= rt.toDist) continue;
+        const p = pointAt(TOWN.rail.loop, d);
+        expect(p.x < B.minX || p.z < B.minZ, `grown tunnel on the board at d=${d.toFixed(2)}`).toBe(true);
+      }
+    }
+    // no off-board rail on the mountain sides is left open (it would be buried by the foothills)
+    for (let d = 0; d < TOWN.rail.loop.length; d += 0.5) {
+      const p = pointAt(TOWN.rail.loop, d);
+      const mountainSide = (p.x < B.minX - 0.5 || p.z < B.minZ - 0.5) && p.x < B.maxX && p.z < B.maxZ;
+      if (mountainSide) expect(f.tunnels.some((t) => d >= t.fromDist && d <= t.toDist), `open rail in the ridge at d=${d}`).toBe(true);
     }
   });
 
-  it('has a rail portal at both ends of every tunnel, facing out along the track', () => {
+  it('has a rail portal at both ends of every tunnel, facing out of it (skewed onto the board edge off the board)', () => {
     const rail = f.portals.filter((p) => p.kind === 'rail');
     expect(rail).toHaveLength(f.tunnels.length * 2);
     for (const t of f.tunnels) {
@@ -97,8 +107,15 @@ describe('terrain field: tunnels and portals', () => {
         const portal = rail.find((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.05);
         expect(portal, `portal at d=${d}`).toBeTruthy();
         const tx = Math.cos(p.heading) * sign, tz = -Math.sin(p.heading) * sign;
-        expect(portal!.face.x * tx + portal!.face.z * tz).toBeGreaterThan(0.99);
+        const onEdge = Math.abs(portal!.x - B.minX) < 1e-6 || Math.abs(portal!.z - B.minZ) < 1e-6;
+        expect(portal!.face.x * tx + portal!.face.z * tz).toBeGreaterThan(onEdge ? 0.5 : 0.99);
+        if (onEdge) expect(portal!.face.x === 1 || portal!.face.z === 1, 'edge portals face the town').toBe(true);
         expect(portal!.half).toBe(RAIL_PORTAL.half);
+        // the facade stands wholly off the board, and the hill behind it is facade-high
+        for (const a of [-RAIL_PORTAL.half, 0, RAIL_PORTAL.half]) {
+          const x = portal!.x - portal!.face.x * 0.3 + portal!.face.z * a, z = portal!.z - portal!.face.z * 0.3 - portal!.face.x * a;
+          expect(f.height(x, z), `hill behind ${portal!.id}`).toBeGreaterThan(RAIL_PORTAL.top - 0.6);
+        }
       }
     }
   });

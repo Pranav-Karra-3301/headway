@@ -1,4 +1,4 @@
-import { POLICY_DSL_DOC } from '@headway/sim';
+import { POLICY_DSL_DOC, SCENARIOS, TOWN } from '@headway/sim';
 import { describe, expect, it } from 'vitest';
 import { designerSystemPrompt, designerUserPrompt, repairPrompt } from '../src/prompts';
 import { POLICY } from './fixtures';
@@ -10,9 +10,27 @@ describe('designer prompts', () => {
     expect(sys).toMatch(/policy designer/i);
     for (const key of ['"summary"', '"rationale"', '"changes"', '"policy"']) expect(sys).toContain(key);
     expect(sys).toMatch(/json/i);
-    expect(sys).toMatch(/at most 3/i);
+    expect(sys).toMatch(/at most 2 focused changes/i);
+    expect(sys).not.toMatch(/at most 3/i);
     // topology is spelled out so rules can be reasoned about
     expect(sys).toContain('central_stn → downtown → old_main → university_stn');
+  });
+
+  it('reads scenario numbers from @headway/sim instead of hard-coding them', () => {
+    const sys = designerSystemPrompt();
+    const crowd = SCENARIOS.stadium_exit.demand.filter((g) => g.id !== 'background').reduce((a, g) => a + g.total, 0);
+    expect(sys).toContain(`About ${(Math.round(crowd / 10) * 10).toLocaleString('en-US')} riders in the crowd`);
+    expect(sys).toContain(`trains every ${TOWN.rail.advertisedHeadwayS} s`);
+    expect(sys).toContain(TOWN.rail.stations.map((s) => s.name).join(' → '));
+    expect(sys).not.toContain('1,200');
+  });
+
+  it('guides allocation changes towards the least-pressured route and protects Central transfers', () => {
+    const sys = designerSystemPrompt();
+    expect(sys).toMatch(/take buses only from the least-pressured route/);
+    expect(sys).toMatch(/every route at >= 1 bus/);
+    expect(sys).toMatch(/Central is the r1\/r2 terminal/);
+    expect(sys).toMatch(/Jev \(the advisor\) is off/);
   });
 
   it('user prompt carries the emphasis directive, the champion JSON and the digest', () => {

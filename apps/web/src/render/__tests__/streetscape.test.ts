@@ -8,6 +8,8 @@ import { pointAt, projectOnPolyline, TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
 import type { DistrictScenery, GroundArea } from '../districts/types';
 import { buildStreetscape, createStreetscapeLayer, STREETSCAPE } from '../streetscape';
+import { okL, resolveRole } from '../streetscape/roles';
+import { type Palette, PALETTES } from '../palettes';
 
 const S = STREETSCAPE;
 const H = S.roadHalf;
@@ -160,6 +162,10 @@ describe('sidewalks and curbs', () => {
     expect(bad).toEqual([]);
   });
 
+  it('grooves paving joints across the sidewalks', () => {
+    expect(full.stats.joints).toBeGreaterThan(150);
+  });
+
   it('rounds the curb at every corner of a crossroads', () => {
     const j = TOWN.roads.nodes.find((n) => n.id === 'j_main_atherton')!.p;
     for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
@@ -247,5 +253,41 @@ describe('district paths and areas', () => {
     expect(full.stats.parkingBays).toBeGreaterThanOrEqual(6);
     expect(full.stats.sportsLines).toBeGreaterThanOrEqual(4);
     expect(plain.stats.parkingBays).toBe(0);
+  });
+
+  it('plants big gardens as allotment rows and small ones as flowerbeds', () => {
+    expect(full.stats.gardenRows).toBe(0); // the FIXTURE garden (12 u²) is a flowerbed
+    const allot = buildStreetscape(TOWN, [{ ...FIXTURE, paths: [], areas: [{ kind: 'garden', polygon: rect(-16, -12, -5, -3) }] }]);
+    expect(allot.stats.gardenRows).toBeGreaterThanOrEqual(8);
+    const y = probe(allot.baked.geometry);
+    expect(y(-10.5, -7.5)).toBeGreaterThanOrEqual(S.heights.garden - 0.002);
+    expect(y(-10.5, -7.5)).toBeLessThanOrEqual(S.heights.garden + 0.06);
+  });
+
+  it('lays plazas in a flagstone checker', () => {
+    // FIXTURE plaza is 8 × 2.9 u: ~7 × 2 flags of ~1.1 u, every other one in the lighter tone
+    expect(full.stats.plazaFlags).toBeGreaterThanOrEqual(5);
+    expect(plain.stats.plazaFlags).toBe(0);
+  });
+});
+
+describe('paving reads against the road (value contrast)', () => {
+  const L = (role: string, p: Palette) => okL(resolveRole(role, 0, p)!);
+  const cases = (['a', 'b', 'c'] as const).flatMap((id) => [false, true].map((cream) => [id, cream] as const));
+  it.each(cases)('palette %s (cream road: %s): sidewalk, zebra, plaza and curb line each read', (id, cream) => {
+    // also check the other road look, so a palette change in either direction keeps the streets readable
+    const p: Palette = cream ? { ...PALETTES[id], road: '#F4EBDD' } : { ...PALETTES[id], road: '#515566' };
+    const road = okL(p.road);
+    expect(Math.abs(L('ssWalk', p) - road)).toBeGreaterThanOrEqual(0.06);
+    expect(Math.abs(L('ssZebra', p) - road)).toBeGreaterThanOrEqual(0.08);
+    expect(Math.abs(L('ssPlaza', p) - road)).toBeGreaterThanOrEqual(0.03);
+    expect(Math.abs(L('ssCurb', p) - L('ssWalk', p))).toBeGreaterThanOrEqual(0.05);
+    expect(Math.abs(L('ssLine', p) - L('ssLot', p))).toBeGreaterThanOrEqual(0.12);
+  });
+  it('matches the live palette', () => {
+    for (const id of ['a', 'b', 'c'] as const) {
+      const p = PALETTES[id];
+      expect(Math.abs(L('ssZebra', p) - okL(p.road)), id).toBeGreaterThanOrEqual(0.08);
+    }
   });
 });

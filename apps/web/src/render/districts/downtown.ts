@@ -92,7 +92,7 @@ lamp(X_ALLEN - LAMP, Z_NORTH + 2.4);
 
 // ------------------------------------------------------------------------------------------------ East of Allen: theater + Central Plaza
 
-put('dt.theater', X_ALLEN + EDGE + 2.5, Z_MAIN - 2 - 2, S, { variant: 3 }); // Allen Corner
+put('dt.theater', X_ALLEN + EDGE + 2.5, Z_MAIN - 2 - 2, S, { variant: 2 }); // Allen Corner: red brick, teal blade sign
 put('dt.cafe', X_ALLEN + EDGE + 1.5, Z_NORTH + EDGE + 1.5, E, { variant: 0 }); // terrace on the plaza
 signal(X_ALLEN + LAMP, Z_MAIN - LAMP, X_ALLEN, Z_MAIN);
 signal(X_STN - LAMP, Z_MAIN - LAMP, X_STN, Z_MAIN);
@@ -222,8 +222,7 @@ const paths: FootPath[] = [
 export const DOWNTOWN: DistrictScenery = {
   id: 'downtown',
   // Street-bounded: Atherton St → North Rd → Station Rd → Main St, plus the Downtown Square block down to Park Ave.
-  region: { center: v(10.3, -3.6), radius: 10.6 }, // TEMP-PREVIEW
-  // region: { polygon: [v(X_ATH, Z_NORTH), v(X_STN, Z_NORTH), v(X_STN, Z_MAIN), v(X_ALLEN, Z_MAIN), v(X_ALLEN, Z_PARK), v(X_ATH, Z_PARK)] },
+  region: { polygon: [v(X_ATH, Z_NORTH), v(X_STN, Z_NORTH), v(X_STN, Z_MAIN), v(X_ALLEN, Z_MAIN), v(X_ALLEN, Z_PARK), v(X_ATH, Z_PARK)] },
   items,
   paths,
   areas,

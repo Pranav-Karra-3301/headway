@@ -27,17 +27,17 @@ export interface TerrainColors {
 
 export const TERRAIN_COLORS: Record<PaletteId, TerrainColors> = {
   a: {
-    foot: PALETTES.a.board, grass: '#9BD4A7', meadow: '#80C793', forest: '#4F9F70', upper: '#6EAE97',
-    rock: '#D5CEC1', cliff: '#B8AFA1', sand: '#EFE3C6', haze: '#A5D3C3', accent: '#80C793',
+    foot: PALETTES.a.board, grass: '#97CFA3', meadow: '#78BB8A', forest: '#4C9469', upper: '#68A08A',
+    rock: '#C2B8A8', cliff: '#A99F90', sand: '#EFE3C6', haze: '#A5D3C3', accent: '#78BB8A',
     strata: ['#7E9F6B', '#A88560', '#C9A97E', '#9C8F80'],
   },
   b: {
-    foot: PALETTES.b.board, grass: '#D0D4AA', meadow: '#B6C392', forest: '#8EA374', upper: '#9AAA8C',
+    foot: PALETTES.b.board, grass: '#CDD2A6', meadow: '#AEBC8A', forest: '#84996B', upper: '#93A385',
     rock: '#C6BAA6', cliff: '#B2A590', sand: '#EEE3CA', haze: '#C3C9B2', accent: '#B6C392',
     strata: ['#8C9A6C', '#9C7A58', '#C2A47E', '#948876'],
   },
   c: {
-    foot: PALETTES.c.board, grass: '#CBD5A6', meadow: '#B3C287', forest: '#93A062', upper: '#A59F7E',
+    foot: PALETTES.c.board, grass: '#C8D2A2', meadow: '#ABBA7F', forest: '#89975A', upper: '#9E9878',
     rock: '#C8C0B2', cliff: '#B3AA9B', sand: '#EEE6D2', haze: '#C7B6AA', accent: '#D99A4E',
     strata: ['#8C9A5E', '#9A7656', '#C2A27C', '#928878'],
   },

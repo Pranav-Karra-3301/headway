@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import type { Side, WorldLayout } from '../layout';
 
 export const BASE = {
-  /** Wall bottom = top face of the wooden plinth (world y): a 5.2 u cut (bible §6.6: 4–6 u). */
-  bottom: -5.2,
+  /** Wall bottom = top face of the wooden plinth (world y): a 6 u cut (bible §6.6: 4–6 u), a chunky slice. */
+  bottom: -6,
   plinthH: 0.8,
   /** How far the plinth sticks out past the cut walls, and its corner radius in plan. */
   plinthOut: 0.9,
@@ -24,6 +24,11 @@ export const BASE = {
   shelf: 10,
   /** The safety floor sits this far under the expected surfaces, so it never pokes through terrain/beach/water. */
   floorDrop: 0.9,
+  /** On the cut face only, the lake's water column shows at least this deep below the water level (the real lake bed
+   *  behind the opaque water stays where E1/E2 put it), so the slice reads as banded water over a sand + soil foot. */
+  cutWaterDepth: 2.95,
+  /** …reaching that depth over this many cut samples away from the nearest dry sample (no cliff in the column). */
+  cutRamp: 4,
   /** Rounded top edge of the cut (bible: r 0.3). */
   bevel: 0.3,
   /** Cut-edge sample spacing (u). */

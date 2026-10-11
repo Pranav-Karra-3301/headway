@@ -1,10 +1,12 @@
 // Owner: T2.4. Where the town FX attach, from the same scenery the composer renders: base SCENERY (Task M, kit
 // models) minus items inside the region of any district that has items, plus every DISTRICTS item (asset families).
 //   clock faces  — base 'clockTower' (kit CLOCK_TOWER.faces), base 'station' (kit STATION_CLOCK),
-//                  district 'lm.clockTower' (A4 CLOCK_TOWER_FACES; skipped when params.hands === true)
+//                  district 'lm.clockTower' (A4 CLOCK_TOWER_FACES; only with params.hands === false — A4 builds
+//                  static hands by default and FX must not draw a second pair over them)
 //   stadiums     — base 'stadium' (kit STADIUM masts) / district 'lm.stadium' (A4 STADIUM_FLOODLIGHTS)
 //   lamps        — district 'st.lamp' heads (A6 LAMP_HEAD)
-//   lawns        — base 'lawn' rectangles + district areas of kind 'lawn' / 'sports'
+//   lawns        — base 'lawn' rectangles (kit lawn top 0.06) + district areas of kind 'lawn' / 'sports' (streetscape
+//                  surface heights), each with the height its decal floats at
 import type { TownMap, Vec2 } from '@headway/sim';
 import { CLOCK_TOWER_FACES, STADIUM_FLOODLIGHTS } from '../assets/families/landmarks';
 import { LAMP_HEAD } from '../assets/families/street';
@@ -13,6 +15,7 @@ import { DISTRICTS } from '../districts';
 import type { DistrictScenery } from '../districts/types';
 import { CLOCK_TOWER, STADIUM, STATION_CLOCK } from '../kit';
 import { SCENERY, type SceneryItem } from '../scenery';
+import { STREETSCAPE } from '../streetscape';
 
 export interface Vec3 { x: number; y: number; z: number }
 /** A clock face in world space; the dial looks along its rotated +z (yaw `rotY`). */
@@ -25,9 +28,17 @@ export interface StadiumAnchor {
   floods: FloodAnchor[];
 }
 export interface LampAnchor { x: number; z: number; headY: number }
-export interface LawnPatch { polygon: Vec2[]; kind: 'lawn' | 'sports' }
+/** A lawn decal: polygon, kind, and the height it floats at (just above the surface it tints). */
+export interface LawnPatch { polygon: Vec2[]; kind: 'lawn' | 'sports'; y: number }
 export interface FxAnchors { clockFaces: ClockFaceAnchor[]; stadiums: StadiumAnchor[]; lamps: LampAnchor[]; lawns: LawnPatch[] }
 export interface FxSources { scenery: readonly SceneryItem[]; districts: readonly DistrictScenery[] }
+/** Model-space lamp head of `st.lamp` (A6 LAMP_HEAD by default; an override may put the head on an arm). */
+export interface FxAnchorOptions { head?: { x?: number; y: number; z?: number } }
+
+/** Decal lift above the surface it tints. */
+const DECAL_LIFT = 0.005;
+/** Kit lawn top (kit makeLawn: 0.06 thick on the board). */
+const KIT_LAWN_TOP = 0.06;
 
 export function insideRegion(r: DistrictScenery['region'], p: Vec2): boolean {
   if ('polygon' in r) {
@@ -79,22 +90,26 @@ function stadiumAt(pl: { x: number; z: number; rot?: number; scale?: number }, k
 const rect = (x: number, z: number, w: number, d: number): Vec2[] =>
   [{ x: x - w / 2, z: z - d / 2 }, { x: x + w / 2, z: z - d / 2 }, { x: x + w / 2, z: z + d / 2 }, { x: x - w / 2, z: z + d / 2 }];
 
-export function fxAnchors(map: TownMap, src: FxSources = { scenery: SCENERY, districts: DISTRICTS }): FxAnchors {
+export function fxAnchors(map: TownMap, src: FxSources = { scenery: SCENERY, districts: DISTRICTS }, opts: FxAnchorOptions = {}): FxAnchors {
   void map;
+  const head: { x?: number; y: number; z?: number } = opts.head ?? LAMP_HEAD;
+  const lampHead: Vec3 = { x: head.x ?? 0, y: head.y, z: head.z ?? 0 };
   const out: FxAnchors = { clockFaces: [], stadiums: [], lamps: [], lawns: [] };
   for (const it of keptScenery(src.scenery, src.districts)) {
     if (it.kind === 'clockTower') out.clockFaces.push(...faces({ ...it, scale: it.scale }, CLOCK_TOWER.faces, CLOCK_TOWER.faceR));
     else if (it.kind === 'station') out.clockFaces.push(...faces(it, [STATION_CLOCK], STATION_CLOCK.r));
     else if (it.kind === 'stadium') out.stadiums.push(stadiumAt(it, 'kit'));
-    else if (it.kind === 'lawn') out.lawns.push({ polygon: rect(it.x, it.z, it.w ?? 2, it.d ?? 2), kind: 'lawn' });
+    else if (it.kind === 'lawn') out.lawns.push({ polygon: rect(it.x, it.z, it.w ?? 2, it.d ?? 2), kind: 'lawn', y: KIT_LAWN_TOP + DECAL_LIFT });
   }
   for (const d of src.districts) {
     for (const it of d.items as PlacedAsset[]) {
-      if (it.kind === 'lm.clockTower' && it.params?.hands !== true) out.clockFaces.push(...faces(it, CLOCK_TOWER_FACES, 0.6));
+      if (it.kind === 'lm.clockTower' && it.params?.hands === false) out.clockFaces.push(...faces(it, CLOCK_TOWER_FACES, 0.6));
       else if (it.kind === 'lm.stadium') out.stadiums.push(stadiumAt(it, 'a4'));
-      else if (it.kind === 'st.lamp') out.lamps.push({ x: it.x, z: it.z, headY: LAMP_HEAD.y * (it.scale ?? 1) });
+      else if (it.kind === 'st.lamp') { const h = toWorld(it, lampHead); out.lamps.push({ x: h.x, z: h.z, headY: h.y }); }
     }
-    for (const a of d.areas) if (a.kind === 'lawn' || a.kind === 'sports') out.lawns.push({ polygon: a.polygon, kind: a.kind });
+    for (const a of d.areas) {
+      if (a.kind === 'lawn' || a.kind === 'sports') out.lawns.push({ polygon: a.polygon, kind: a.kind, y: STREETSCAPE.heights[a.kind] + DECAL_LIFT });
+    }
   }
   return out;
 }

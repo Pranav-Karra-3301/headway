@@ -1,6 +1,7 @@
 import type { FailureFinding, Proposal } from '@headway/sim';
 import { describe, expect, it } from 'vitest';
-import { buildDigest } from '../src/digest';
+import { buildDigest, pressureRanking, tripsByStop } from '../src/digest';
+import { SCENARIOS } from '@headway/sim';
 import { bunching, gap, missed, overload, POLICY, runResult, score, stopStats } from './fixtures';
 
 function proposal(p: Partial<Proposal>): Proposal {
@@ -59,6 +60,33 @@ describe('buildDigest', () => {
     expect(digest).toContain('unknown feature "train_eta"');
     expect(digest).toContain('−3.2%');
     for (const leak of ['77777', '77,777', '21.6']) expect(digest).not.toContain(leak); // 77,777 s = 21.6 passenger-hours
+  });
+
+  it('has a per-route table with buses, left behind, missed connections, worst gap and a pressure ranking', () => {
+    const routes = digest.slice(digest.indexOf('## Routes'), digest.indexOf('## Top findings'));
+    expect(routes).toContain('## Routes (champion, over the training runs)');
+    expect(routes).toMatch(/\| r1 Campus Loop \| 2 \| central_stn → downtown → old_main → university_stn\* \|/);
+    expect(routes).toMatch(/\| r2 Apartments \| 2 \|[^\n]*apts_north\*[^\n]*\| 0 \| 38 \(train→r2 at central_stn 38\) \| 14\.0 at apts_south; 2 gaps >10 min hit 80 riders \|/);
+    expect(routes).toMatch(/\| r3 Stadium \| 2 \|[^\n]*\| 23 \| 0 \|/);
+    // r2: 38 missed + 80 riders in gaps = 118; r3: 23 left behind; r1: nothing
+    expect(routes).toContain('Pressure ranking (most → least): r2 > r3 > r1');
+    expect(routes).toMatch(/Shared stops[^\n]*downtown \(r1 r2 r3\)/);
+    expect(digest.indexOf('## Routes')).toBeLessThan(digest.indexOf('## Top findings'));
+  });
+
+  it('ranks pressure by riders hurt, ties broken by the worst gap', () => {
+    const rank = pressureRanking([runResult({ findings: [overload(1, 10), { ...overload(1, 4), routeId: 'r1' }], stops: [] })]);
+    expect(rank.map((r) => r.routeId)).toEqual(['r3', 'r1', 'r2']);
+    expect(rank[0]!.hurt).toBe(10);
+  });
+
+  it('counts scenario trips by nearest stop from SCENARIOS (apartments stops get most stadium_exit arrivals)', () => {
+    const t = tripsByStop(SCENARIOS.stadium_exit);
+    const total = [...t.values()].reduce((a, e) => a + e.to, 0);
+    expect(total).toBeCloseTo(SCENARIOS.stadium_exit.demand.reduce((a, g) => a + g.total, 0), 6);
+    const apts = t.get('stop_apts_north')!.to + t.get('stop_apts_south')!.to;
+    expect(apts / total).toBeGreaterThan(0.4);
+    expect(t.get('stop_stadium_gate')!.from).toBeGreaterThan(t.get('stop_apts_south')!.from);
   });
 
   it('stays within 6,000 characters for huge inputs', () => {

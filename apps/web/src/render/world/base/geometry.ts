@@ -73,12 +73,41 @@ function panel(b: Builder, xa: number, za: number, xc: number, zc: number, lo: [
   }
 }
 
+/** The ground shown on the cut faces (per side, per sample): the profile's ground, except under water, where the
+ *  cut's lake bed sinks to `BASE.cutWaterDepth` below the water level, easing in over `BASE.cutRamp` samples from the
+ *  nearest dry sample anywhere round the (closed) perimeter, so shared corners agree. */
+export function cutGround(sides: EdgeProfile[]): number[][] {
+  const ring = sides.flatMap((s, si) => s.samples.slice(0, -1).map((p, i) => ({ si, i, wet: p.water !== null })));
+  const n = ring.length;
+  const dist = new Array<number>(n).fill(Infinity);
+  if (ring.some((r) => !r.wet)) {
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k = 0, d = Infinity; k < 2 * n; k++) {
+        const j = pass === 0 ? k % n : (2 * n - 1 - k) % n;
+        d = ring[j]!.wet ? d + 1 : 0;
+        dist[j] = Math.min(dist[j]!, d);
+      }
+    }
+  }
+  const at = new Map<string, number>();
+  ring.forEach((r, j) => at.set(`${r.si}:${r.i}`, dist[j]!));
+  return sides.map((s, si) => s.samples.map((p, i) => {
+    if (p.water === null) return p.ground;
+    const d = at.get(`${si}:${i}`) ?? at.get(`${(si + 1) % sides.length}:0`) ?? Infinity; // last sample = next side's first
+    const t = Math.min(1, d / BASE.cutRamp), k = t * t * (3 - 2 * t);
+    const deep = Math.max(BASE.bottom + 1.6, p.water - BASE.cutWaterDepth);
+    return Math.min(p.ground, p.ground + (deep - p.ground) * k);
+  }));
+}
+
 function walls(b: Builder, sides: EdgeProfile[]): void {
   const bot = BASE.bottom;
-  for (const side of sides) {
+  const grounds = cutGround(sides);
+  for (const [si, side] of sides.entries()) {
     const n: V3 = [side.nx, 0, side.nz];
-    for (let i = 0; i + 1 < side.samples.length; i++) {
-      const a = side.samples[i]!, c = side.samples[i + 1]!;
+    const samples = side.samples.map((s, i) => ({ ...s, ground: grounds[si]![i]! }));
+    for (let i = 0; i + 1 < samples.length; i++) {
+      const a = samples[i]!, c = samples[i + 1]!;
       const wet = a.water !== null || c.water !== null;
       panel(b, a.x, a.z, c.x, c.z, [bot, bot], [a.ground, c.ground], n, KIND.strata, a.ground, c.ground, !wet);
       if (wet) {

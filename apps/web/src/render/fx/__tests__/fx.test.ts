@@ -5,6 +5,7 @@ import { CLOCK_TOWER, STADIUM, STATION_CLOCK } from '../../kit';
 import { CLOCK_TOWER_FACES, STADIUM_FLOODLIGHTS } from '../../assets/families/landmarks';
 import { LAMP_HEAD } from '../../assets/families/street';
 import type { SceneryItem } from '../../scenery';
+import { STREETSCAPE } from '../../streetscape';
 import type { DistrictScenery } from '../../districts/types';
 import { fxAnchors, insideRegion, keptScenery } from '../anchors';
 import { clockAngles, parseClock } from '../clock';
@@ -153,14 +154,17 @@ describe('fx anchors', () => {
     expect(r.x).toBeCloseTo(-10.5 + CLOCK_TOWER.faces[0].z); expect(r.z).toBeCloseTo(-9); expect(r.rotY).toBeCloseTo(Math.PI / 2);
   });
   it('uses A4 clock faces for a district lm.clockTower (scaled), and kit station clocks for base stations', () => {
-    const d = district([{ kind: 'lm.clockTower', x: -10, z: -9, rot: Math.PI, scale: 1.1 }], { center: { x: -10, z: -9 }, radius: 4 });
+    const d = district([{ kind: 'lm.clockTower', x: -10, z: -9, rot: Math.PI, scale: 1.1, params: { hands: false } }], { center: { x: -10, z: -9 }, radius: 4 });
     const a = fxAnchors(TOWN, { scenery: [tower], districts: [d] });
     expect(a.clockFaces).toHaveLength(4);
     const f = a.clockFaces[0]!;
     expect(f.x).toBeCloseTo(-10); expect(f.z).toBeCloseTo(-9 - CLOCK_TOWER_FACES[0]!.z * 1.1);
     expect(f.y).toBeCloseTo(CLOCK_TOWER_FACES[0]!.y * 1.1); expect(f.r).toBeCloseTo(CLOCK_TOWER_FACES[0]!.r * 1.1);
-    const withHands = district([{ kind: 'lm.clockTower', x: -10, z: -9, params: { hands: true } }], { center: { x: -10, z: -9 }, radius: 4 });
-    expect(fxAnchors(TOWN, { scenery: [], districts: [withHands] }).clockFaces).toHaveLength(0);
+    // A4 builds static hands unless params.hands === false: FX must not draw a second pair over them
+    for (const params of [{ hands: true }, undefined]) {
+      const withHands = district([{ kind: 'lm.clockTower', x: -10, z: -9, ...(params ? { params } : {}) }], { center: { x: -10, z: -9 }, radius: 4 });
+      expect(fxAnchors(TOWN, { scenery: [], districts: [withHands] }).clockFaces).toHaveLength(0);
+    }
     const st: SceneryItem = { kind: 'station', stationId: 'stn_central', x: 28.25, z: -2, rot: Math.PI / 2 };
     const s = fxAnchors(TOWN, { scenery: [st], districts: [] }).clockFaces;
     expect(s).toHaveLength(1);
@@ -189,6 +193,33 @@ describe('fx anchors', () => {
     expect(a.lamps[0]!.headY).toBeCloseTo(LAMP_HEAD.y * 1.2);
     expect(a.lawns).toHaveLength(2);
     expect(a.lawns[0]!.polygon).toHaveLength(4);
+    // decals sit just above the surface they tint: kit lawn top 0.06, streetscape lawn top STREETSCAPE.heights.lawn
+    expect(a.lawns[0]!.y).toBeGreaterThan(0.06); expect(a.lawns[0]!.y).toBeLessThan(0.07);
+    expect(a.lawns[1]!.y).toBeGreaterThan(STREETSCAPE.heights.lawn);
+    expect(a.lawns[1]!.y).toBeLessThan(STREETSCAPE.heights.footpath); // footpaths across a lawn stay untinted
+  });
+  it('rotates an offset lamp head with its placement', () => {
+    const d = district([{ kind: 'st.lamp', x: 3, z: 4, rot: Math.PI / 2 }], { center: { x: 50, z: 50 }, radius: 1 });
+    const a = fxAnchors(TOWN, { scenery: [], districts: [d] }, { head: { x: 0, y: 2, z: 0.5 } });
+    expect(a.lamps[0]!.x).toBeCloseTo(3.5); expect(a.lamps[0]!.z).toBeCloseTo(4); expect(a.lamps[0]!.headY).toBeCloseTo(2);
+  });
+});
+
+describe('fx anchors on the real town (SCENERY + DISTRICTS)', () => {
+  const a = fxAnchors(TOWN);
+  it('finds one stadium with floodlights, the district street lamps and the lawns', () => {
+    expect(a.stadiums).toHaveLength(1);
+    expect(a.stadiums[0]!.floods.length).toBeGreaterThanOrEqual(4);
+    expect(a.lamps.length).toBeGreaterThan(5);
+    expect(a.lawns.length).toBeGreaterThan(2);
+    const b = TOWN.bounds;
+    for (const l of a.lamps) { expect(l.x).toBeGreaterThan(b.minX - 1); expect(l.x).toBeLessThan(b.maxX + 1); }
+  });
+  it('never puts two clock faces on top of each other', () => {
+    for (let i = 0; i < a.clockFaces.length; i++) for (let j = i + 1; j < a.clockFaces.length; j++) {
+      const p = a.clockFaces[i]!, q = a.clockFaces[j]!;
+      expect(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z)).toBeGreaterThan(0.3);
+    }
   });
 });
 

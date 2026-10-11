@@ -8,10 +8,13 @@
 // freeze when the sim pauses). With no sim running (static town) they idle along in real time.
 // Stadium exodus: after the scenario's advertised stadium closing time more cars pull out near the stadium.
 // The time comes from `opts.closingT` / `setClosingT`, else it is read once per sim from the app's runner.
+// Seed: renderer-local mulberry32 (never @headway/sim streams), seeded by the running session's scenario seed when
+// the app has one (traffic restarts with each new run of a crowd, so it replays identically), else `opts.seed`.
 import * as THREE from 'three';
 import { deadheadPath, pointAt } from '@headway/sim';
 import type { Polyline, SimSnapshot, TownMap, VehicleView } from '@headway/sim';
 import { frame } from '../../state/frame';
+import { useApp } from '../../state/store';
 import { KENNEY_CARS, kenneyModel, kenneyReady, kenneyTemplate, preloadKenney, type KenneyId } from '../assets/kenney/index';
 import { bakeGeometry, recolorBaked, type Baked } from '../kit/bake';
 import { CAR_SIZE, CAR_VARIANTS, makeCar } from '../kit/cars';
@@ -49,6 +52,8 @@ export interface TrafficLayerOptions {
 
 export interface TrafficLayer extends RenderLayer {
   readonly model: TrafficModel;
+  /** Seed of the current traffic (the session's scenario seed while the app runs one, else opts.seed). */
+  readonly seed: number;
   /** Pin the stadium closing time (sim s), null for none, undefined to read it from the running sim again. */
   setClosingT(t: number | null | undefined): void;
   /** 'kit' or 'kenney' (which car models are drawn). */
@@ -94,6 +99,14 @@ export function vehiclePoses(map: TownMap, prev: SimSnapshot, next: SimSnapshot,
     });
   }
   return { buses, trainDist };
+}
+
+/** Scenario seed of the session the app is running, or null (previews, tests, static town). */
+function sessionSeed(): number | null {
+  try {
+    const seed = useApp.getState().session?.scenario.seed;
+    return typeof seed === 'number' && Number.isFinite(seed) ? seed : null;
+  } catch { return null; }
 }
 
 const closingCache = new WeakMap<object, number | null>();
@@ -155,15 +168,19 @@ export function createTrafficLayer(map: TownMap, opts: TrafficLayerOptions): Tra
       ? kenneyIds.map((id) => kenneyVariant(id, palette)!).filter(Boolean)
       : [0, 1, 2].map((i) => kitVariant(i, palette));
   let built = build();
-  const specs: CarVariantSpec[] = kind === 'kenney'
+  let specs: CarVariantSpec[] = kind === 'kenney'
     ? built.map((b, i) => ({ length: b.length, weight: [0.45, 0.3, 0.25][i] ?? 0.2 }))
     : KIT_VARIANTS;
-  const model = createTrafficModel(graph, {
-    seed: opts.seed, variants: specs, colors: PALETTES[palette].car.length,
-    ...(opts.carCount !== undefined ? { carCount: opts.carCount } : {}),
-    ...(opts.closingT !== undefined ? { closingT: opts.closingT } : {}),
-  });
   let closingPinned = opts.closingT !== undefined;
+  let seed = opts.seed;
+  const makeModel = (s: number, closingT: number | null | undefined) => createTrafficModel(graph, {
+    seed: s, variants: specs, colors: PALETTES[palette].car.length,
+    ...(opts.carCount !== undefined ? { carCount: opts.carCount } : {}),
+    ...(closingT !== undefined ? { closingT } : {}),
+  });
+  let model = makeModel(seed, opts.closingT);
+  /** The runner's sim at the last update (undefined before the first update). */
+  let lastSim: object | null | undefined;
 
   let variants: Variant[] = [];
   const mount = () => {
@@ -195,6 +212,8 @@ export function createTrafficLayer(map: TownMap, opts: TrafficLayerOptions): Tra
     kenneyIds = ready;
     built = build();
     if (built.length < 2) { kind = 'kit'; built = build(); return; }
+    specs = built.map((b, i) => ({ length: b.length, weight: [0.45, 0.3, 0.25][i] ?? 0.2 }));
+    model.setVariants(specs);
     mount();
   };
 
@@ -236,7 +255,8 @@ export function createTrafficLayer(map: TownMap, opts: TrafficLayerOptions): Tra
   const layer: TrafficLayer = {
     name: 'traffic',
     object,
-    model,
+    get model() { return model; },
+    get seed() { return seed; },
     get cars() { return kind; },
     setClosingT(t) {
       closingPinned = t !== undefined;
@@ -244,10 +264,20 @@ export function createTrafficLayer(map: TownMap, opts: TrafficLayerOptions): Tra
     },
     update(ctx: FrameContext) {
       maybeUpgrade();
+      const runner = frame.runner;
+      const sim = runner?.sim ?? null;
+      if (sim !== lastSim) {
+        const first = lastSim === undefined;
+        lastSim = sim;
+        const s = sim ? sessionSeed() : null;
+        if (s !== null && (!first || s !== seed)) { // a new run: fresh traffic from the crowd's seed
+          seed = s;
+          model = makeModel(seed, closingPinned ? model.closingT : undefined);
+        }
+      }
       if (!closingPinned) model.closingT = runnerClosingT();
       const simT = ctx.simT;
       let dt = 0;
-      const runner = frame.runner;
       if (lastSimT !== null && Number.isFinite(simT)) dt = simT - lastSimT;
       if (!(dt > 0)) dt = 0;
       if (dt === 0 && !runner && ctx.next.t === ctx.prev.t) dt = ctx.dtS * IDLE_RATE; // static town: idle along

@@ -38,7 +38,7 @@ export const BASE_LOOKS: Record<PaletteId, BaseLook> = {
 };
 
 /** Band boundaries (u): water bands by depth below the surface; soil bands by world height. */
-export const BANDS = { surface: 0.3, water: [0.75, 1.2], lip: 0.3, soil: [-1.6, -3.3] } as const;
+export const BANDS = { surface: 0.32, water: [1.15, 2.05], lip: 0.3, soil: [-1.6, -3.3], wetSoil: [-0.9, -1.75] } as const;
 
 const SCALARS = ['grass', 'sand', 'rock', 'waterSurface', 'wood', 'woodDark', 'floor'] as const;
 const uname = (k: string) => 'uB' + k[0]!.toUpperCase() + k.slice(1);
@@ -77,10 +77,12 @@ vec3 hwStrata( vec3 w, float top ) {
   float s = w.x + w.z;
   float aa = fwidth( w.y ) * 0.75 + 0.003;
   float wet = step( top, -0.5 );
-  float y = w.y + 0.17 * hwWave( s, 0.21, 4.0 );
+  // land: bands by world height (sliced mountains show rock above the board); under the lake: by depth below the bed
+  float y = w.y - min( top, 0.0 ) + ( 0.17 - 0.07 * wet ) * hwWave( s, 0.21, 4.0 );
+  vec2 cuts = mix( vec2( ${BANDS.soil[0].toFixed(2)}, ${BANDS.soil[1].toFixed(2)} ), vec2( ${BANDS.wetSoil[0].toFixed(2)}, ${BANDS.wetSoil[1].toFixed(2)} ), wet );
   vec3 c = uBSoil2;
-  c = hwBand( c, uBSoil1, y - ( ${BANDS.soil[1].toFixed(2)} ), aa );
-  c = hwBand( c, uBSoil0, y - ( ${BANDS.soil[0].toFixed(2)} ), aa );
+  c = hwBand( c, uBSoil1, y - cuts.y, aa );
+  c = hwBand( c, uBSoil0, y - cuts.x, aa );
   c = hwBand( c, uBRock, y - 0.45, aa );
   float lip = ${BANDS.lip.toFixed(2)} + 0.05 * hwWave( s, 1.1, 1.0 );
   return mix( c, mix( uBGrass, uBSand, wet ), smoothstep( aa, -aa, top - w.y - lip ) );

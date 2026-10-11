@@ -7,7 +7,8 @@ import { PALETTES, type Role } from '../../palettes';
 import { WATER_ROLES } from './colors';
 
 const mats = new Map<string, THREE.MeshStandardMaterial>();
-function roleMat(role: string, idx: number): THREE.MeshStandardMaterial {
+/** Shared material tagged with a role ("role#idx"), so bakeGeometry colours it per palette. */
+export function roleMat(role: string, idx: number): THREE.MeshStandardMaterial {
   const key = `${role}#${idx}`;
   let m = mats.get(key);
   if (!m) {

@@ -34,15 +34,33 @@ export function findBlocks(g: GridFrame, net: Network): Block[] {
   const B = g.board, bounds = cellRect(g, B.c, B.r, B.w, B.h);
   const eastExit = net.pieces.find((p) => p.id === 'rb-e');
   const eastZ = eastExit ? cellCenter(g, eastExit.cells.c + 1, eastExit.cells.r + 1).z : 0;
+  const useAt = (c: number, r: number) => (inGrid(g, c, r) ? net.use[r]![c]! : null);
   const streetOf = (c: number, r: number): string | null => {
-    if (!inGrid(g, c, r) || net.use[r]![c] !== 'road') return null;
+    if (useAt(c, r) !== 'road') return null;
     const pi = net.pieceAt[r * cols + c]!;
     return pi >= 0 ? net.pieces[pi]!.street : net.streetAt[r * cols + c] ?? '';
   };
-  const touchesBoard = (k: CellRect): boolean => {
-    for (let c = k.c - 1; c <= k.c + k.w; c++) for (const r of [k.r - 1, k.r + k.h]) if (inRect(B, c, r)) return true;
-    for (let r = k.r; r < k.r + k.h; r++) for (const c of [k.c - 1, k.c + k.w]) if (inRect(B, c, r)) return true;
+  const ring = (k: CellRect): Array<[number, number]> => {
+    const out: Array<[number, number]> = [];
+    for (let c = k.c - 1; c <= k.c + k.w; c++) out.push([c, k.r - 1], [c, k.r + k.h]);
+    for (let r = k.r; r < k.r + k.h; r++) out.push([k.c - 1, r], [k.c + k.w, r]);
+    return out;
+  };
+  const touches = (k: CellRect, f: (c: number, r: number) => boolean) => ring(k).some(([c, r]) => f(c, r));
+  const nearWater = (k: CellRect) => {
+    // a water / causeway cell next to the block, or the shore within 3.5 u south or east of one of its cells
+    if (touches(k, (c, r) => useAt(c, r) === 'water' || (useAt(c, r) === 'road' && !!net.bridge[r * cols + c]))) return true;
+    for (let r = k.r; r < k.r + k.h; r++) for (let c = k.c; c < k.c + k.w; c++) {
+      const p = cellCenter(g, c, r);
+      if (net.land.isWater({ x: p.x, z: p.z + 3.5 }) || net.land.isWater({ x: p.x + 3.5, z: p.z })) return true;
+    }
     return false;
+  };
+  const distToBoard = (x: number, z: number) => Math.hypot(Math.max(bounds.minX - x, 0, x - bounds.maxX), Math.max(bounds.minZ - z, 0, z - bounds.maxZ));
+  const hash = (c: number, r: number) => {
+    let h = (Math.imul(c + 101, 73856093) ^ Math.imul(r + 37, 19349663)) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+    return (h ^ (h >>> 16)) >>> 0;
   };
 
   return rects
@@ -61,17 +79,22 @@ export function findBlocks(g: GridFrame, net: Network): Block[] {
       }
       const rect = cellRect(g, k.c, k.r, k.w, k.h);
       const ctr = { x: (rect.minX + rect.maxX) / 2, z: (rect.minZ + rect.maxZ) / 2 };
+      const boardSide = touches(k, (c, r) => inRect(B, c, r));
+      const shore = nearWater(k);
       let zone: ZoneHint;
-      if (k.c + k.w >= cols && k.c >= cols - 1) zone = 'waterfront';
-      else if (k.r >= rows - 2) zone = 'waterfront';
+      if (shore && (Math.min(k.w, k.h) <= 2 || k.r >= B.r + B.h + 4)) zone = 'waterfront';
       else if (k.r + k.h <= B.r - 2 || k.c + k.w <= 1) zone = 'verge';
-      else if (touchesBoard(k)) zone = 'frontage';
+      else if (boardSide) zone = 'frontage';
       else if (k.w * k.h <= 2) zone = 'park';
+      else if (ctr.z > bounds.maxZ) zone = ctr.x < bounds.minX - 10 ? 'industrial' : 'commercial';
       else if (ctr.x < bounds.minX) zone = ctr.z < 0 ? 'suburb' : 'industrial';
-      else if (ctr.x > bounds.maxX) zone = ctr.z < eastZ ? 'suburb' : 'commercial';
-      else if (ctr.z < bounds.minZ) zone = 'suburb';
-      else zone = ctr.x < bounds.minX + 16 ? 'industrial' : 'commercial';
-      return { id: `b${k.c}-${k.r}`, cells: k, rect, zone, frontage };
+      else if (ctr.x > bounds.maxX) zone = ctr.z < eastZ ? 'suburb' : 'park';
+      else zone = 'suburb';
+      const h = hash(k.c, k.r);
+      const noise = ((h & 0xffff) / 0xffff) * 2 - 1;
+      const street = frontage.some((f) => ['Ring Rd', 'Lakeshore Pkwy', 'Foothill Rd'].includes(f.street)) ? 0.12 : 0;
+      const density = Math.max(0, Math.min(1, 1.02 - distToBoard(ctr.x, ctr.z) / 30 + street + 0.22 * noise - (zone === 'verge' ? 0.3 : 0)));
+      return { id: `b${k.c}-${k.r}`, cells: k, rect, zone, frontage, shore, density: Math.round(density * 100) / 100, seed: h };
     });
 }
 

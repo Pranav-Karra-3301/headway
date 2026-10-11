@@ -1,16 +1,18 @@
 // Owner: T4. Evidence digest for designers (spec §8.3), at most 6,000 characters.
 // Training evidence only: validation results are reduced to the verdict ("Rejected: validation worse").
-import type { Policy, Proposal, RunResult, SplitScore, StopId } from '@headway/sim';
+import { SCENARIOS, TOWN } from '@headway/sim';
+import type { Policy, Proposal, RouteId, RunResult, ScenarioDef, SplitScore, StopId, Zone, ZoneSelector } from '@headway/sim';
 import { aggregateResults, findingLabel, groupFindings } from './aggregate';
 
 export const DIGEST_MAX_CHARS = 6000;
 const VERDICT_MARKERS = ['Promoted to ', 'Rejected: ', 'Not promoted: '];
 
-interface Limits { findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number }
+interface Limits { findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number; sharedStops: boolean }
 const LIMITS: Limits[] = [
-  { findings: 8, stops: 8, proposals: 6, summaryChars: 160, errorChars: 160 },
-  { findings: 6, stops: 8, proposals: 4, summaryChars: 90, errorChars: 100 },
-  { findings: 4, stops: 5, proposals: 2, summaryChars: 60, errorChars: 60 },
+  { findings: 8, stops: 8, proposals: 6, summaryChars: 160, errorChars: 160, sharedStops: true },
+  { findings: 6, stops: 6, proposals: 4, summaryChars: 90, errorChars: 100, sharedStops: true },
+  { findings: 4, stops: 4, proposals: 3, summaryChars: 70, errorChars: 70, sharedStops: true },
+  { findings: 3, stops: 0, proposals: 2, summaryChars: 60, errorChars: 60, sharedStops: false },
 ];
 
 const hours = (s: number) => (s / 3600).toFixed(1);
@@ -80,7 +82,7 @@ function stopsSection(results: RunResult[], n: number): string[] {
       stops.set(s.id, e);
     }
   }
-  if (!stops.size) return [];
+  if (!stops.size || n <= 0) return [];
   const rows = [...stops].sort((a, b) => b[1].maxQueue - a[1].maxQueue).slice(0, n);
   return [
     '## Stops (champion, worst over the training runs)',
@@ -98,6 +100,119 @@ function ruleFiresSection(policy: Policy, results: RunResult[]): string[] {
   const lines = ['## Rule fires (champion, summed over the training runs)', fired.length ? fired.map(([id, n]) => `${id} ${n}`).join(' · ') : '(no decisions recorded)'];
   if (never.length) lines.push(`never fired: ${never.join(', ')}`);
   return lines;
+}
+
+// ---------- routes: pressure from the champion's findings, coverage from the scenario demand ----------
+
+const shortStop = (id: string) => id.replace(/^stop_/, '');
+const int = (x: number) => Math.round(x).toLocaleString('en-US');
+
+function selectZones(sel: ZoneSelector): Zone[] {
+  if (sel.zones) return TOWN.zones.filter((z) => sel.zones!.includes(z.id));
+  return TOWN.zones.filter((z) => (sel.neighborhood === undefined || z.neighborhood === sel.neighborhood) && (sel.tag === undefined || z.tags.includes(sel.tag)));
+}
+
+const NEAREST_STOP = new Map<string, StopId>(TOWN.zones.map((z) => {
+  let best: { id: StopId; d: number } = { id: TOWN.stops[0]!.id, d: Infinity };
+  for (const s of TOWN.stops) {
+    const d = Math.hypot(z.door.x - s.p.x, z.door.z - s.p.z);
+    if (d < best.d) best = { id: s.id, d };
+  }
+  return [z.id, best.id];
+}));
+
+/** Expected trips per run (mean demand scale) starting and ending nearest each bus stop. */
+export function tripsByStop(def: ScenarioDef): Map<StopId, { from: number; to: number }> {
+  const out = new Map<StopId, { from: number; to: number }>(TOWN.stops.map((s) => [s.id, { from: 0, to: 0 }]));
+  const spread = (sel: ZoneSelector, total: number, key: 'from' | 'to') => {
+    const zones = selectZones(sel);
+    const w = zones.reduce((a, z) => a + z.weight, 0);
+    for (const z of zones) out.get(NEAREST_STOP.get(z.id)!)![key] += (total * z.weight) / (w || 1);
+  };
+  for (const g of def.demand) {
+    spread(g.from, g.total, 'from');
+    for (const t of g.to) spread(t.sel, g.total * t.share, 'to');
+  }
+  return out;
+}
+
+interface RouteStats {
+  leftBehind: number; missed: number; missedFrom: Map<string, number>; gapRiders: number; gapFlags: number;
+  worstGapS: number; worstGapStop: string; bunching: number; unused: Map<string, { runs: number; loadSum: number }>;
+}
+
+function routeStats(results: RunResult[]): Map<RouteId, RouteStats> {
+  const m = new Map<RouteId, RouteStats>(TOWN.routes.map((r) => [r.id, {
+    leftBehind: 0, missed: 0, missedFrom: new Map(), gapRiders: 0, gapFlags: 0, worstGapS: 0, worstGapStop: '', bunching: 0, unused: new Map(),
+  }]));
+  for (const r of results) {
+    for (const s of r.stops) {
+      for (const [route, g] of Object.entries(s.maxGapS)) {
+        const e = m.get(route as RouteId);
+        if (e && typeof g === 'number' && g > e.worstGapS) { e.worstGapS = g; e.worstGapStop = shortStop(s.id); }
+      }
+    }
+    for (const f of r.findings) {
+      if (f.kind === 'overload' && f.routeId !== 'train') m.get(f.routeId)!.leftBehind += f.leftBehind;
+      else if (f.kind === 'missed_transfer' && f.to !== 'train') {
+        const e = m.get(f.to)!;
+        e.missed += f.count;
+        const k = `${f.from}→${f.to} at ${shortStop(f.at.id)}`;
+        e.missedFrom.set(k, (e.missedFrom.get(k) ?? 0) + f.count);
+      } else if (f.kind === 'service_gap') { const e = m.get(f.routeId)!; e.gapRiders += f.affected; e.gapFlags++; }
+      else if (f.kind === 'bunching') m.get(f.routeId)!.bunching += f.events;
+      else if (f.kind === 'unused_capacity') {
+        const u = m.get(f.routeId)!.unused;
+        const e = u.get(r.scenarioId) ?? { runs: 0, loadSum: 0 };
+        e.runs++; e.loadSum += f.meanLoad;
+        u.set(r.scenarioId, e);
+      }
+    }
+  }
+  return m;
+}
+
+/** Riders hurt on each route (left behind + missed connections onto it + caught in flagged service gaps), most first. */
+export function pressureRanking(results: RunResult[]): Array<{ routeId: RouteId; hurt: number; worstGapS: number }> {
+  return [...routeStats(results)]
+    .map(([routeId, e]) => ({ routeId, hurt: e.leftBehind + e.missed + e.gapRiders, worstGapS: e.worstGapS }))
+    .sort((a, b) => b.hurt - a.hurt || b.worstGapS - a.worstGapS || a.routeId.localeCompare(b.routeId));
+}
+
+function routesSection(policy: Policy, results: RunResult[], lim: Limits): string[] {
+  if (!results.length) return [];
+  const stats = routeStats(results);
+  const runsBy = new Map<string, number>();
+  for (const r of results) runsBy.set(r.scenarioId, (runsBy.get(r.scenarioId) ?? 0) + 1);
+  const scen = [...runsBy.keys()].flatMap((id) => {
+    const def = (SCENARIOS as Record<string, ScenarioDef | undefined>)[id];
+    return def ? [{ id, trips: tripsByStop(def) }] : [];
+  });
+  const demand = (stops: StopId[]) => scen.map(({ id, trips }) => {
+    const t = stops.reduce((a, s) => ({ from: a.from + trips.get(s)!.from, to: a.to + trips.get(s)!.to }), { from: 0, to: 0 });
+    return `${id} ${int(t.from)}→${int(t.to)}`;
+  }).join(' · ') || '-';
+  const sole = (s: StopId) => TOWN.stops.find((x) => x.id === s)!.servedRoutes.length === 1;
+  const rows = TOWN.routes.map((route) => {
+    const e = stats.get(route.id)!;
+    const stops = route.stops.map((s) => `${shortStop(s)}${sole(s) ? '*' : ''}`).join(' → ');
+    const top = [...e.missedFrom].sort((a, b) => b[1] - a[1])[0];
+    const missed = e.missed ? `${int(e.missed)}${top ? ` (${top[0]} ${int(top[1])})` : ''}` : '0';
+    const gap = e.worstGapS ? `${mins(e.worstGapS)} at ${e.worstGapStop}${e.gapFlags ? `; ${e.gapFlags} gaps >10 min hit ${int(e.gapRiders)} riders` : ''}` : '-';
+    const unused = [...e.unused].map(([id, u]) => `${id} ${u.runs}/${runsBy.get(id) ?? u.runs} runs, ${Math.round((100 * u.loadSum) / u.runs)}% full`).join('; ') || '-';
+    return `| ${route.id} ${route.name} | ${policy.params.allocation[route.id]} | ${stops} | ${demand(route.stops.filter(sole))} | ${int(e.leftBehind)} | ${missed} | ${gap} | ${unused} | ${e.bunching} |`;
+  });
+  const shared = TOWN.stops.filter((s) => s.servedRoutes.length > 1)
+    .map((s) => `${shortStop(s.id)} (${s.servedRoutes.join(' ')}${s.stationId ? ', rail station' : ''}) ${demand([s.id])}`);
+  const rank = pressureRanking(results);
+  return [
+    '## Routes (champion, over the training runs)',
+    '| route | buses at start | stops, terminal first (* = only this route) | trips/run starting→ending nearest its * stops | left behind | missed connections onto it | worst gap min | flagged unused capacity (mean load) | bunching events |',
+    '|---|---|---|---|---|---|---|---|---|',
+    ...rows,
+    ...(lim.sharedStops && shared.length ? [`Shared stops, trips/run starting→ending nearest: ${shared.join('; ')}`] : []),
+    `Pressure ranking (most → least): ${rank.map((r) => r.routeId).join(' > ')} (riders hurt = left behind + missed connections + riders in >10 min gaps: ${rank.map((r) => `${r.routeId} ${int(r.hurt)}`).join(', ')})`,
+  ];
 }
 
 const roundNo = (p: Proposal) => Number(/\d+/.exec(p.roundId)?.[0] ?? 0);
@@ -123,6 +238,7 @@ export function buildDigest(a: { champion: { policy: Policy; results: RunResult[
   for (const lim of LIMITS) {
     text = [
       scoresSection(policy, results, a.baseline, a.reference),
+      routesSection(policy, results, lim),
       findingsSection(results, lim.findings),
       stopsSection(results, lim.stops),
       ruleFiresSection(policy, results),

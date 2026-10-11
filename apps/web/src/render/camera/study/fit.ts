@@ -11,6 +11,12 @@ export interface Rect { x0: number; y0: number; x1: number; y1: number }
 export type HudMode = 'watch' | 'play';
 export interface HudOptions { mode?: HudMode; inspector?: boolean; /** largest rect clear of every panel instead of the bible rect */ strict?: boolean }
 export type HudBox = Rect & { id: 'topbar' | 'legend' | 'bottom' | 'inspector' };
+export interface PlanRect { minX: number; maxX: number; minZ: number; maxZ: number }
+export interface FitOptions extends HudOptions {
+  /** Fit only the network inside this plan rect (e.g. the board): a rail detour through a mountain tunnel beyond the
+   *  board edge then does not shrink the Overview. */
+  clip?: PlanRect;
+}
 
 /** Shell layout (styles/tokens.css): gap 14, bar 52 → --hw-top 80; legend 236 wide; inspector 332 wide. */
 export const HUD = {
@@ -69,10 +75,13 @@ export function bibleSafeRect(w: number, h: number, o: HudOptions = {}): Rect {
 }
 
 /** Bible §1.4 overview points: the rail loop every 2 u at y 0 and 2.6, every stop and platform at y 0 and 2.2. */
-export function networkPoints(map: TownMap): V3[] {
+export function networkPoints(map: TownMap, clip?: PlanRect): V3[] {
   const pts: V3[] = [];
+  const inside = (p: { x: number; z: number }) => !clip || (p.x >= clip.minX && p.x <= clip.maxX && p.z >= clip.minZ && p.z <= clip.maxZ);
   const loop = map.rail.loop;
-  for (let d = 0; d < loop.length; d += 2) { const p = pointAt(loop, d); pts.push({ x: p.x, y: 0, z: p.z }, { x: p.x, y: 2.6, z: p.z }); }
+  for (let d = 0; d < loop.length; d += 2) { const p = pointAt(loop, d); if (inside(p)) pts.push({ x: p.x, y: 0, z: p.z }, { x: p.x, y: 2.6, z: p.z }); }
+  // plus the loop's own vertices, so a rounded corner between two 2 u samples never pokes out of the fit
+  for (const p of loop.points) if (inside(p)) pts.push({ x: p.x, y: 0, z: p.z }, { x: p.x, y: 2.6, z: p.z });
   for (const s of map.stops) pts.push({ x: s.p.x, y: 0, z: s.p.z }, { x: s.p.x, y: 2.2, z: s.p.z });
   for (const st of map.rail.stations) pts.push({ x: st.platform.x, y: 0, z: st.platform.z }, { x: st.platform.x, y: 2.2, z: st.platform.z });
   return pts;
@@ -89,9 +98,9 @@ export interface Fit {
   viewport: { w: number; h: number };
 }
 
-export function fitView(view: { elev: number; az: number }, map: TownMap, viewport: { w: number; h: number }, hud: HudOptions = {}, pad = 0.04): Fit & { toScreen(q: V2): V2; refits: number } {
+export function fitView(view: { elev: number; az: number }, map: TownMap, viewport: { w: number; h: number }, hud: FitOptions = {}, pad = 0.04): Fit & { toScreen(q: V2): V2; refits: number } {
   const b = viewBasis(view);
-  const content = contentRect(networkPoints(map).map((p) => toImage(b, p)));
+  const content = contentRect(networkPoints(map, hud.clip).map((p) => toImage(b, p)));
   const cw = content.x1 - content.x0, ch = content.y1 - content.y0;
   const boxes = hudBoxes(viewport.w, viewport.h, hud);
   let s: { rect: Rect; inner: Rect; scale: number };

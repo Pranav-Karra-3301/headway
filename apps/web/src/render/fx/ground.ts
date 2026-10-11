@@ -1,13 +1,14 @@
 // Owner: T2.4. Subtle procedural ground variation (no textures): soft sunlit/shaded patches and faint grass flecks
 // on the bare board, mowing stripes + patches on lawns. A lit, transparent decal just above the board (0.004) and
-// lawns (0.066), so roads, plazas and buildings simply cover it. One draw call; fades with the route highlight.
+// just above each lawn surface (LawnPatch.y), so roads, footpaths, plazas and buildings simply cover it. One draw
+// call; fades with the route highlight.
 import * as THREE from 'three';
 import type { TownMap, Vec2 } from '@headway/sim';
 import { PALETTES } from '../palettes';
 import type { PaletteId } from '../types';
 import type { LawnPatch } from './anchors';
 
-const BOARD_Y = 0.004, LAWN_Y = 0.066, INSET = 0.5;
+const BOARD_Y = 0.004, INSET = 0.5;
 
 const VERT_PARS = /* glsl */ `
 attribute vec4 aGround;
@@ -104,7 +105,7 @@ export function createGroundFx(map: TownMap, lawns: readonly LawnPatch[], palett
   for (const l of lawns) {
     const d = longestEdgeDir(l.polygon);
     // stripes run along the long side: their "across" direction is the edge normal
-    pushPolygon(l.polygon, LAWN_Y, [1, -d.z, d.x, 0], pos, ground, idx);
+    pushPolygon(l.polygon, l.y, [1, -d.z, d.x, 0], pos, ground, idx);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));

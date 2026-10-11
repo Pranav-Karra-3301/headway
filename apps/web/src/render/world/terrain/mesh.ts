@@ -224,8 +224,8 @@ export function meshTerrain(field: TerrainField, step = 0.75): { band: TerrainPa
       if (outside) kind = KIND.strata;
       else {
         const nmx = (xs[ni]! + xs[ni + 1]!) / 2, nmz = (zs[nj]! + zs[nj + 1]!) / 2;
-        // spur walls facing a portal cut are masonry; everything else (road-portal cliffs) is rock
-        kind = m === 1 && field.cut(nmx, nmz) ? KIND.stone : KIND.rock;
+        // walls facing a portal cut or the board (retaining walls beside the portals) are masonry; the rest is rock
+        kind = (m === 1 && field.cut(nmx, nmz)) || (m === 0 && nmx > B.minX && nmx < B.maxX && nmz > B.minZ && nmz < B.maxZ) ? KIND.stone : KIND.rock;
         if (Math.max(ha, hb) < 0.08) continue; // feet that meet the board flush need no wall
       }
       skirt(m, kind, xs[i + ai]!, zs[j + aj]!, ha, xs[i + bi]!, zs[j + bj]!, hb, onx, onz, seg++);

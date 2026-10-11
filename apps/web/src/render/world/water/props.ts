@@ -9,6 +9,7 @@ import type { PaletteId } from '../../types';
 import { resolveWaterRole, WATER_COLORS } from './colors';
 import { at, box, capsule, cone, cyl, dome, group, pebble, prism, rbox, rot, scl, slab, sphere, torus } from './kit';
 import { BEACH_Y, DECK_Y, LAKE_BED_Y, PIER_Y, WATER_Y, type Bridge, type Prop, type WaterPlan } from './plan';
+import { buildViaduct } from './viaduct';
 
 type Builder = (p: Prop) => THREE.Object3D;
 
@@ -143,7 +144,7 @@ function boathouse(): THREE.Object3D {
   g.add(at(rbox(W + 0.3, base + 0.3, D + 0.36, 0.05, 'plank', 1), 0, base / 2 - 0.15, 0.03));
   g.add(at(rbox(W, H, D, 0.05, 'wall', 2), 0, base + H / 2, 0));
   for (let k = -3; k <= 3; k++) g.add(at(box(0.04, H - 0.06, 0.03, 'trim'), (k * W) / 7.4, base + H / 2, D / 2 + 0.005));
-  g.add(at(prism(W + 0.36, 0.78, D + 0.34, 'z', 'roof', 1), 0, base + H - 0.01, 0));
+  g.add(at(prism(W + 0.36, 0.78, D + 0.34, 'z', 'hutPaint', 0), 0, base + H - 0.01, 0));
   g.add(at(rbox(1.0, 1.02, 0.06, 0.03, 'trim'), 0, base + 0.52, D / 2 + 0.03));
   g.add(at(rbox(0.88, 0.94, 0.06, 0.03, 'door', 0), 0, base + 0.48, D / 2 + 0.05));
   g.add(at(box(0.03, 0.9, 0.065, 'trim'), 0, base + 0.48, D / 2 + 0.06));
@@ -280,9 +281,23 @@ function crates(): THREE.Object3D {
   return g;
 }
 
+/** Level-crossing sign: post, white crossbuck with red rims, a red lamp (glows at dusk via the palette lamp role). */
+function xsign(): THREE.Object3D {
+  const g = group();
+  g.add(at(cyl(0.1, 0.12, 0.08, 'stone', 0, 8), 0, 0.04, 0));
+  g.add(at(cyl(0.045, 0.05, 1.3, 'post', 0, 8), 0, 0.68, 0));
+  for (const s of [-1, 1]) {
+    g.add(at(rot(rbox(0.66, 0.14, 0.04, 0.02, 'taillight'), 0, 0, s * 0.62), 0, 1.22, 0.04));
+    g.add(at(rot(rbox(0.6, 0.08, 0.045, 0.015, 'stripe'), 0, 0, s * 0.62), 0, 1.22, 0.045));
+  }
+  g.add(at(rbox(0.26, 0.16, 0.12, 0.04, 'post'), 0, 0.86, 0.05));
+  for (const x of [-0.07, 0.07]) g.add(at(sphere(0.045, 'taillight', 0, 8, 6), x, 0.86, 0.11));
+  return g;
+}
+
 const BUILDERS: Record<Prop['kind'], Builder> = {
   hut, umbrella, towel, lifeguard, rowboat, castle, rock, grass, driftwood, boathouse, lamp, flag, bench,
-  lighthouse, cottage, pierDeck, pile, bollard, lifering, crates,
+  lighthouse, cottage, pierDeck, pile, bollard, lifering, crates, xsign,
 };
 
 export function buildProp(p: Prop): THREE.Object3D {
@@ -308,10 +323,21 @@ export function buildBridge(br: Bridge): THREE.Object3D {
   g.add(at(box(W + 0.06, 0.08, L - d0 - 0.1, 'stoneDark'), 0, DECK_Y - 0.36, (d0 + L) / 2));
   // road, sidewalks, parapets with a white coping, dashed centre line
   g.add(at(box(road, 0.03, L + 0.3, 'road'), 0, DECK_Y - 0.01, L / 2 - 0.15));
+  // parapets run from 0.3 u to the end, broken at level crossings (br.gaps)
+  const spans: Array<[number, number]> = [];
+  let from = 0.3;
+  for (const [a, c] of [...br.gaps].sort((p, q) => p[0] - q[0])) {
+    if (a > from) spans.push([from, a]);
+    from = Math.max(from, c);
+  }
+  if (L > from) spans.push([from, L]);
   for (const s of [-1, 1]) {
     g.add(at(box(walk, 0.1, L + 0.3, 'curb'), s * (road / 2 + walk / 2), DECK_Y + 0.02, L / 2 - 0.15));
-    g.add(at(rbox(0.17, 0.34, L - 0.3, 0.05, 'stone'), s * (W / 2 - 0.085), DECK_Y + 0.15, L / 2 + 0.15));
-    g.add(at(rbox(0.23, 0.06, L - 0.3, 0.025, 'trim'), s * (W / 2 - 0.085), DECK_Y + 0.33, L / 2 + 0.15));
+    for (const [a, c] of spans) {
+      if (c - a < 0.3) continue;
+      g.add(at(rbox(0.17, 0.34, c - a, 0.05, 'stone'), s * (W / 2 - 0.085), DECK_Y + 0.15, (a + c) / 2));
+      g.add(at(rbox(0.23, 0.06, c - a, 0.025, 'trim'), s * (W / 2 - 0.085), DECK_Y + 0.33, (a + c) / 2));
+    }
   }
   for (let z = 1.2; z < L - 0.6; z += 2.0) g.add(at(box(0.12, 0.012, 0.9, 'mark'), 0, DECK_Y + 0.011, z));
   // piers with rounded cutwaters and a pale cap course
@@ -427,6 +453,7 @@ export function buildStatics(plan: WaterPlan, palette: PaletteId): Statics {
   const root = group();
   for (const p of plan.props) root.add(buildProp(p));
   for (const br of plan.bridges) root.add(buildBridge(br));
+  root.add(buildViaduct(plan.viaduct));
   root.add(buildPoint(plan));
   const baked = bakeGeometry(root, palette, { resolve: resolveWaterRole });
   const beach = buildBeach(plan, palette);

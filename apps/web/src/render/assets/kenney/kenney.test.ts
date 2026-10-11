@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { bakeGeometry } from '../../kit/bake';
 import { PALETTES } from '../../palettes';
 import {
-  BUILDING_UP_ROLE, chroma, hexToRgb, isPaletteRole, kenneyColor, KENNEY_ROLES, lightness, NATURE_REMAP, quantizeShade, shadeHex, SWATCH_ROLE, swatchRole,
+  BUILDING_UP_ROLE, chroma, hexToRgb, isPaletteRole, kenneyColor, KENNEY_ROLES, lightness, modelRoleMap, NATURE_REMAP, quantizeShade, shadeHex, SWATCH_ROLE, swatchRole,
 } from './colors';
 import {
   _setKenneyTemplate, declareKenney, KENNEY_BOATS, KENNEY_CARS, KENNEY_KITS, KENNEY_SCALE, KENNEY_SERVICE, kenneyIdsFor, kenneyMaterial,
@@ -218,6 +218,20 @@ describe('buildTemplate', () => {
     expect(byRole.knSlate!.up).toBeUndefined();
     // without splitUp, the same faces stay one dark part
     expect(buildTemplate('car-kit/test', root, 1, cm).parts.map((p) => p.info.role).sort()).toEqual(['knSlate', 'knWhite']);
+  });
+  it('modelRoleMap: suburban houses take our palette roof colour (not planters/trees); roleMap applies after upRole', () => {
+    expect(modelRoleMap('city-kit-suburban/building-type-a')).toEqual({ knGreen: 'roof' });
+    expect(modelRoleMap('city-kit-suburban/building-type-u')?.knGreen).toBe('roof');
+    for (const id of ['city-kit-suburban/planter', 'city-kit-suburban/tree-large', 'city-kit-commercial/building-a', 'car-kit/sedan', 'nature-kit/tree_oak']) {
+      expect(modelRoleMap(id)).toBeUndefined();
+    }
+    expect(isPaletteRole('roof')).toBe(true);
+    const cm = colormap({ '3,0': '#61cb8b', '1,1': '#ffffff' });
+    const root = new THREE.Group();
+    root.add(new THREE.Mesh(quad(-1, 1, 0, 1, gradUv(3, 0)), named('colormap')), new THREE.Mesh(quad(-1, 1, 0, 1, gradUv(1, 1)), named('colormap')));
+    const t = buildTemplate('city-kit-suburban/building-type-test', root, 1, cm, { splitUp: true, upRole: BUILDING_UP_ROLE, roleMap: { knGreen: 'roof' } });
+    expect(t.parts.map((p) => p.info.role).sort()).toEqual(['knWhite', 'roof']);
+    expect(t.parts.find((p) => p.info.role === 'roof')!.info.source).toBe('#61cb8b');
   });
   it('mirrored nodes keep outward winding; paint = the largest saturated part of a vehicle', () => {
     const cm = colormap({ '4,1': '#cf534f', '6,1': '#38383d', '7,1': '#d0e8ff' });

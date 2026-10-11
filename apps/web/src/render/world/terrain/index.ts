@@ -1,10 +1,12 @@
 // Owner: E1. Terrain layer: Nittany Ridge around the north + west of the board (layered ridges, pine forests,
 // rocky summits and headlands where it meets Nittany Lake), stone tunnel portals with lanterns where roads leave
-// the board on the mountain sides, and the rail-tunnel spur on the board's west strip (split into a stone-lined
-// cutting where Main St crosses, so the road and level crossing stay open).
-// Draw calls: 5 — mountains (terrain + road portals, one mesh), rail spur (terrain + rail portals + its trees, one
-// mesh with its own KitMaterial so the composer can x-ray-fade it: `material.fade.value`), pines, broadleaf and
-// rocks (InstancedMeshes; trees sway). Everything is vertex-coloured KitMaterial; palettes repaint in place.
+// the board on the mountain sides, and the rail tunnel: the whole off-board run of the line through the ridge is
+// underground, with skew portals on the board edge (facing the town and camera) so the train visibly enters and
+// leaves. (An on-board `layout.railTunnel` span instead becomes a loaf-shaped spur hill, cut open at road crossings.)
+// Draw calls: ≤ 5 — mountains (terrain + road portals, one mesh), rail tunnel (rail portals + any on-board spur and
+// its trees, one mesh with its own KitMaterial so the composer can x-ray-fade it: `material.fade.value`), pines,
+// broadleaf and rocks (InstancedMeshes; trees sway). Everything is vertex-coloured KitMaterial; palettes repaint in
+// place. Terrain beyond the board casts no realtime shadow (bible §3.6); the instanced trees do.
 import * as THREE from 'three';
 import type { TownMap } from '@headway/sim';
 import { recolorBaked, type Baked, bakeGeometry } from '../../kit/bake';

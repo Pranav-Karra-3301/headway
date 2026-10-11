@@ -17,6 +17,9 @@ import { createTrafficLayer } from './traffic/index';
 import type { DetailMode, LightMode, PaletteId, Pick, TownRendererApi, TownRendererOptions } from './types';
 import { createWorldLayer } from './world/index';
 import { DISTRICTS } from './districts/index';
+import { createRegistry } from './assets/index';
+import { kenneyIdsFor, preloadKenney, setKenneyPalette, type KenneyId } from './assets/kenney/index';
+import type { DistrictScenery } from './districts/types';
 
 /** Optional extras (all optional, so plain TownRendererOptions keep working). */
 export interface TownRendererExtras {
@@ -35,6 +38,22 @@ export interface TownRendererExtras {
 }
 
 const PAD = 0.04;
+
+/**
+ * Load every Kenney model the town's district kinds need (plus `extra`, e.g. traffic cars) before constructing a
+ * TownRenderer, so Kenney-backed builders use their models instead of the fallbacks. Never rejects (missing models
+ * just keep the fallback builders); call it once, `await` it, then `new TownRenderer(...)`.
+ */
+export async function preloadTownAssets(opts: { districts?: readonly DistrictScenery[]; extra?: readonly KenneyId[] } = {}): Promise<void> {
+  try {
+    createRegistry(); // families declare their Kenney models at registration
+    const kinds = new Set<string>();
+    for (const d of opts.districts ?? DISTRICTS) for (const it of d.items) kinds.add(it.kind);
+    await preloadKenney([...kenneyIdsFor(kinds), ...(opts.extra ?? [])]);
+  } catch (e) {
+    console.warn('[headway] town asset preload failed; using fallback builders', e);
+  }
+}
 
 export class TownRenderer implements TownRendererApi {
   readonly stage: Stage;
@@ -57,6 +76,7 @@ export class TownRenderer implements TownRendererApi {
     this.palette = opts.palette ?? DEFAULT_PALETTE;
     this.detail = opts.detail ?? DEFAULT_DETAIL;
     this.light = opts.light ?? DEFAULT_LIGHT;
+    setKenneyPalette(this.palette);
     this.stage = new Stage(canvas, {
       palette: this.palette, light: this.light, bounds: map.bounds, maxHeight: 10,
       ...(opts.quality ? { quality: opts.quality } : {}),
@@ -97,7 +117,22 @@ export class TownRenderer implements TownRendererApi {
     this.fit();
   }
 
-  /** Default framing: the rail loop and every stop fill the canvas (4 % padding), centred. */
+  /** CSS-pixel insets of the canvas covered by HUD (top bar, legend, dock, inspector); default framing avoids them. */
+  private safe = { top: 0, right: 0, bottom: 0, left: 0 };
+
+  /**
+   * Tell the renderer which part of the canvas the HUD leaves visible (CSS px from each edge). The default framing
+   * then fits the transit network into that rectangle; re-fits immediately unless the user has moved the camera
+   * (pass refit: true to force).
+   */
+  setSafeArea(insets: Partial<{ top: number; right: number; bottom: number; left: number }>, refit = false): void {
+    const c = (v: number | undefined) => (Number.isFinite(v) ? Math.max(0, v!) : 0);
+    this.safe = { top: c(insets.top), right: c(insets.right), bottom: c(insets.bottom), left: c(insets.left) };
+    if (refit) this.userMoved = false;
+    if (!this.userMoved) this.fit();
+  }
+
+  /** Default framing: the rail loop and every stop fill the HUD-safe rectangle (4 % padding), centred in it. */
   fit(): void {
     const cam = this.stage.camera;
     cam.updateMatrixWorld(true);
@@ -113,16 +148,24 @@ export class TownRenderer implements TownRendererApi {
     for (const s of this.map.stops) add(s.p.x, 0, s.p.z);
     if (!Number.isFinite(minX)) return;
     const w = Math.max(1, this.canvas.clientWidth || this.canvas.width), h = Math.max(1, this.canvas.clientHeight || this.canvas.height);
-    const needH = Math.max(maxY - minY, (maxX - minX) * (h / w)) * (1 + 2 * PAD);
-    const zoom = this.stage.rig.view / needH;
-    // Move the target along the ground so the box centre (camera space) lands on the screen centre:
-    // Δ = cx·right + cy·up + c·dir with Δ.y = 0 (orthographic, so only the camera-space x/y shift matters).
-    const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    const sf = this.safe;
+    // a safe rect smaller than 30 % of the canvas in either direction is ignored (tiny canvases, bad insets)
+    const ok = w - sf.left - sf.right >= 0.3 * w && h - sf.top - sf.bottom >= 0.3 * h;
+    const sl = ok ? sf.left : 0, sr = ok ? sf.right : 0, st = ok ? sf.top : 0, sb = ok ? sf.bottom : 0;
+    const sw = w - sl - sr, sh = h - st - sb;
+    const needH = Math.max(maxY - minY, (maxX - minX) * (sh / sw)) * (1 + 2 * PAD);
+    // visible world height of the safe rect at zoom z is (view / z) · (sh / h)
+    const zoom = (this.stage.rig.view * sh) / (h * needH);
+    const upp = this.stage.rig.view / (zoom * h); // world units per CSS px
+    // Move the target along the ground so the box centre (camera space) lands on the safe rect's centre:
+    // Δ = ex·right + ey·up + c·dir with Δ.y = 0 (orthographic, so only the camera-space x/y shift matters).
+    const ex = (minX + maxX) / 2 - ((sl - sr) / 2) * upp;
+    const ey = (minY + maxY) / 2 - ((sb - st) / 2) * upp;
     const right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
     const up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
     const dir = cam.getWorldDirection(new THREE.Vector3());
-    const c = Math.abs(dir.y) > 1e-6 ? -(cx * right.y + cy * up.y) / dir.y : 0;
-    const delta = right.multiplyScalar(cx).addScaledVector(up, cy).addScaledVector(dir, c);
+    const c = Math.abs(dir.y) > 1e-6 ? -(ex * right.y + ey * up.y) / dir.y : 0;
+    const delta = right.multiplyScalar(ex).addScaledVector(up, ey).addScaledVector(dir, c);
     const t = this.stage.rig.target;
     this.stage.rig.set(t.x + delta.x, t.z + delta.z, zoom);
   }
@@ -176,6 +219,7 @@ export class TownRenderer implements TownRendererApi {
   setPalette(p: PaletteId): void {
     if (p === this.palette) return;
     this.palette = p;
+    setKenneyPalette(p);
     this.stage.setPalette(p);
     this.town.setPalette(p);
     this.dynamic.setPalette(p);

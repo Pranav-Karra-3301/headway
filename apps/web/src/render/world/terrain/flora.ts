@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { bakeGeometry, type Baked } from '../../kit/bake';
 import type { PaletteId } from '../../types';
 import { resolveTerrainRole } from './colors';
-import { smooth, WATER_LEVEL, type TerrainField } from './field';
+import { fbm, smooth, WATER_LEVEL, type TerrainField } from './field';
 import { rolePart } from './portals';
 
 /** One placed instance. `tone` 0..1 picks a colour jitter, `haze` 0..1 is the aerial-perspective amount. */
@@ -103,7 +103,7 @@ export function scatterFlora(field: TerrainField, seed = 11): Flora {
   const out: Flora = { conifers: [], broadleaf: [], rocks: [], spurTrees: [] };
   const roadPortals = field.portals.filter((p) => p.kind === 'road');
   const railPortals = field.portals.filter((p) => p.kind === 'rail');
-  const nearRoadPortal = (x: number, z: number) => roadPortals.some((p) => {
+  const nearRoadPortal = (x: number, z: number) => field.portals.some((p) => {
     const rx = x - p.x, rz = z - p.z, o = -(rx * p.face.x + rz * p.face.z), a = Math.abs(rx * p.face.z - rz * p.face.x);
     return o > -1 && o < 3.4 && a < p.half + 1.6;
   });
@@ -121,7 +121,7 @@ export function scatterFlora(field: TerrainField, seed = 11): Flora {
       if (d < 0.7) continue;
       const h = field.height(px, pz);
       if (h < WATER_LEVEL + 0.65 || field.coast(px, pz) < 2.4) continue;
-      if (field.slope(px, pz) > 1.15 || nearRoadPortal(px, pz)) continue;
+      if (field.slope(px, pz) > 1.45 || nearRoadPortal(px, pz)) continue;
       const dens = field.forest(px, pz, h) * 0.92 + 0.05 * smooth(0.5, 3, h) * (1 - smooth(15, 18, h));
       if (r1 > dens) continue;
       const pine = r2 < 0.3 + 0.62 * smooth(1.5, 7, h);
@@ -142,7 +142,8 @@ export function scatterFlora(field: TerrainField, seed = 11): Flora {
       if (field.region(px, pz) !== 0 || field.depth(px, pz) < 0.8 || nearRoadPortal(px, pz)) continue;
       const h = field.height(px, pz), L = field.coast(px, pz), sl = field.slope(px, pz);
       if (h < WATER_LEVEL - 0.45) continue;
-      const p = 0.5 * smooth(0.75, 1.3, sl) + 0.4 * smooth(15.5, 19, h) + 0.5 * smooth(3.2, 0.6, L) * smooth(-1.4, 0.4, h) + 0.025;
+      const clump = smooth(0.05, 0.45, fbm(px / 7, pz / 7, 131));
+      const p = (0.3 * smooth(1.2, 2, sl) + 0.35 * smooth(15.5, 19, h)) * clump + 0.5 * smooth(3.2, 0.6, L) * smooth(-1.4, 0.4, h) + 0.006;
       if (r1 > p) continue;
       const coastal = L < 3;
       const s = (coastal ? 0.55 + r2 * 0.9 : 0.5 + r2 * 1.1) * (1 - 0.2 * smooth(14, 30, field.depth(px, pz)));

@@ -206,3 +206,76 @@ describe('props', () => {
     }
   });
 });
+
+// The rail loop leaves the board to the south: along the lakeshore beach, out over the bay on a viaduct and back onto
+// the board at the south-east (TOWN rail reroute). The lake carries it and keeps everything else out of its way.
+describe('rail over the bay', () => {
+  const loop = TOWN.rail.loop;
+  const railPts: Vec2[] = [];
+  for (let d = 0; d < loop.length; d += 0.25) railPts.push(pointAt(loop, d));
+  const southOff = railPts.filter((p) => p.z > b.maxZ + 0.01 && p.x > b.minX);
+  const railDist = (x: number, z: number) => Math.min(...railPts.map((p) => Math.hypot(p.x - x, p.z - z)));
+  const vd = plan.viaduct;
+
+  it('decks every stretch of track that runs over water, flush under the ballast', () => {
+    expect(southOff.length).toBeGreaterThan(20);
+    const decks = vd.runs.filter((r) => r.kind === 'deck');
+    expect(decks.length).toBeGreaterThanOrEqual(1);
+    const onDeck = (p: Vec2) => decks.some((r) => r.pts.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.4));
+    for (const p of southOff) if (plan.shore.ground(p.x, p.z) < WATER_Y + 0.05) expect(onDeck(p), `${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBe(true);
+    expect(vd.deckTop).toBeLessThanOrEqual(0);
+    expect(vd.deckTop).toBeGreaterThan(-0.06);
+    expect(vd.width).toBeGreaterThanOrEqual(2.2);
+  });
+
+  it('beds the track on the beach (no floating ballast) wherever it is off the board but not over water', () => {
+    const all = vd.runs.flatMap((r) => r.pts);
+    for (const p of southOff) expect(Math.min(...all.map((q) => Math.hypot(q.x - p.x, q.z - p.z)))).toBeLessThan(0.4);
+  });
+
+  it('stands viaduct piers in the water under the track, no more than 6 u apart', () => {
+    expect(vd.piers.length).toBeGreaterThanOrEqual(3);
+    for (const pr of vd.piers) {
+      expect(railDist(pr.x, pr.z)).toBeLessThan(0.3);
+      expect(plan.shore.ground(pr.x, pr.z)).toBeLessThan(WATER_Y - 0.1);
+      expect(Math.hypot(pr.dx, pr.dz)).toBeCloseTo(1, 3);
+    }
+    for (let i = 1; i < vd.piers.length; i++) {
+      const a = vd.piers[i - 1]!, c = vd.piers[i]!;
+      const gap = Math.hypot(c.x - a.x, c.z - a.z);
+      expect(gap).toBeGreaterThan(2.5);
+      expect(gap).toBeLessThan(6.5);
+    }
+  });
+
+  it('keeps props, moored boats and the marina off the track (ballast + 0.5 u), apart from the crossing causeway', () => {
+    for (const p of plan.props) {
+      const r = p.kind === 'grass' ? 0.3 : Math.max(p.w, p.d) / 2;
+      expect(railDist(p.x, p.z) - r, `${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)}`).toBeGreaterThan(1.4);
+    }
+    for (const bt of plan.boats.filter((x) => !x.loop && !x.follow)) expect(railDist(bt.x, bt.z)).toBeGreaterThan(2.6);
+  });
+
+  it('sails boats clear of the viaduct', () => {
+    for (const bt of plan.boats.filter((x) => x.loop || x.follow)) {
+      for (let t = 0; t < 240; t += 0.5) {
+        const p = boatPose(plan, bt, t);
+        expect(railDist(p.x, p.z), `${bt.kind} at t=${t}`).toBeGreaterThan(bt.kind === 'duck' || bt.kind === 'duckling' ? 1.6 : 2.8);
+      }
+    }
+  });
+
+  it('opens the causeway parapets where the rail crosses and keeps lamps off the level crossing', () => {
+    for (const br of plan.bridges) {
+      for (let at = 0; at < br.len; at += 0.1) {
+        const p = { x: br.from.x + br.dir.x * at, z: br.from.z + br.dir.z * at };
+        if (railDist(p.x, p.z) < 0.9) expect(br.gaps.some(([a, c]) => a <= Math.max(0, at - 1) && c >= at + 1), `gap at ${at.toFixed(1)}`).toBe(true);
+      }
+      for (const l of br.lamps) {
+        const off = br.width / 2 - 0.3;
+        const x = br.from.x + br.dir.x * l.at - br.dir.z * off * l.side, z = br.from.z + br.dir.z * l.at + br.dir.x * off * l.side;
+        expect(railDist(x, z)).toBeGreaterThan(1.8);
+      }
+    }
+  });
+});

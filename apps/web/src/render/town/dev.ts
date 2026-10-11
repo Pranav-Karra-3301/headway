@@ -1,12 +1,12 @@
 // Owner: T2.2. Town dev page (Vite dev: /src/render/town/dev.html): the full TownRenderer driven by the stub sim.
 // URL: ?palette=a|b|c &detail=toy|min &light=day|dusk &quality=high|low &post=0 &speed=8 &t=660 (fast-forward, sim s)
 //      &anim=0 (freeze after fast-forward) &route=r1 (highlight) &select=bus:b1 &zoom=1.4 &x=0&z=0 (pan target)
-//      &off=world,traffic,fx,streetscape (drop layers) &clean=1 (hide UI) &seed=4001
+//      &off=world,traffic,fx,streetscape (drop layers) &clean=1 (hide UI) &seed=4001 &safe=64,0,140,0 (HUD insets)
 import * as THREE from 'three';
 import { createStubSim, playInstance, TOWN } from '@headway/sim';
 import type { RouteId, ScenarioInstance } from '@headway/sim';
 import { SimRunner, type Speed } from '../../sim/runner';
-import { TownRenderer } from '../index';
+import { preloadTownAssets, TownRenderer } from '../index';
 import type { Quality } from '../post';
 import type { DetailMode, LightMode, PaletteId, Pick } from '../types';
 
@@ -24,6 +24,7 @@ if (q.get('clean') === '1') document.body.classList.add('clean');
 const off = new Set((q.get('off') ?? '').split(',').filter(Boolean));
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
+await preloadTownAssets();
 const renderer = new TownRenderer(canvas, TOWN, {
   palette: state.palette, detail: state.detail, light: state.light,
   quality: pickParam<Quality>('quality', ['high', 'low'], 'high'),
@@ -31,6 +32,10 @@ const renderer = new TownRenderer(canvas, TOWN, {
   layers: { world: !off.has('world'), streetscape: !off.has('streetscape'), traffic: !off.has('traffic'), fx: !off.has('fx') },
 });
 renderer.stage.setLight(state.light, true);
+if (q.has('safe')) { // &safe=top,right,bottom,left (CSS px covered by HUD)
+  const [top, right, bottom, left] = (q.get('safe') ?? '').split(',').map(Number);
+  renderer.setSafeArea({ top, right, bottom, left }, true);
+}
 if (q.has('zoom') || q.has('x') || q.has('z')) {
   const t = renderer.stage.rig.target;
   renderer.stage.rig.set(num('x', t.x), num('z', t.z), renderer.stage.camera.zoom * num('zoom', 1));

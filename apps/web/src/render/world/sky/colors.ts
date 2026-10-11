@@ -3,13 +3,17 @@
 // farthest distant-ridge curtain, so the lightest haze band always sits just above the ridge line (whatever the pan,
 // zoom or peek azimuth) and deepens toward the top: day mint over a pale cream horizon, dusk indigo #2F3A5E over a
 // peach horizon. Below the horizon (behind misty ridge feet and around the base in the beauty shot) it settles into
-// a soft haze. Distant ridge layers are flat silhouettes: mix(ridgeBase, haze, t) in sRGB with t = 0.35 / 0.55 / 0.75
+// a soft haze: pale by day; at dusk a deep plum → indigo, so the lit town is the brightest thing on screen (bible
+// §2.5 dusk order) and the peach glow only hugs the ridge line. Distant ridge layers are flat silhouettes: mix(ridgeBase, haze, t) in sRGB with t = 0.35 / 0.55 / 0.75
 // (bible: #89B3A0, #A2C5B5, #BCD8CA by day in palette A).
 import * as THREE from 'three';
 import type { PaletteId } from '../../types';
+import { RIDGE_FOOT_Y } from './ridges';
 
 /** Positions (u above the horizon) of the five gradient stops: deep haze, haze, horizon (lightest), upper, top. */
 export const SKY_T = [-50, -14, 0, 9, 26] as const;
+/** Valley mist on the distant ridges glows like the sky at this height (never darker): see `ridgeMist`. */
+export const MIST_T = -5;
 /** Aerial perspective of the three distant ridge layers, near → far. */
 export const RIDGE_HAZE = [0.35, 0.55, 0.75] as const;
 
@@ -37,7 +41,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
       cloudLit: '#FFFFFF', cloudShade: '#DDEDE6', shadow: '#A3BDB3', shadowAmt: 0.5, stars: 0,
     },
     dusk: {
-      stops: ['#C98C85', '#D69A8C', '#E6A78C', '#8A6E96', '#2F3A5E'],
+      stops: ['#3A3D62', '#655779', '#E6A78C', '#8A6E96', '#2F3A5E'],
       ridgeBase: '#3B3F68', haze: '#D49B8E', rim: '#F7C0A0', rimAmt: 0.85,
       cloudLit: '#F4BEA2', cloudShade: '#8B7CA6', shadow: '#77708F', shadowAmt: 0.45, stars: 1,
     },
@@ -49,7 +53,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
       cloudLit: '#FFFDF8', cloudShade: '#E6E1D3', shadow: '#BDB4A0', shadowAmt: 0.45, stars: 0,
     },
     dusk: {
-      stops: ['#C48B80', '#D29988', '#E2A68B', '#856C86', '#2E3550'],
+      stops: ['#383A5A', '#625672', '#E2A68B', '#856C86', '#2E3550'],
       ridgeBase: '#3D3E5C', haze: '#CF9C8C', rim: '#F4C19F', rimAmt: 0.8,
       cloudLit: '#EFBEA3', cloudShade: '#857993', shadow: '#76708A', shadowAmt: 0.45, stars: 1,
     },
@@ -61,7 +65,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
       cloudLit: '#FFFFFF', cloudShade: '#DEE3EC', shadow: '#ADB4C1', shadowAmt: 0.45, stars: 0,
     },
     dusk: {
-      stops: ['#C78A84', '#D4998B', '#E5A68A', '#856B94', '#262E48'],
+      stops: ['#363A62', '#615679', '#E5A68A', '#856B94', '#262E48'],
       ridgeBase: '#383C66', haze: '#D29A8D', rim: '#F6BF9F', rimAmt: 0.85,
       cloudLit: '#F3BDA1', cloudShade: '#8879A5', shadow: '#736E8E', shadowAmt: 0.45, stars: 1,
     },
@@ -123,4 +127,16 @@ export function skyAt(m: SkyMix, t: number, out = new THREE.Color()): THREE.Colo
   out.copy(m.stops[0]);
   for (let i = 1; i < 5; i++) out.lerp(m.stops[i]!, smooth(SKY_T[i - 1]!, SKY_T[i]!, t));
   return out;
+}
+
+/** World heights over which a ridge curtain's mist turns from the backdrop (at its foot) to the glowing valley haze. */
+export const MIST_FOOT = [RIDGE_FOOT_Y + 4, RIDGE_FOOT_Y + 20] as const;
+
+/** What a distant ridge mists into at world height `y`, where the backdrop behind it is at horizon height `t` — the
+ *  same curve as the props shader (for a band facing the camera): the sky, lifted to at least the glow at `MIST_T`,
+ *  except down at the curtain's foot, where it is exactly the backdrop so the curtain never shows an edge. */
+export function ridgeMist(m: SkyMix, t: number, y: number, out = new THREE.Color()): THREE.Color {
+  skyAt(m, t, out);
+  const glow = skyAt(m, Math.max(t, MIST_T), new THREE.Color());
+  return out.lerp(glow, smooth(MIST_FOOT[0], MIST_FOOT[1], y));
 }

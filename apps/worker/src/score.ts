@@ -1,5 +1,5 @@
 // Running the engine in the worker: split scores for /api/evolve, play-seed runs for the leaderboard, sealed runs.
-import { evaluatePolicy } from '@headway/evolve';
+import { createEvaluator } from '@headway/evolve';
 import { PolicyController, runSync, SEEDS, TOWN } from '@headway/sim';
 import type { FailureFinding, Intent, Metrics, Policy, RunResult, ScenarioInstance, SplitScore } from '@headway/sim';
 import type { Evaluate } from './env';
@@ -52,9 +52,11 @@ export function runPolicy(policy: Policy, scenario: ScenarioInstance, intents?: 
   return runSync({ map: TOWN, scenario, controller: new PolicyController(policy), ...(intents?.length ? { intents } : {}) });
 }
 
-/** Default `AppDeps.evaluate`: the CLI's own scorer (`evaluatePolicy`) on train = stadium_exit + class_change × 1001–1004,
- *  val = × 2001–2002 (spec §7), so worker and CLI rounds score identically. */
-export const evaluateSplit: Evaluate = async (policy, split) => evaluatePolicy(policy, SEEDS[split]);
+/** Default `AppDeps.evaluate`: the CLI's own evaluator (`createEvaluator`: real engine, same aggregation) on train =
+ *  stadium_exit + class_change × 1001–1004, val = × 2001–2002 (spec §7), so worker and CLI rounds score identically.
+ *  It yields to the event loop between runs, so `/api/evolve` events reach the client while a split is scored. */
+export const evaluateSplit: Evaluate = (policy, split) =>
+  createEvaluator({ instances: (s) => SEEDS[s].map((x) => ({ ...x })), yieldBetweenRuns: true }).evaluate(policy, split);
 
 /** Everything but meta: what the simulator actually runs (a memo key; key order as stored). */
 export const policyKey = (p: Policy): string => JSON.stringify({ params: p.params, rules: p.rules, defaults: p.defaults, advisor: p.advisor ?? null });

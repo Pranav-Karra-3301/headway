@@ -22,7 +22,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { applyClay } from '../../materials';
 import type { PaletteId } from '../../types';
-import { BUILDING_UP_ROLE, isPaletteRole, kenneyColor, shadeHex } from './colors';
+import { BUILDING_UP_ROLE, isPaletteRole, kenneyColor, modelRoleMap, shadeHex } from './colors';
 import { buildTemplate, type ColormapPixels, type KenneyPartInfo, type KenneyTemplate } from './template';
 
 export type KenneyKit =
@@ -62,7 +62,7 @@ export const KENNEY_BOATS: KenneyId[] = [
 ];
 
 export type { KenneyPartInfo } from './template';
-export { KENNEY_ROLES, NATURE_REMAP, SWATCH_ROLE, kenneyColor, roleVariants } from './colors';
+export { KENNEY_ROLES, NATURE_REMAP, SWATCH_ROLE, kenneyColor, modelRoleMap, roleVariants } from './colors';
 
 // ---------- loading ----------
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}models/kenney/`;
@@ -119,6 +119,7 @@ function loadOne(id: KenneyId): Promise<void> {
         const building = kit === 'city-kit-suburban' || kit === 'city-kit-commercial' || kit === 'city-kit-industrial';
         templates.set(id, buildTemplate(id, gltf.scene, KENNEY_SCALE[kit], cm, {
           paint: kit === 'car-kit' || kit === 'watercraft-pack', splitUp: building, upRole: building ? BUILDING_UP_ROLE : undefined,
+          roleMap: modelRoleMap(id),
         }));
         disposeGltf(gltf.scene);
       } catch (err) {

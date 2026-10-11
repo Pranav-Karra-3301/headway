@@ -84,6 +84,13 @@ export const SWATCH_ROLE: Record<string, string> = {
 /** Building kits: up-facing faces of these roles take another role (dark slate flat roofs → warm roofs). */
 export const BUILDING_UP_ROLE: Readonly<Record<string, string>> = { knSlate: 'knRoofFlat', knDark: 'knRoofFlat' };
 
+/** Per-model role overrides (harmonised defaults; per-placement recolorKenney still wins). Suburban houses' green
+ *  roofs take our palette `roof` colour (terracotta / slate / navy in a / b / c) instead of reading as lawn. */
+export function modelRoleMap(id: string): Readonly<Record<string, string>> | undefined {
+  return id.startsWith('city-kit-suburban/building-type-') ? SUBURBAN_HOUSE_ROLE : undefined;
+}
+const SUBURBAN_HOUSE_ROLE: Readonly<Record<string, string>> = { knGreen: 'roof' };
+
 /** Saturated swatch families that can be a vehicle's paint. */
 export const PAINT_ROLES = new Set(['knRed', 'knOrange', 'knYellow', 'knGreen', 'knBlue', 'knIndigo', 'knPurple', 'knPink', 'knPeach']);
 

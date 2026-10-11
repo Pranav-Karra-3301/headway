@@ -40,7 +40,8 @@ export interface ViewResult {
   fit: Fit & { refits: number; inspectorScale: number; playScale: number; alt: Record<string, number> };
   screen: ScreenStats;
   perPlace: PlaceStat[];
-  hiddenPoints: Array<{ cls: SampleClass; p: V3; by: string }>;
+  /** Every hidden sample, its occluder's label and (when a catalog/station box hid it) that box. */
+  hiddenPoints: Array<{ cls: SampleClass; p: V3; by: string; box?: Box }>;
   score: number;
 }
 
@@ -91,7 +92,7 @@ export function measureView(view: ViewSpec, input: StudyInput): ViewResult {
     if (by) {
       st.hidden++;
       if (!hit || hit.cls !== 'tree' || firstOccluder(s.p, d, solidBoxes)) st.solid++;
-      hiddenPoints.push({ cls: s.cls, p: s.p, by });
+      hiddenPoints.push(hit ? { cls: s.cls, p: s.p, by, box: hit } : { cls: s.cls, p: s.p, by });
     }
     const pl = places.get(s.place);
     if (!pl) continue;
@@ -181,4 +182,11 @@ function scoreOf(r: ViewResult, maxScale: number): number {
 export function rankViews(rs: readonly ViewResult[]): ViewResult[] {
   const maxScale = Math.max(...rs.map((r) => r.fit.scale));
   return rs.map((r) => ({ ...r, score: scoreOf(r, maxScale) })).sort((a, b) => b.score - a.score);
+}
+
+/** Boxes that hide at least one gameplay sample of the given classes (stop queues, stops, platforms by default). */
+export function culprits(r: Pick<ViewResult, 'hiddenPoints'>, classes: readonly SampleClass[] = ['queue', 'platformQueue', 'stop', 'platform']): Box[] {
+  const out = new Set<Box>();
+  for (const h of r.hiddenPoints) if (h.box && classes.includes(h.cls)) out.add(h.box);
+  return [...out];
 }

@@ -274,6 +274,20 @@ describe('traffic model', () => {
     expect(withClose.cars.some((c) => c.surge)).toBe(true);
   });
 
+  it('swaps car models in place: cars keep their spot and take the new lengths', () => {
+    const m = createTrafficModel(graph, { seed: 6, carCount: 18 });
+    run(m, 60, 0.25);
+    const where = m.cars.map((c) => `${c.id}:${c.x},${c.z}`).join('|');
+    m.setVariants([{ length: 1.66, weight: 0.6 }, { length: 1.8, weight: 0.4 }]);
+    expect(m.cars.map((c) => `${c.id}:${c.x},${c.z}`).join('|')).toBe(where);
+    for (const c of m.cars) {
+      expect(c.variant).toBeLessThan(2);
+      expect(c.halfLen).toBeCloseTo([0.83, 0.9][c.variant]!, 6);
+    }
+    run(m, 300, 0.25, () => ({}), undefined, 60);
+    for (const c of m.cars) expect(c.variant).toBeLessThan(2);
+  });
+
   it('copes with a huge or negative time step without breaking the invariants', () => {
     const m = createTrafficModel(graph, { seed: 2, carCount: 20 });
     m.step(0.1, { simT: 0.1 });

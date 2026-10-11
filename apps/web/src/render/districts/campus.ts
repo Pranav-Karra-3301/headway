@@ -8,7 +8,10 @@
 //   Atherton St to Willard's portico, and two diagonals, all crossing at a paved hub on the queue axis.
 // - The West Halls block (West Rd–Burrowes St): the dorm faces Burrowes St, the chapel faces Main St.
 // Camera rules (it looks from +x/+z): nothing tall stands south-east of a queue; the strip south-east of the University
-// Station stop stays low, so the stop and its queue never hide behind the campus.
+// Station stop stays low, so the stop and its queue never hide behind the campus. Route 1 runs up Burrowes St and
+// along North Rd, the quad's camera-hidden edges: only hedges, bushes and beds there (no tree crowns), and the clock
+// tower keeps lawn on its north and west. Willard (pinned to Burrowes St by its zone door), the tower and the library
+// still hide short stretches of those streets; x-ray covers them (art bible §2.4).
 import { TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
 import type { AssetParams, PlacedAsset } from '../assets/types';
@@ -82,18 +85,22 @@ const AREAS: GroundArea[] = [
 
 // ---------------------------------------------------------------- trees, beds, furniture
 const TREES: PlacedAsset[] = [
-  // the tower corner: a pine and a birch behind it, a cherry and a birch toward the North Rd lane
-  put('veg.pine', Q.w + 0.65, TOWER.z - 1.1), put('veg.birch', Q.w + 0.6, TOWER.z + 0.35),
-  put('veg.cherry', LANE_X - 1.0, Q.n + 0.85), put('veg.birch', TOWER.x + 2.15, TOWER.z + 0.75),
-  // the quad's west panels: an oak by Willard and a birch by the walk, either side of the portico walk
+  // the tower corner: one birch beside it (the North Rd / Burrowes St edges stay low, see BEDS)
+  put('veg.birch', TOWER.x + 2.15, TOWER.z + 0.75),
+  // the quad's west panels: an oak (south) and a maple (north) by Willard, birches by the walk, either side of the portico walk
   put('veg.oak', Q.w + 4.5, Q.s - 1.15), put('veg.birch', HUB.x - 2.75, HUB.z + 1.65),
-  put('veg.oak', Q.w + 4.5, HUB.z - 2.2), put('veg.birch', HUB.x - 2.75, HUB.z - 1.95),
-  // the quad's east panels (by the gate)
-  put('veg.birch', Q.e - 1.5, Q.s - 1.05), put('veg.birch', Q.e - 2.05, HUB.z + 1.2), put('veg.cherry', Q.e - 1.95, HUB.z - 1.35),
+  put('veg.maple', Q.w + 4.5, HUB.z - 2.2), put('veg.birch', HUB.x - 2.75, HUB.z - 1.95),
+  // the quad's east panels: a birch on the Main St corner and one behind the gate walk's north bench (nothing tall
+  // right behind the gate, so its arch reads clearly from the camera)
+  put('veg.birch', Q.e - 1.5, Q.s - 1.05), put('veg.birch', HUB.x + 2.95, HUB.z - 1.75),
   // West Halls block: poplars along West Rd beside the chapel
   put('veg.poplar', WB.w + 0.55, Q.s - 0.6), put('veg.poplar', WB.w + 0.55, Q.s - 2.4), put('veg.poplar', WB.w + 0.55, Q.s - 4.2),
 ];
 const BEDS: PlacedAsset[] = [
+  // Burrowes St and North Rd carry route 1 past the quad on its camera-hidden sides: only low planting there, so
+  // buses stay readable and the clock tower keeps its calm, with lawn on its north and west (art bible §2.2, §5.2)
+  put('veg.hedge', Q.w + 0.42, TOWER.z - 0.55, E, { length: 2.4 }),          // clipped hedge along Burrowes St
+  put('veg.bush', LANE_X - 1.0, Q.n + 0.75),                                 // by the North Rd lane
   put('veg.flowerbed', TOWER.x - 1.1, TOWER.z + 1.6),                        // beside the tower door
   put('veg.bush', LANE_X + 1.0, Q.n + 0.6), put('veg.bush', LANE_X + 1.0, Q.n + 2.2), // low by the University stop's sight line
 ];
@@ -103,8 +110,9 @@ const FURNITURE: PlacedAsset[] = [
   // benches, lamps and a bin along Willard's walk, facing it
   put('st.bench', Q.w + 5.05, HUB.z + 0.75, N), put('st.bench', Q.w + 5.05, HUB.z - 0.75, S), put('st.bin', Q.w + 4.2, HUB.z + 0.75),
   put('st.lamp', HUB.x - 2.6, HUB.z + 0.75), put('st.lamp', HUB.x - 2.6, HUB.z - 0.75),
-  // lamps along the gate walk
+  // lamps and benches along the gate walk, mirroring Willard's side
   put('st.lamp', HUB.x + 2.4, HUB.z + 0.75), put('st.lamp', HUB.x + 2.4, HUB.z - 0.75),
+  put('st.bench', HUB.x + 3.75, HUB.z + 0.75, N), put('st.bench', HUB.x + 3.75, HUB.z - 0.75, S),
   // the tower court and the North Rd lane
   put('st.lamp', TOWER.x + 1.45, Q.n + 0.45), put('st.lamp', LANE_X + 0.6, Q.n + 1.4),
   // the forecourt's east side: a bench facing the quad and the bikes

@@ -2,13 +2,14 @@
 // waterline y = 0), merged with an `aBoat` index attribute, and posed in the vertex shader from two small uniform
 // arrays (x, y, z, heading) + (roll, pitch, scale) that the layer fills each frame from boatPose().
 import * as THREE from 'three';
+import { kenneyModel, kenneyReady, kenneyTemplate, type KenneyId, type KenneyPartInfo } from '../../assets/kenney';
 import { bakeGeometry, mergeBaked, recolorBaked, type Baked } from '../../kit/bake';
 import { KitMaterial } from '../../materials';
 import type { PaletteId } from '../../types';
 import { resolveWaterRole } from './colors';
-import { at, box, capsule, cone, cyl, group, rbox, rot, scl, slab, sphere, wpart } from './kit';
+import { at, box, capsule, cone, cyl, group, rbox, roleMat, rot, scl, slab, sphere, wpart } from './kit';
 import { hullShape } from './props';
-import type { Boat } from './plan';
+import type { Boat, BoatKind } from './plan';
 
 export const MAX_BOATS = 24;
 
@@ -90,7 +91,45 @@ function duck(scale: number): THREE.Object3D {
   return g;
 }
 
-export function buildBoat(b: Boat): THREE.Object3D {
+// ---------------------------------------------------------------- Kenney watercraft (v5/v7 Kenney-first)
+/** Kenney models per boat kind (picked by the boat's colour variant). Ducks, buoys and floats stay ours. */
+export const KENNEY_BOAT_MODELS: Partial<Record<BoatKind, KenneyId[]>> = {
+  sail: ['watercraft-pack/boat-sail-a', 'watercraft-pack/boat-sail-b'],
+  motor: ['watercraft-pack/boat-speed-a', 'watercraft-pack/boat-fishing-small', 'watercraft-pack/boat-speed-c'],
+};
+/** Every Kenney model the lake uses: preload them (the layer also upgrades itself when they arrive). */
+export const WATER_KENNEY_IDS: KenneyId[] = [...new Set(Object.values(KENNEY_BOAT_MODELS).flat())];
+/** How deep each model sits in the water (u below the waterline; Kenney keels sit at y = 0). */
+const SINK: Partial<Record<KenneyId, number>> = {
+  'watercraft-pack/boat-sail-a': 0.2, 'watercraft-pack/boat-sail-b': 0.2,
+  'watercraft-pack/boat-speed-a': 0.17, 'watercraft-pack/boat-speed-c': 0.17, 'watercraft-pack/boat-fishing-small': 0.2,
+};
+
+export function kenneyBoatId(b: Boat): KenneyId | null {
+  const list = KENNEY_BOAT_MODELS[b.kind];
+  return list?.length ? list[((b.v % list.length) + list.length) % list.length]! : null;
+}
+
+/** A loaded Kenney boat in our boat frame: bow +x, centred on the origin, keel `SINK` under the waterline, its paint
+ *  part repainted in the lake's (palette-following) boat colours. */
+function kenneyBoat(b: Boat, id: KenneyId, palette: PaletteId): THREE.Object3D {
+  const t = kenneyTemplate(id)!;
+  const m = kenneyModel(id, { palette });
+  m.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    const info = mesh.userData?.kenney as KenneyPartInfo | undefined;
+    if (mesh.isMesh && info?.paint) mesh.material = roleMat('boatPaint', b.v);
+  });
+  // rotate +π/2 about y: (x, y, z) → (z, y, −x), so Kenney's +z bow points along +x
+  const cx = (t.box.min.x + t.box.max.x) / 2, cz = (t.box.min.z + t.box.max.z) / 2;
+  m.rotation.y = Math.PI / 2;
+  m.position.set(-cz, -(SINK[id] ?? 0.2) - t.box.min.y, cx);
+  return group(m);
+}
+
+export function buildBoat(b: Boat, palette: PaletteId = 'a'): THREE.Object3D {
+  const id = kenneyBoatId(b);
+  if (id && kenneyReady(id)) return kenneyBoat(b, id, palette);
   switch (b.kind) {
     case 'sail': return sailboat(b.v, !!b.loop);
     case 'motor': return motorboat(b.v);
@@ -153,11 +192,17 @@ export interface Boats {
   mesh: THREE.Mesh;
   uniforms: BoatUniforms;
   recolor(p: PaletteId): void;
+  /** Re-bake every boat (e.g. once the Kenney models have loaded, or for a palette); swaps the mesh's geometry. */
+  rebuild(p: PaletteId): void;
 }
 
-export function buildBoats(boats: Boat[], palette: PaletteId, dusk: { value: number }): Boats {
-  if (boats.length > MAX_BOATS) throw new Error(`water: ${boats.length} boats > ${MAX_BOATS}`);
-  const list: Baked[] = boats.map((b) => bakeGeometry(buildBoat(b), palette, { resolve: resolveWaterRole }));
+/** One boat baked in its local frame (bow +x, waterline y = 0). */
+export function bakeBoat(b: Boat, palette: PaletteId): Baked {
+  return bakeGeometry(buildBoat(b, palette), palette, { resolve: resolveWaterRole });
+}
+
+function bakeFleet(boats: Boat[], palette: PaletteId): Baked {
+  const list: Baked[] = boats.map((b) => bakeBoat(b, palette));
   const merged = mergeBaked(list);
   for (const b of list) b.geometry.dispose();
   const nv = merged.geometry.getAttribute('position').count;
@@ -169,6 +214,12 @@ export function buildBoats(boats: Boat[], palette: PaletteId, dusk: { value: num
     off += n;
   });
   merged.geometry.setAttribute('aBoat', new THREE.BufferAttribute(idx, 1));
+  return merged;
+}
+
+export function buildBoats(boats: Boat[], palette: PaletteId, dusk: { value: number }): Boats {
+  if (boats.length > MAX_BOATS) throw new Error(`water: ${boats.length} boats > ${MAX_BOATS}`);
+  let merged = bakeFleet(boats, palette);
   const uniforms: BoatUniforms = {
     uBoatPose: { value: Array.from({ length: MAX_BOATS }, () => new THREE.Vector4(0, -50, 0, 0)) },
     uBoatTilt: { value: Array.from({ length: MAX_BOATS }, () => new THREE.Vector4(0, 0, 1, 0)) },
@@ -178,5 +229,16 @@ export function buildBoats(boats: Boat[], palette: PaletteId, dusk: { value: num
   mesh.frustumCulled = false; // vertices are boat-local; the shader places them
   mesh.castShadow = false;
   mesh.receiveShadow = true;
-  return { mesh, uniforms, recolor: (p) => recolorBaked(merged, p) };
+  return {
+    mesh,
+    uniforms,
+    recolor: (p) => recolorBaked(merged, p),
+    rebuild(p) {
+      const next = bakeFleet(boats, p);
+      const old = mesh.geometry;
+      mesh.geometry = next.geometry;
+      merged = next;
+      old.dispose();
+    },
+  };
 }

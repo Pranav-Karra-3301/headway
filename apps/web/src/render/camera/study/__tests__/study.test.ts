@@ -10,9 +10,10 @@ import { CURRENT_RIG_VIEW, ISO_ELEV, STUDY_VIEWS, toImage, viewBasis } from '../
 import { containsPoint, firstOccluder, rayBox, type Box } from '../occlusion';
 import { composeStudyTown, placementBoxes, sceneryToPlacement, stationBoxes, studyBoxes } from '../town';
 import { queueSlot, studySamples } from '../samples';
-import { contentRect, fitView, hudBoxes, overlaps, polyHitsRect, safeRect, silhouetteScale } from '../fit';
-import { measureView, rankViews, type StudyInput } from '../measure';
+import { contentRect, fitView, hudBoxes, networkPoints, overlaps, polyHitsRect, safeRect, silhouetteScale } from '../fit';
+import { culprits, measureView, rankViews, type StudyInput } from '../measure';
 import { buildHeightField, heightFieldHit } from '../heightfield';
+import { sweepTable, sweepViews } from '../sweep';
 import * as THREE from 'three';
 
 const dot = (a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }) => a.x * b.x + a.y * b.y + a.z * b.z;
@@ -213,7 +214,7 @@ describe('fit', () => {
   it('uses the bible safe rect: 36 px of marker room under the top bar, cut by the inspector and the Play dock', () => {
     const f = fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 });
     expect(f.rect).toEqual({ x0: 14, y0: 116, x1: 1426, y1: 886 });
-    expect(f.scale).toBeGreaterThan(14); // the bible's worked example: ≈ 17 px/u at 1440 × 900
+    expect(f.scale).toBeGreaterThan(12); // bible example ≈ 17 px/u on the pre-v6 town; the rail now detours west, so less
     expect(fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { inspector: true }).rect.x1).toBe(1440 - 360);
     expect(fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { mode: 'play' }).rect.y1).toBe(900 - 168);
     const strict = fitView({ elev: ISO_ELEV, az: 45 }, TOWN, { w: 1440, h: 900 }, { strict: true });
@@ -230,7 +231,7 @@ describe('fit', () => {
     const v = { elev: ISO_ELEV, az: 45 };
     const closed = fitView(v, TOWN, { w: 1600, h: 1000 });
     const open = fitView(v, TOWN, { w: 1600, h: 1000 }, { inspector: true });
-    expect(open.scale).toBeLessThan(closed.scale);
+    expect(open.scale).toBeLessThanOrEqual(closed.scale); // equal when the fit is height-bound
     for (const f of [closed, open]) {
       const basis = viewBasis(v);
       for (const s of [...TOWN.rail.loop.points.map((p) => ({ x: p.x, y: 0, z: p.z })), ...TOWN.stops.map((s) => ({ x: s.p.x, y: 2.2, z: s.p.z }))]) {
@@ -240,6 +241,20 @@ describe('fit', () => {
         expect(q.y).toBeGreaterThanOrEqual(f.inner.y0 - 1); expect(q.y).toBeLessThanOrEqual(f.inner.y1 + 1);
       }
     }
+  });
+});
+
+describe('fit clip', () => {
+  it('clipping the network to a plan rect only drops points outside it and never zooms out', () => {
+    const v = { elev: ISO_ELEV, az: 45 };
+    const all = networkPoints(TOWN), board = networkPoints(TOWN, TOWN.bounds);
+    const b = TOWN.bounds;
+    for (const p of board) { expect(p.x).toBeGreaterThanOrEqual(b.minX); expect(p.x).toBeLessThanOrEqual(b.maxX); expect(p.z).toBeGreaterThanOrEqual(b.minZ); expect(p.z).toBeLessThanOrEqual(b.maxZ); }
+    expect(board.length).toBeLessThanOrEqual(all.length);
+    expect(fitView(v, TOWN, { w: 1600, h: 1000 }, { clip: TOWN.bounds }).scale).toBeGreaterThanOrEqual(fitView(v, TOWN, { w: 1600, h: 1000 }).scale - 1e-9);
+    // a clip that contains everything changes nothing
+    const huge = { minX: -1e4, maxX: 1e4, minZ: -1e4, maxZ: 1e4 };
+    expect(fitView(v, TOWN, { w: 1600, h: 1000 }, { clip: huge }).scale).toBeCloseTo(fitView(v, TOWN, { w: 1600, h: 1000 }).scale, 9);
   });
 });
 
@@ -297,6 +312,18 @@ describe('measure', () => {
     expect(again[again.length - 1]!.view.id).toBe('worse');
   });
 
+  it('names the boxes that hide gameplay samples, and removing them clears those samples', () => {
+    const v = { id: 'iso', elev: ISO_ELEV, az: 45 };
+    const s = TOWN.stops[0]!;
+    // a tall block right on the camera side of the first stop's queue
+    const blocker: Box = box({ cx: s.p.x + s.queueDir.x * 2 + 2, cz: s.p.z + s.queueDir.z * 2 + 2, hx: 1.5, hz: 1.5, y1: 8, kind: 'blocker' });
+    const r = measureView(v, { ...base, boxes: [...base.boxes, blocker] });
+    const c = culprits(r);
+    expect(c).toContain(blocker);
+    const after = measureView(v, { ...base, boxes: base.boxes.filter((b) => !c.includes(b)) });
+    expect(after.hidden.queue.hidden + after.hidden.stop.hidden).toBe(0);
+  });
+
   it('works on any map shape (no TOWN-only assumptions)', () => {
     const tiny: TownMap = { ...TOWN, routes: TOWN.routes.slice(0, 1) };
     const r = measureView(STUDY_VIEWS[1]!, { ...base, map: tiny, samples: studySamples(tiny) });
@@ -332,5 +359,21 @@ describe('world height field', () => {
     expect(heightFieldHit(hf, { x: -10, y: 9, z: 0 }, { x: 0, y: 1, z: 0 })).toBe('cloud'); // but a ray climbing into the cloud is blocked
     expect(heightFieldHit(hf, { x: 5, y: 0.1, z: 5 }, { x: 0, y: 1, z: 0 })).toBeNull(); // water below the board never occludes
     expect(heightFieldHit(hf, { x: 0, y: 1, z: -6 }, { x: 0, y: 1, z: 0 })).toBeNull(); // shader-posed meshes are skipped
+  });
+});
+
+describe('sweep', () => {
+  it('measures an elevation × azimuth grid that matches single views and prints a table', () => {
+    const town = composeStudyTown(TOWN, [], SCENERY);
+    const input: StudyInput = { map: TOWN, samples: studySamples(TOWN), boxes: studyBoxes(town), viewport: { w: 1600, h: 1000 } };
+    const grid = sweepViews(input, [30, ISO_ELEV], [40, 45]);
+    expect(grid.length).toBe(2);
+    expect(grid[0]!.map((c) => c.az)).toEqual([40, 45]);
+    const one = measureView({ id: 'x', elev: ISO_ELEV, az: 45 }, input);
+    expect(grid[1]![1]!.route).toBe(one.hidden.route.frac);
+    expect(grid[1]![1]!.scale).toBe(one.fit.scale);
+    const t = sweepTable(grid);
+    expect(t.split('\n').length).toBe(4);
+    expect(t).toContain('35.26°');
   });
 });

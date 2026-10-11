@@ -35,13 +35,16 @@ import type { Polyline, TownMap, Vec2 } from '@headway/sim';
 import type { KenneyId } from '../assets/kenney/index';
 import { findBlocks } from './roads/blocks';
 import { cellOf, gridFrame, inGrid, type CellRect, type Dir, type GridFrame, type Rect } from './roads/cells';
+import { pointInPolygon } from './roads/land';
 import { buildLanes } from './roads/lanes';
 import { planNetwork } from './roads/plan';
 
 export { TILE, RING_CELLS, HIGHWAY_ROWS, KERB, DIRS, DIR_VEC, OPPOSITE, cellCenter, cellOf, cellRect, inGrid, rightOf, sideMid } from './roads/cells';
 export type { CellRect, Dir, GridFrame, Rect } from './roads/cells';
 
-export type CellUse = 'board' | 'highway' | 'road' | 'free';
+/** board = the playable town; highway = G1's band; road = a placed tile; rail = the off-board rail on the beach;
+ *  hill = the ridge spur over the rail tunnel (E1 terrain); water = the bay; free = dressable land (G2 / G3). */
+export type CellUse = 'board' | 'highway' | 'road' | 'rail' | 'hill' | 'water' | 'free';
 export type RoadClass = 'ring' | 'parkway' | 'avenue' | 'radial' | 'local';
 export type RoadTileKind = 'straight' | 'crossing' | 'bend' | 'curve' | 'tee' | 'cross' | 'roundabout' | 'end' | 'connector';
 export type LaneKind = RoadClass | 'junction' | 'roundabout' | 'uturn' | 'highway' | 'ramp';
@@ -61,6 +64,10 @@ export interface RoadCell {
   /** Sides of the footprint a road leaves through (pieces: their arms' sides). */
   open: Dir[];
   street: string;
+  /** Causeway over the bay (the layer adds an embankment under it). */
+  bridge?: boolean;
+  /** The off-board rail crosses this tile square-on (level crossing: barriers / signals go here). */
+  railCrossing?: boolean;
 }
 
 /** A named street: centreline polylines, one per stretch between junctions (no direction implied). */
@@ -111,10 +118,12 @@ export interface Port {
   /** Road centre at the boundary, and the outward unit direction. */
   p: Vec2;
   dir: Vec2;
-  /** Lane entering the grid network here (spawn), and the lane leaving it here (despawn). */
+  /** Lane entering the grid network here, and the lane leaving it here. */
   inLane: string | null;
   outLane: string | null;
   street: string;
+  /** 'board' ports: the town road edge (TOWN.roads.edges id) that continues the street onto the board. */
+  townEdge?: string;
 }
 
 export interface Block {
@@ -125,6 +134,13 @@ export interface Block {
   zone: ZoneHint;
   /** Sides touching a street (face buildings toward one of these). */
   frontage: Array<{ side: Dir; street: string }>;
+  /** Touches the bay (or the shore is within 3.5 u): keep a promenade strip on the water side. */
+  shore: boolean;
+  /** Built-up density 0..1: high by the board and main roads, thinning out (with noise) toward the edges and the
+   *  shore. Organic city: below ~0.35 dress as park / field / forest instead of buildings. */
+  density: number;
+  /** Deterministic per-block seed (rng streams for dressing). */
+  seed: number;
 }
 
 export interface GreaterGrid extends GridFrame {
@@ -137,6 +153,10 @@ export interface GreaterGrid extends GridFrame {
   lanes: Lane[];
   ports: Port[];
   blocks: Block[];
+  /** Shoreline polyline (grid east edge → west edge; the bay lies south / east of it). */
+  shore: Vec2[];
+  /** The bay inside the grid as a closed polygon (E2 water / G3 waterfront align to it). */
+  water: Vec2[];
 }
 
 const cache = new WeakMap<TownMap, GreaterGrid>();
@@ -159,9 +179,24 @@ export function greaterGrid(map: TownMap): GreaterGrid {
     lanes,
     ports,
     blocks,
+    shore: net.land.shore,
+    water: net.land.water,
   };
+  for (const p of ports) {
+    if (p.kind !== 'board') continue;
+    const e = map.roads.edges.find((ed) => {
+      const pts = ed.path.points;
+      return pts.length > 1 && [pts[0]!, pts[pts.length - 1]!].some((q) => Math.hypot(q.x - p.p.x, q.z - p.p.z) < 0.75);
+    });
+    if (e) p.townEdge = e.id;
+  }
   cache.set(map, g);
   return g;
+}
+
+/** True when (x, z) lies in the bay (south / east of g.shore). */
+export function isWater(g: GreaterGrid, x: number, z: number): boolean {
+  return pointInPolygon(g.water, { x, z });
 }
 
 /** Use of the cell containing (x, z); 'free' outside the grid. */
