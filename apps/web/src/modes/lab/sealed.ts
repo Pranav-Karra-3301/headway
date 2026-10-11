@@ -1,5 +1,5 @@
 // Owner: T3d. Sealed-test results for the Lab panel ("never shown to agents", spec §7, §11).
-// GET /api/sealed → /data/sealed.json → []. The row shape is read tolerantly (D1 rows, camelCase rows, or a policy map).
+// GET /api/sealed → [] on any failure. The row shape is read tolerantly (D1 rows, camelCase rows, or a policy map).
 import type { Metrics } from '@headway/sim';
 import { pctVs } from './model';
 
@@ -80,12 +80,11 @@ async function getJson(url: string): Promise<unknown> {
   return res.json();
 }
 
+/** Sealed results live only in D1 (the CLI posts them to /api/admin/sealed-eval), so there is no static fallback. */
 export async function loadSealed(): Promise<SealedRow[]> {
-  for (const url of ['/api/sealed', '/data/sealed.json']) {
-    try {
-      const rows = normalizeSealed(await getJson(url));
-      if (rows.length) return rows;
-    } catch { /* try the next source */ }
+  try {
+    return normalizeSealed(await getJson('/api/sealed'));
+  } catch {
+    return [];
   }
-  return [];
 }

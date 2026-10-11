@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { bakeGeometry } from '../bake';
 import {
-  BUILDING_TYPES, CAR_VARIANTS, TREE_VARIANTS, makeBuilding, makeBus, makeCar, makePerson, makeStation, makeStop, makeTree,
-  partOf,
+  BUILDING_TYPES, CAR_VARIANTS, TREE_VARIANTS, bakeGeometry, buildingSize, createForest, makeBuilding, makeBus, makeCar,
+  makeClockTower, makePerson, makeStadium, makeStation, makeStop, makeTree, mergeBaked, partOf, recolorBaked, setBakedDetail,
+  type BakeRange,
 } from '../kit';
+import { clayTweak, KitMaterial, shared } from '../materials';
 import { DEFAULT_DETAIL, DEFAULT_PALETTE, PALETTES } from '../palettes';
 
 const size = (o: THREE.Object3D) => {
@@ -111,11 +112,130 @@ describe('bakeGeometry', () => {
     const { geometry, ranges, baseIndexCount } = bakeGeometry(makeBus(2));
     for (const a of ['position', 'normal', 'color', 'aGlow', 'aTint']) expect(geometry.getAttribute(a), a).toBeTruthy();
     const n = geometry.getAttribute('position').count;
-    expect(ranges.reduce((s, r) => s + r.count, 0)).toBe(n);
+    expect(ranges.reduce((s: number, r: BakeRange) => s + r.count, 0)).toBe(n);
     expect(geometry.index).toBeTruthy();
     expect(baseIndexCount).toBeGreaterThan(0);
     expect(baseIndexCount).toBeLessThan(geometry.index!.count);
-    const firstDetail = ranges.findIndex((r) => r.detail);
-    expect(ranges.slice(firstDetail).every((r) => r.detail)).toBe(true);
+    const firstDetail = ranges.findIndex((r: BakeRange) => r.detail);
+    expect(ranges.slice(firstDetail).every((r: BakeRange) => r.detail)).toBe(true);
+  });
+  it('writes palette colours, lit-window glow only, and recolours in place', () => {
+    const b = bakeGeometry(makeBuilding('tall', { seed: 3 }), 'a');
+    const col = b.geometry.getAttribute('color'), glow = b.geometry.getAttribute('aGlow');
+    const wall = b.ranges.find((r) => r.role === 'wall')!;
+    const expectA = new THREE.Color(PALETTES.a.wall[0]);
+    expect(col.getX(wall.start)).toBeCloseTo(expectA.r, 5);
+    const lit = b.ranges.filter((r) => r.role === 'window' && r.idx === 1);
+    const dark = b.ranges.filter((r) => r.role === 'window' && r.idx === 0);
+    expect(lit.length).toBeGreaterThan(0);
+    expect(dark.length).toBeGreaterThan(0);
+    expect(glow.getX(lit[0]!.start) + glow.getY(lit[0]!.start)).toBeGreaterThan(0.1);
+    expect(glow.getX(dark[0]!.start) + glow.getY(dark[0]!.start) + glow.getZ(dark[0]!.start)).toBe(0);
+    expect(glow.getX(wall.start)).toBe(0);
+    recolorBaked(b, 'b');
+    expect(col.getX(wall.start)).toBeCloseTo(new THREE.Color(PALETTES.b.wall[0]).r, 5);
+  });
+  it('detail = min draws only the base parts', () => {
+    const b = bakeGeometry(makeBuilding('small'));
+    setBakedDetail(b, false);
+    expect(b.geometry.drawRange.count).toBe(b.baseIndexCount);
+    setBakedDetail(b.geometry, true);
+    expect(b.geometry.drawRange.count).toBe(Infinity);
+  });
+  it('tints car bodies, shirts and tree crowns but not tyres, heads or trunks', () => {
+    const tinted = (o: THREE.Object3D, role: string) => bakeGeometry(o).ranges.filter((r) => r.role === role).every((r) => r.tint);
+    const untinted = (o: THREE.Object3D, role: string) => bakeGeometry(o).ranges.filter((r) => r.role === role).every((r) => !r.tint);
+    for (let v = 0; v < CAR_VARIANTS.length; v++) {
+      expect(tinted(makeCar(v), 'car')).toBe(true);
+      expect(untinted(makeCar(v), 'tire')).toBe(true);
+    }
+    expect(tinted(makePerson(2), 'shirt')).toBe(true);
+    expect(untinted(makePerson(2), 'skin')).toBe(true);
+    expect(tinted(makeTree('round'), 'leaf')).toBe(true);
+    expect(tinted(makeTree('pine'), 'pine')).toBe(true);
+    expect(untinted(makeTree('round'), 'trunk')).toBe(true);
+  });
+  it('mergeBaked keeps every base index before every detail index', () => {
+    const a = bakeGeometry(makeBus(0)), b = bakeGeometry(makeBuilding('house'));
+    const m = mergeBaked([a, b]);
+    expect(m.geometry.getAttribute('position').count).toBe(a.geometry.getAttribute('position').count + b.geometry.getAttribute('position').count);
+    expect(m.baseIndexCount).toBe(a.baseIndexCount + b.baseIndexCount);
+    expect(m.geometry.index!.count).toBe(a.geometry.index!.count + b.geometry.index!.count);
+    const off = a.geometry.getAttribute('position').count;
+    expect(m.geometry.index!.getX(a.baseIndexCount)).toBe(b.geometry.index!.getX(0) + off);
+  });
+});
+
+describe('kit pieces', () => {
+  it('building footprints are compact and consistent', () => {
+    for (const t of BUILDING_TYPES) {
+      const s = buildingSize(t);
+      expect(s.w, t).toBeGreaterThan(2);
+      expect(s.w, t).toBeLessThan(7.5);
+      expect(s.d, t).toBeGreaterThan(2);
+      expect(s.d, t).toBeLessThan(6.5);
+      expect(s.h, t).toBeGreaterThan(1.6);
+      expect(s.h, t).toBeLessThan(7.5);
+    }
+    expect(buildingSize('tall').h).toBeGreaterThan(buildingSize('dorm').h);
+    expect(buildingSize('dorm').h).toBeGreaterThan(buildingSize('house').h);
+  });
+  it('landmarks build, stadium ≈ 10.8 × 8.4', () => {
+    expect(size(makeClockTower()).y).toBeGreaterThan(7);
+    const st = size(makeStadium());
+    expect(st.x).toBeGreaterThan(10.5);
+    expect(st.x).toBeLessThan(11.5);
+    expect(st.z).toBeGreaterThan(8.2);
+    expect(st.z).toBeLessThan(9.2);
+  });
+  it('createForest makes one InstancedMesh per used variant with per-instance colours', () => {
+    const f = createForest([
+      { x: 0, z: 0, variant: 'round' }, { x: 2, z: 0, variant: 'round' }, { x: 4, z: 0, variant: 'pine' },
+      { x: 6, z: 0, variant: 'bush' }, { x: 8, z: 0, variant: 3 },
+    ], { seed: 3 });
+    expect(f.meshes.length).toBe(4);
+    const round = f.meshes.find((m) => m.name === 'trees:round')!;
+    expect(round.count).toBe(2);
+    expect(round.instanceColor).toBeTruthy();
+    const c0 = new THREE.Color(), c1 = new THREE.Color();
+    round.getColorAt(0, c0); round.getColorAt(1, c1);
+    expect(c0.equals(c1)).toBe(false);
+    f.setPalette('c');
+    f.setDetail('min');
+    f.dispose();
+  });
+});
+
+describe('clay material', () => {
+  const patch = (src: { vertexShader: string; fragmentShader: string }, kit: boolean) => {
+    const shader = { uniforms: {} as Record<string, THREE.IUniform>, vertexShader: src.vertexShader, fragmentShader: src.fragmentShader };
+    clayTweak(shader as unknown as THREE.WebGLProgramParametersWithUniforms, { kit, sway: true, fade: { value: 0.6 } });
+    return shader;
+  };
+  it('finds every anchor in three\'s standard shader (wrap, glow, tint, fade, rim, sway)', () => {
+    const s = patch(THREE.ShaderLib.standard, true);
+    expect(s.vertexShader).toContain('mix( vColor.rgb, instanceColor.rgb, aTint )');
+    expect(s.vertexShader).toContain('HW_SWAY');
+    expect(s.vertexShader).toContain('vHwY = hwW.y');
+    expect(s.fragmentShader).toContain('vHwGlow * uDusk');
+    expect(s.fragmentShader).toContain('mix( diffuseColor.rgb, uFadeColor, hwFade )');
+    expect(s.fragmentShader).toContain('hwRim');
+    expect(s.fragmentShader).toContain('hwIrr');
+    expect(s.fragmentShader).not.toContain('#include <lights_physical_pars_fragment>');
+    expect(s.uniforms.uTime).toBe(shared.uTime);
+    expect(s.uniforms.uDusk).toBe(shared.uDusk);
+    expect((s.uniforms.uFade as THREE.IUniform).value).toBe(0.6);
+  });
+  it('non-kit materials keep the standard instance colour multiply', () => {
+    const s = patch(THREE.ShaderLib.standard, false);
+    expect(s.vertexShader).toContain('#include <color_vertex>');
+    expect(s.fragmentShader).toContain('hwRim');
+  });
+  it('KitMaterial variants get distinct program cache keys', () => {
+    const a = new KitMaterial(), b = new KitMaterial({ sway: true });
+    expect(a.vertexColors).toBe(true);
+    expect(a.customProgramCacheKey()).not.toBe(b.customProgramCacheKey());
+    a.fade.value = 0.6;
+    expect(b.fade.value).toBe(0);
   });
 });

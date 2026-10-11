@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { TownMap } from '@headway/sim';
 import { jAt, paceModel } from '../pace';
 import { markerPlaces, markerText, placeKey } from '../markers';
+import { declutter } from '../QueueMarkers';
 
 const samples = [
   { t: 0, you: 0, champion: 0, baseline: 0 },
-  { t: 30, you: 0, champion: 300, baseline: 400 },
-  { t: 60, you: 0, champion: 900, baseline: 1200 },
+  { t: 30, you: Number.NaN, champion: 300, baseline: 400 },
+  { t: 60, you: Number.NaN, champion: 900, baseline: 1200 },
 ];
 
 describe('pace', () => {
@@ -17,16 +18,18 @@ describe('pace', () => {
     expect(jAt(samples, 'champion', -5)).toBeCloseTo(0);
     expect(jAt([], 'champion', 10)).toBeNull();
   });
-  it('is positive (ahead) when the player has accumulated less J than the AI', () => {
+  it('is positive (ahead) when the player has accumulated less J than the AI; ignores NaN `you` samples', () => {
     const m = paceModel(samples, 45, 600 - 3600 * 2)!;
     expect(m.vsAiPaxH).toBeCloseTo(2);
     expect(m.ahead).toBe(true);
+    expect(m.tone).toBe('ahead');
     const behind = paceModel(samples, 60, 900 + 1800)!;
     expect(behind.vsAiPaxH).toBeCloseTo(-0.5);
-    expect(behind.ahead).toBe(false);
+    expect(behind.tone).toBe('behind');
     expect(behind.vsBaselinePaxH).toBeCloseTo((1200 - 2700) / 3600);
   });
-  it('needs samples', () => {
+  it('reads as even within 0.05 pax-h, and needs samples', () => {
+    expect(paceModel(samples, 30, 300 + 100)!.tone).toBe('even');
     expect(paceModel([], 100, 5)).toBeNull();
   });
 });
@@ -61,5 +64,23 @@ describe('queue markers', () => {
     expect(placeKey({ kind: 'platform', id: 'stn_stadium' })).toBe('platform:stn_stadium');
     expect(markerText({ count: 12, longestWaitS: 200 })).toEqual({ count: '12', wait: '3m' });
     expect(markerText({ count: 3, longestWaitS: 42 })).toEqual({ count: '3', wait: '42s' });
+  });
+});
+
+describe('declutter', () => {
+  it('pushes a marker that overlaps an earlier one upward and leaves separate ones alone', () => {
+    const a = { x: 100, y: 200, w: 80 };
+    const b = { x: 120, y: 205, w: 80 };
+    const c = { x: 400, y: 200, w: 80 };
+    declutter([a, b, c]);
+    expect(a.y).toBe(200);
+    expect(b.y).toBeLessThanOrEqual(200 - 30);
+    expect(c.y).toBe(200);
+  });
+  it('stacks a third overlapping marker above the second', () => {
+    const items = [{ x: 0, y: 100, w: 80 }, { x: 5, y: 100, w: 80 }, { x: 10, y: 100, w: 80 }];
+    declutter(items);
+    expect(items[1]!.y).toBeLessThan(items[0]!.y);
+    expect(items[2]!.y).toBeLessThan(items[1]!.y);
   });
 });

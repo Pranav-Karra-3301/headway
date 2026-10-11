@@ -1,4 +1,4 @@
-import { G0 } from '@headway/sim';
+import { G0, validatePolicy } from '@headway/sim';
 import type { Generation, Policy, Round, SplitScore } from '@headway/sim';
 import { exports } from 'cloudflare:workers';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -115,6 +115,44 @@ describe('POST /api/admin/publish', () => {
     const gens = await (await call(app, '/api/generations')).json<Generations>();
     expect(gens.baseline).toEqual(g0.train);
     expect(gens.reference).toBeNull();
+  });
+
+  it('fixtures are DSL-valid policies', () => {
+    expect(validatePolicy(g0.policy).ok).toBe(true);
+    expect(validatePolicy(g1.policy).ok).toBe(true);
+    expect(validatePolicy(proposal(1, 0, true).policy).ok).toBe(true);
+  });
+
+  it('400s generation and valid-proposal policies that fail the DSL validator, naming the path', async () => {
+    const unknownFeature = { ...g1.policy, rules: [{ ...g1.policy.rules[0], when: [{ f: 'train_eta', op: '<=', v: 60 }] }] };
+    const badGen = await publish({ generations: [g0, { ...g1, policy: unknownFeature }] });
+    expect(badGen.status).toBe(400);
+    const genErr = await badGen.json<Err>();
+    expect(genErr.details).toContainEqual(expect.stringMatching(/^generations\[1\]\.policy\.rules\[0\]\.when\[0\]\.f: unknown feature "train_eta"/));
+
+    const valid = proposal(1, 0, true);
+    const lopsided = { ...valid, policy: { ...valid.policy!, params: { ...valid.policy!.params, allocation: { r1: 3, r2: 2, r3: 2 } } } };
+    const badProp = await publish({ rounds: [round(1, [lopsided])] });
+    expect(badProp.status).toBe(400);
+    expect((await badProp.json<Err>()).details).toContainEqual(expect.stringMatching(/^rounds\[0\]\.proposals\[0\]\.policy\.params\.allocation: must sum to 6/));
+
+    const notAPolicy = await publish({ generations: [{ ...g0, policy: 'g0' }] });
+    expect(notAPolicy.status).toBe(400);
+    expect((await notAPolicy.json<Err>()).details?.some((d) => d.startsWith('generations[0].policy'))).toBe(true);
+
+    const gens = await (await call(app, '/api/generations')).json<Generations>();
+    expect(gens).toEqual({ generations: [], rounds: [], baseline: null, reference: null });
+  });
+
+  it('accepts whatever an invalid proposal carries; a non-policy is stored as null', async () => {
+    const junk = { ...proposal(1, 2, false), policy: { rules: 'all of them', note: 'LLM output' } as unknown as Policy };
+    const halfBaked = { ...proposal(1, 1, false), policy: { ...g1.policy, rules: [{ ...g1.policy.rules[0], id: 'Bad Id!' }] } };
+    const res = await publish({ rounds: [round(1, [proposal(1, 0, true), halfBaked, junk])] });
+    expect(res.status).toBe(200);
+    const stored = (await (await call(app, '/api/generations')).json<Generations>()).rounds[0].proposals;
+    expect(stored.map((p) => p.id)).toEqual(['r1-a', 'r1-b', 'r1-c']);
+    expect(stored[1]).toEqual(halfBaked);
+    expect(stored[2]).toEqual({ ...junk, policy: null });
   });
 
   it('400s with path-named errors for malformed bodies', async () => {

@@ -63,6 +63,22 @@ export type Outcome =
   | { kind: 'promoted'; label: string; generationId: string }
   | { kind: 'invalid' | 'rejected' | 'pending'; label: string };
 
+const SHORT: Record<string, string> = {
+  'Not the best this round': 'Runner-up',
+  'Validation worse': 'Val worse',
+  'Gain under 1%': 'Under 1%',
+  'Worse on training': 'Worse',
+  'Failed a promotion guard': 'Guard failed',
+  'Not evaluated': 'Not scored',
+  'Waiting for validation…': 'Validating…',
+};
+
+/** Badge text: "Promoted → g4", "Runner-up", "Val worse", "Invalid", … (the full label goes in the tooltip). */
+export function shortOutcome(o: Outcome): string {
+  if (o.kind === 'invalid') return 'Invalid';
+  return SHORT[o.label] ?? o.label;
+}
+
 /** Why a proposal did or did not become the next generation (spec §7 promotion rule). */
 export function proposalOutcome(p: Proposal, round: Round, generations: Generation[]): Outcome {
   if (!p.valid) return { kind: 'invalid', label: `Invalid · ${p.errors.length} error${p.errors.length === 1 ? '' : 's'}` };

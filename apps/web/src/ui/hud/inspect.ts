@@ -23,6 +23,8 @@ export interface VehicleModel {
   loadPct: number;
   next: { name: string; etaS: number | null } | null;
   holdLeftS: number | null;
+  /** Length of the current hold when the last decision set it (for the ring timer). */
+  holdTotalS: number | null;
   headway: { aheadS: number | null; behindS: number | null; targetS: number | null } | null;
   decision: { text: string; ruleId: string; source: DecisionSource; action: string; clock: string; agoS: number } | null;
   train: {
@@ -64,7 +66,9 @@ const pctOf = (a: number, b: number) => (b > 0 ? Math.round(Math.min(1, Math.max
 
 export function vehicleModel(id: string, obs: Observation | null, snap: SimSnapshot | null, map: TownMap | null = townMap()): VehicleModel | null {
   const view = snap?.vehicles.find((v) => v.id === id) ?? null;
-  const t = obs?.t ?? snap?.t ?? 0;
+  // The per-frame snapshot is fresher than the 4 Hz observation: prefer it for state, fall back to the observation.
+  const t = snap?.t ?? obs?.t ?? 0;
+  const lag = obs ? Math.max(0, t - obs.t) : 0;
   const clockStart = obs?.scenario.clockStart ?? '00:00';
   const rec = view?.lastDecision ?? null;
   const decision = rec
@@ -81,8 +85,8 @@ export function vehicleModel(id: string, obs: Observation | null, snap: SimSnaps
     return {
       kind: 'train', id, title: 'Train', subtitle: 'Rail loop', routeId: null, state, stateLabel: state === 'dwelling' ? 'At platform' : stateLabel(state),
       onboard, capacity, loadPct: pctOf(onboard, capacity),
-      next: tr ? { name: stationName(tr.stationId, map), etaS: tr.etaS } : null,
-      holdLeftS: null, headway: null, decision,
+      next: tr ? { name: stationName(tr.stationId, map), etaS: Math.max(0, tr.etaS - lag) } : null,
+      holdLeftS: null, holdTotalS: null, headway: null, decision,
       train: tr ? {
         alightingNext: tr.alightingNext,
         transfers: ROUTE_IDS.map((r) => ({ routeId: r, n: tr.transfersNext?.[r] ?? 0 })).filter((x) => x.n > 0).sort((a, b) => b.n - a.n),
@@ -94,19 +98,21 @@ export function vehicleModel(id: string, obs: Observation | null, snap: SimSnaps
 
   const ob = obs?.buses.find((b) => b.id === id) ?? null;
   if (!ob && !view) return null;
-  const routeId = ob?.routeId ?? view?.routeId ?? null;
-  const onboard = ob?.onboard ?? view?.onboard ?? 0;
-  const capacity = ob?.capacity ?? view?.capacity ?? 0;
-  const state = ob?.state ?? view?.state ?? 'moving';
-  const holdUntil = ob?.holdUntil ?? view?.holdUntil ?? null;
-  const nextStopId = ob?.nextStopId ?? view?.nextStopId ?? null;
+  const routeId = view?.routeId ?? ob?.routeId ?? null;
+  const onboard = view?.onboard ?? ob?.onboard ?? 0;
+  const capacity = view?.capacity ?? ob?.capacity ?? 0;
+  const state = view?.state ?? ob?.state ?? 'moving';
+  const holdUntil = view ? view.holdUntil : ob?.holdUntil ?? null;
+  const nextStopId = view?.nextStopId ?? ob?.nextStopId ?? null;
+  const etaS = ob?.etaNextStopS != null && ob.nextStopId === nextStopId ? Math.max(0, ob.etaNextStopS - lag) : null;
   const target = routeId ? obs?.routes.find((r) => r.id === routeId)?.targetHeadwayS ?? null : null;
   return {
     kind: 'bus', id, title: `Bus ${id}`, subtitle: routeId ? routeName(routeId, map) : 'Unassigned', routeId, state,
     stateLabel: state === 'deadhead' ? 'Deadheading' : stateLabel(state),
     onboard, capacity, loadPct: pctOf(onboard, capacity),
-    next: nextStopId ? { name: stopName(nextStopId, map), etaS: ob?.etaNextStopS ?? null } : null,
+    next: nextStopId ? { name: stopName(nextStopId, map), etaS } : null,
     holdLeftS: holdUntil != null && holdUntil > t ? holdUntil - t : null,
+    holdTotalS: rec && rec.action.type === 'hold' && holdUntil != null && holdUntil > rec.t ? holdUntil - rec.t : null,
     headway: ob ? { aheadS: ob.headwayAheadS, behindS: ob.headwayBehindS, targetS: target } : null,
     decision, train: null,
   };

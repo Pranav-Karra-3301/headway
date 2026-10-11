@@ -1,0 +1,55 @@
+{
+  "policy": {
+    "meta": {
+      "id": "g0",
+      "parent": null,
+      "generation": 0,
+      "author": "human",
+      "emphasis": "baseline",
+      "summary": "Baseline: 2/2/2 buses; hold at the terminal until the target headway; otherwise continue, dispatch and a 45 s train dwell."
+    },
+    "params": {
+      "allocation": {
+        "r1": 2,
+        "r2": 2,
+        "r3": 2
+      },
+      "maxHoldS": 60,
+      "trainDefaultDwellS": 45
+    },
+    "rules": [
+      {
+        "id": "even-headway",
+        "on": "bus_at_terminal",
+        "priority": 10,
+        "when": [
+          {
+            "f": "headway_ratio",
+            "op": "<",
+            "v": 1
+          }
+        ],
+        "do": {
+          "type": "hold",
+          "until": "target_headway"
+        },
+        "say": "Waiting {seconds}s at the terminal to keep a {target_headway_s}s headway"
+      }
+    ],
+    "defaults": {
+      "bus_at_stop": {
+        "type": "continue"
+      },
+      "bus_at_terminal": {
+        "type": "dispatch"
+      },
+      "train_at_station": {
+        "type": "setTrainDeparture",
+        "dwellS": 45
+      }
+    }
+  },
+  "generation": null,
+  "train": null,
+  "val": null
+}

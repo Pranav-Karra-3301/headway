@@ -1,0 +1,328 @@
+/* App shell layout (T3a). See the layout contract at the top of App.tsx. */
+.hw-app {
+  /* T3b HUD overlays position themselves (fixed) from these */
+  --hud-top: var(--hw-top);
+  --hud-inset: var(--hw-gap);
+  --hud-bottom: var(--hw-gap);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* ---------- stage ---------- */
+.hw-stage {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-stage);
+}
+
+.hw-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 95% at 50% 32%, color-mix(in srgb, var(--bg) 62%, #fff) 0%, var(--bg) 58%, color-mix(in srgb, var(--bg) 86%, var(--ink)) 100%);
+  transition: background-color 400ms ease;
+}
+
+.hw-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Queue markers etc.: same box as the canvas so renderer.project() pixels map 1:1. Clickable markers opt in with
+   pointer-events: auto. */
+.hw-markers {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-markers);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ---------- HUD grid ---------- */
+.hw-hud {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-hud);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "top    top    top"
+    ".      .      right"
+    "left   bottom toasts";
+  gap: var(--hw-gap);
+  padding: var(--hw-gap);
+  pointer-events: none;
+}
+
+.hw-area {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.hw-area > * {
+  pointer-events: auto;
+}
+
+.hw-area--right {
+  grid-area: right;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+
+.hw-area--left {
+  grid-area: left;
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.hw-area--bottom {
+  grid-area: bottom;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+.hw-area--toasts {
+  grid-area: toasts;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+/* ---------- top bar ---------- */
+.hw-topbar {
+  grid-area: top;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "left center right";
+  align-items: start;
+  gap: 10px var(--hw-gap);
+  min-height: var(--hw-bar-h);
+  pointer-events: none;
+}
+
+.hw-topbar__left {
+  grid-area: left;
+  justify-self: start;
+}
+
+.hw-topbar__center {
+  grid-area: center;
+  justify-self: center;
+}
+
+.hw-topbar__right {
+  grid-area: right;
+  justify-self: end;
+}
+
+.hw-app[data-mode="lab"] .hw-topbar__center {
+  display: none;
+}
+
+.hw-topbar__left,
+.hw-topbar__center,
+.hw-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--hw-bar-h);
+  max-width: 100%;
+  pointer-events: none;
+}
+
+.hw-topbar__left > *,
+.hw-topbar__center > *,
+.hw-topbar__right > * {
+  pointer-events: auto;
+}
+
+.hw-island {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  height: var(--hw-bar-h);
+  padding: 0 9px 0 20px;
+  border-radius: var(--r-pill);
+}
+
+.hw-island--tight {
+  gap: 2px;
+  padding: 0 8px;
+}
+
+/* ---------- wordmark ---------- */
+.hw-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 27px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  transform-origin: left center;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.hw-wordmark:active {
+  transform: scale(0.97);
+}
+
+.hw-wordmark__dots {
+  display: inline-flex;
+  gap: 3px;
+  transform: translateY(1px);
+}
+
+.hw-wordmark__dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.hw-wordmark__dots i:nth-child(1) { background: var(--route-r1); }
+.hw-wordmark__dots i:nth-child(2) { background: var(--route-r2); }
+.hw-wordmark__dots i:nth-child(3) { background: var(--route-r3); }
+
+.hw-tabs > button {
+  height: 34px;
+  padding: 0 14px;
+  font-size: var(--fs-md);
+}
+
+.hw-tabs .hw-seg__thumb {
+  height: 34px;
+}
+
+/* ---------- Watch card ---------- */
+.hw-watch {
+  display: grid;
+  gap: 8px;
+  width: min(760px, calc(100vw - 2 * var(--hw-gap)));
+  padding: 10px 10px 10px 16px;
+  animation: hw-rise var(--dur-slow) var(--ease-out) both;
+}
+
+.hw-watch__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.hw-watch__title {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.hw-watch__scenario {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hw-watch__ticker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  background: var(--wash);
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.hw-watch__ticker-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  animation: hw-fade var(--dur-med) var(--ease-out) both;
+}
+
+.hw-watch__ticker b {
+  font-family: var(--font-display);
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.hw-watch__tag {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--warn-soft);
+  color: color-mix(in srgb, var(--warn) 70%, var(--ink));
+  font-family: var(--font-display);
+  font-size: var(--fs-2xs);
+  letter-spacing: 0.04em;
+}
+
+.hw-src {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.hw-src[data-src="human"] { background: var(--route-r2); }
+.hw-src[data-src="jev"] { background: var(--route-r3); }
+.hw-src[data-src="fallback"] { background: var(--ink-3); }
+
+/* ---------- motion ---------- */
+@keyframes hw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--shift));
+  }
+}
+
+@keyframes hw-fade {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* ---------- narrower screens (after the base rules so these win) ---------- */
+@media (max-width: 1520px) {
+  .hw-wordmark__dots {
+    display: none;
+  }
+}
+
+/* Not enough room for three groups in one row: scenario + speed drop to a second row. */
+@media (max-width: 1420px) {
+  .hw-app:not([data-mode="lab"]) {
+    --hw-top: calc(var(--hw-gap) * 2 + var(--hw-bar-h) * 2 + 10px);
+  }
+  .hw-app:not([data-mode="lab"]) .hw-topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "left   .      right"
+      "center center center";
+  }
+}

@@ -72,6 +72,8 @@ export function AboutPanel() {
         e.preventDefault();
         e.stopImmediatePropagation();
         s.setAbout(false);
+      } else if (s.about && e.key !== 'Tab' && !e.metaKey && !e.ctrlKey) {
+        e.stopPropagation(); // modal: game keys never reach Play/Watch behind the sheet (scrolling still works)
       }
     };
     window.addEventListener('keydown', onKey, true);

@@ -8,6 +8,13 @@ export interface GenerationsInfo { generations: Generation[]; rounds: Round[]; b
 export interface LeaderboardRow { name: string; j: number; verified: boolean }
 export interface SealedRow { policyId: string; jTest: number; metrics: Metrics | null; simVersion: string | null; createdAt: string | null }
 
+/** `vite dev` has no Worker behind it: skip `/api` there (no 404 noise) unless VITE_HEADWAY_API points at one
+ *  (e.g. `VITE_HEADWAY_API=http://127.0.0.1:8787` for `wrangler dev`). Builds and tests always use same-origin `/api`. */
+const API_BASE: string = (import.meta.env?.VITE_HEADWAY_API as string | undefined) ?? '';
+const API_ENABLED = import.meta.env?.MODE !== 'development' || API_BASE !== '';
+const api = (path: string) => `${API_BASE}${path}`;
+const noApi = (): Promise<never> => Promise.reject(new Error('API disabled in vite dev'));
+
 class HttpError extends Error {
   constructor(readonly status: number, message: string) { super(message); }
 }
@@ -70,7 +77,7 @@ function asChampion(x: unknown): ChampionInfo | null {
 }
 
 export async function fetchChampion(): Promise<ChampionInfo> {
-  const c = await firstOf([() => getJson('/api/champion'), () => getJson('/data/champion.json')], asChampion);
+  const c = await firstOf([() => (API_ENABLED ? getJson(api('/api/champion')) : noApi()), () => getJson('/data/champion.json')], asChampion);
   return c ?? { policy: G0, generation: null };
 }
 
@@ -91,7 +98,7 @@ function asGenerations(x: unknown): GenerationsInfo | null {
 }
 
 export async function fetchGenerations(): Promise<GenerationsInfo> {
-  const g = await firstOf([() => getJson('/api/generations'), () => getJson('/data/generations.json')], asGenerations);
+  const g = await firstOf([() => (API_ENABLED ? getJson(api('/api/generations')) : noApi()), () => getJson('/data/generations.json')], asGenerations);
   return g ?? { generations: [], rounds: [], baseline: null, reference: null };
 }
 
@@ -112,7 +119,8 @@ export async function streamEvolve(
 ): Promise<void> {
   let res: Response | null = null;
   try {
-    res = await fetch('/api/evolve', {
+    if (!API_ENABLED) throw new Error('API disabled in vite dev');
+    res = await fetch(api('/api/evolve'), {
       method: 'POST', signal: opts.signal,
       headers: { authorization: `Bearer ${token}`, accept: 'application/x-ndjson' },
     });
@@ -128,7 +136,12 @@ export async function streamEvolve(
   }
   const recorded = await firstOf([() => getJson('/data/evolve-events.json')], (x) =>
     Array.isArray(x) ? x.filter(isEvolveEvent) : isObj(x) && Array.isArray(x.events) ? x.events.filter(isEvolveEvent) : null);
-  if (!recorded || recorded.length === 0) throw new Error(res ? await errorMessage(res) : 'Evolution is offline');
+  if (!recorded || recorded.length === 0) {
+    if (!res) throw new Error('Evolution is offline: the server could not be reached');
+    if (res.ok) throw new Error('Live evolution needs the Headway API, which this server does not provide');
+    if (res.status === 404 || res.status === 501) throw new Error('Live evolution is not available on this deployment');
+    throw new Error(await errorMessage(res));
+  }
   onEvent({ type: 'error', message: 'Live evolution is not available here, so this replays the last recorded round.' });
   const delay = opts.replayDelayMs ?? 450;
   for (const e of recorded) {
@@ -177,7 +190,7 @@ function asLeaderboard(x: unknown): LeaderboardRow[] | null {
 
 export async function fetchLeaderboard(seed: number): Promise<LeaderboardRow[]> {
   const rows = await firstOf(
-    [() => getJson(`/api/leaderboard?seed=${encodeURIComponent(String(seed))}`), () => getJson('/data/leaderboard.json')],
+    [() => (API_ENABLED ? getJson(api(`/api/leaderboard?seed=${encodeURIComponent(String(seed))}`)) : noApi()), () => getJson('/data/leaderboard.json')],
     asLeaderboard,
   );
   return rows ?? [];
@@ -185,7 +198,8 @@ export async function fetchLeaderboard(seed: number): Promise<LeaderboardRow[]> 
 
 export async function submitRun(name: string, replay: Replay): Promise<{ ok: boolean; j?: number; error?: string }> {
   try {
-    const res = await fetch('/api/leaderboard', {
+    if (!API_ENABLED) return { ok: false, error: 'The leaderboard needs the Headway API (not running under vite dev)' };
+    const res = await fetch(api('/api/leaderboard'), {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ name, replay }),
@@ -216,5 +230,5 @@ function asSealed(x: unknown): SealedRow[] | null {
 
 /** Sealed-test results (`GET /api/sealed`, fallback `/data/sealed.json`); empty when none are published. */
 export async function fetchSealed(): Promise<SealedRow[]> {
-  return (await firstOf([() => getJson('/api/sealed'), () => getJson('/data/sealed.json')], asSealed)) ?? [];
+  return (await firstOf([() => (API_ENABLED ? getJson(api('/api/sealed')) : noApi()), () => getJson('/data/sealed.json')], asSealed)) ?? [];
 }

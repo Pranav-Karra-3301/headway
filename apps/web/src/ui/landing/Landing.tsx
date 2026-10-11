@@ -18,13 +18,19 @@ function storage(): Storage | null {
   }
 }
 
+/** WebDriver/CDP sessions and `--headless` screenshots (whose UA says HeadlessChrome; navigator.webdriver stays false). */
+function isAutomated(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return navigator.webdriver === true || /HeadlessChrome/.test(navigator.userAgent);
+}
+
 function initialOpen(): boolean {
   if (typeof window === 'undefined') return false;
   return shouldShowLanding({
     pathname: window.location.pathname,
     search: window.location.search,
     seen: readSeen(storage()),
-    automated: typeof navigator !== 'undefined' && navigator.webdriver === true,
+    automated: isAutomated(),
   });
 }
 

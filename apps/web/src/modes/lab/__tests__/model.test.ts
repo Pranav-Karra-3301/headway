@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTimeline, chartData, designerOfProposalId, niceTicks, pctVs, proposalOutcome, roundForGeneration } from '../model';
+import { buildTimeline, chartData, designerOfProposalId, niceTicks, pctVs, proposalOutcome, roundForGeneration, shortOutcome } from '../model';
 import { gen, history, proposal, round, score } from './helpers';
 
 describe('designerOfProposalId', () => {
@@ -56,6 +56,15 @@ describe('proposalOutcome', () => {
     expect(outcome(r2, 0)).toEqual({ kind: 'rejected', label: 'Validation worse' });
     expect(outcome(r2, 1)).toEqual({ kind: 'rejected', label: 'Gain under 1%' });
     expect(outcome(r2, 2)).toEqual({ kind: 'rejected', label: 'Worse on training' });
+  });
+
+  it('has short badge labels', () => {
+    expect(shortOutcome(outcome(r1, 1))).toBe('Promoted → g1');
+    expect(shortOutcome(outcome(r1, 2))).toBe('Invalid');
+    expect(shortOutcome(outcome(r1, 0))).toBe('Runner-up');
+    expect(shortOutcome(outcome(r2, 0))).toBe('Val worse');
+    expect(shortOutcome(outcome(r2, 1))).toBe('Under 1%');
+    expect(shortOutcome(outcome(r2, 2))).toBe('Worse');
   });
 
   it('shows pending proposals of a running round', () => {

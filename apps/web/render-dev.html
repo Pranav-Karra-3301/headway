@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · render dev (kit v2 + look)</title>
+    <link rel="preload" href="/fonts/GumballRounded.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("/fonts/GumballRounded.ttf") format("truetype"); font-display: block; }
+      :root { --ink: #1F2A44; --paper: #FFFBF2; --accent: #2E5BDA; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: var(--ink);
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .gb { font-family: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif; font-weight: 400; }
+      .brand { position: fixed; top: 22px; left: 28px; pointer-events: none; transition: color .4s; }
+      .brand h1 { margin: 0; font-size: 56px; line-height: 1; letter-spacing: .01em; }
+      .brand p { margin: 8px 0 0 3px; font-size: 16px; opacity: .6; }
+      body.dusk .brand { color: #FFF4E2; }
+      .panel { position: fixed; top: 18px; right: 18px; background: var(--paper); border-radius: 18px; padding: 12px 14px;
+        box-shadow: 0 10px 30px rgba(20,30,50,.14); display: grid; gap: 8px; }
+      .panel .title { font-size: 12px; letter-spacing: .08em; opacity: .5; }
+      .row { display: flex; gap: 6px; align-items: center; }
+      .row .lbl { width: 62px; font-size: 14px; opacity: .55; }
+      .chip { border: 0; border-radius: 999px; padding: 7px 13px; font-size: 15px; background: rgba(31,42,68,.07); color: var(--ink);
+        cursor: pointer; transition: background .2s, color .2s, transform .15s; }
+      .chip:hover { transform: translateY(-1px); }
+      .chip.on { background: var(--accent); color: #fff; }
+      #tags { position: fixed; inset: 0; pointer-events: none; }
+      .tag { position: absolute; transform: translate(-50%, -100%); padding: 5px 11px 4px; border-radius: 999px; background: var(--paper);
+        color: var(--ink); font-size: 14px; box-shadow: 0 3px 10px rgba(20,30,50,.14); white-space: nowrap; }
+      .tag small { opacity: .55; margin-left: 6px; font-family: "Avenir Next Rounded Std", Nunito, system-ui, sans-serif; font-size: 11px; }
+      #stats { position: fixed; left: 28px; bottom: 20px; font-size: 13px; opacity: .65; }
+      body.dusk #stats { color: #FFF4E2; }
+      body.nolabels #tags, body.nolabels .panel { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div class="brand"><h1 class="gb">HEADWAY</h1><p class="gb">model kit v2 · every piece in the town</p></div>
+    <div class="panel">
+      <div class="title gb">RENDER DEV</div>
+      <div class="row"><span class="lbl gb">Palette</span>
+        <button class="chip gb" data-k="palette" data-v="a">Wooden Toy</button>
+        <button class="chip gb" data-k="palette" data-v="b">Miniature Railway</button>
+        <button class="chip gb" data-k="palette" data-v="c">State College Autumn</button>
+      </div>
+      <div class="row"><span class="lbl gb">Detail</span>
+        <button class="chip gb" data-k="detail" data-v="min">Minimal</button>
+        <button class="chip gb" data-k="detail" data-v="toy">Toy</button>
+      </div>
+      <div class="row"><span class="lbl gb">Light</span>
+        <button class="chip gb" data-k="light" data-v="day">Day</button>
+        <button class="chip gb" data-k="light" data-v="dusk">Dusk</button>
+      </div>
+      <div class="row"><span class="lbl gb">Quality</span>
+        <button class="chip gb" data-k="quality" data-v="high">High</button>
+        <button class="chip gb" data-k="quality" data-v="low">Low</button>
+      </div>
+    </div>
+    <div id="tags"></div>
+    <div id="stats" class="gb"></div>
+    <script type="module" src="/src/render/dev.ts"></script>
+  </body>
+</html>

@@ -1,5 +1,6 @@
 // Hand-rolled structural checks for request bodies (the worker has no direct zod dependency).
 // Every error is one short line naming the path, e.g. `generations[0].train.J: expected number`.
+import { validatePolicy } from '@headway/sim';
 import type { Generation, Round, SplitScore } from '@headway/sim';
 
 type Check = (v: unknown, path: string, errs: string[]) => void;
@@ -30,6 +31,7 @@ const nullable = (c: Check): Check => (v, p, e) => {
 const optional = (c: Check): Check => (v, p, e) => {
   if (v !== undefined) c(v, p, e);
 };
+const anything: Check = () => {};
 const array = (c: Check, min = 0, max = Infinity): Check => (v, p, e) => {
   if (!Array.isArray(v)) return void e.push(`${p}: expected array`);
   if (v.length < min || v.length > max) e.push(`${p}: expected ${min}..${max} items, got ${v.length}`);
@@ -53,13 +55,18 @@ const metrics = object({
   effort: object({ busDistanceU: num, deadheadDistanceU: num, holdS: num, trainDwellS: num }),
 });
 const splitScore = object({ J: num, metrics, runs: int(0) });
-/** Shape only; full DSL validation is `validatePolicy` in @headway/sim (the CLI validates before publishing). */
+/** Minimal shape. Generations and valid proposals additionally pass `validatePolicy` (see `parsePublish`). */
 const policy = object({
   meta: object({ id: str(1, 64) }),
   params: object({}),
   rules: array(object({ id: str(1, 64) }), 0, 24),
   defaults: object({}),
 });
+const isPolicyShaped = (v: unknown): boolean => {
+  const errs: string[] = [];
+  policy(v, '', errs);
+  return errs.length === 0;
+};
 const finding = object({ kind: str(1), impactS: num, text: str() });
 const generation = object({
   id: str(1, 64), number: int(0), parentId: nullable(str(1, 64)), policy, fromProposal: nullable(str(1, 64)), explanation: str(),
@@ -67,7 +74,8 @@ const generation = object({
 });
 const proposal = object({
   id: str(1, 64), roundId: str(1, 64), designer: oneOf(0, 1, 2), model: str(1), emphasis: oneOf('transfers', 'spacing', 'allocation'),
-  summary: str(), rationale: str(), policy: nullable(policy), valid: bool, errors: array(str()),
+  // Checked in parsePublish: valid → full DSL validation; invalid → kept when policy-shaped, else stored as null.
+  summary: str(), rationale: str(), policy: anything, valid: bool, errors: array(str()),
   train: nullable(splitScore), val: nullable(splitScore), deltaTrainPct: nullable(num), findings: array(finding), narrative: str(),
 });
 const round = object({
@@ -114,7 +122,25 @@ export function parsePublish(v: unknown): Result<PublishBody> {
       if (p.roundId !== r.id) errors.push(`rounds[${i}].proposals[${j}].roundId: "${p.roundId}" does not match round "${r.id}"`);
     }),
   );
-  return errors.length === 0 ? { ok: true, value: b } : { ok: false, errors };
+  // Policies the web may run (the champion feeds Watch; valid proposals can be replayed) must pass the sim's own
+  // DSL validator, so a deploy never serves a policy its bundled sim cannot run. Invalid proposals are display-only.
+  (b.generations ?? []).forEach((g, i) => checkPolicy(g.policy, `generations[${i}].policy`, errors));
+  const rounds = b.rounds?.map((r, i) => ({
+    ...r,
+    proposals: r.proposals.map((p, j) => {
+      if (p.valid) checkPolicy(p.policy, `rounds[${i}].proposals[${j}].policy`, errors);
+      else if (p.policy !== null && !isPolicyShaped(p.policy)) return { ...p, policy: null };
+      return p;
+    }),
+  }));
+  return errors.length === 0 ? { ok: true, value: { ...b, rounds } } : { ok: false, errors: errors.slice(0, 50) };
+}
+
+/** Runs `validatePolicy` and re-roots its paths (`rules[0].when[0].f: …`) under `at`. */
+function checkPolicy(p: unknown, at: string, errors: string[]): void {
+  const v = validatePolicy(p);
+  if (v.ok) return;
+  for (const e of v.errors) errors.push(e.startsWith('policy:') ? at + e.slice('policy'.length) : e.startsWith('[') ? at + e : `${at}.${e}`);
 }
 
 // ---------- Jev proxy ----------

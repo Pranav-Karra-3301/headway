@@ -90,12 +90,6 @@ export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) 
             <title>{`${s.label}${s.promoted ? '' : ` (champion ${s.genId})`}: J_train ${fmtPaxH(s.trainJ)} pax-h, ${fmtSignedPct(s.train)} vs g0${s.val !== null ? `; J_val ${fmtSignedPct(s.val)}` : ''}`}</title>
           </g>
         ))}
-        {sel && (
-          <g className="lab-chart__bubble" transform={`translate(${Math.min(Math.max(x(sel.step), PAD.l + 34), W - PAD.r - 34)},${y(sel.train) - 16})`}>
-            <rect x={-34} y={-20} width={68} height={22} rx={11} />
-            <text y={-5} textAnchor="middle">{fmtSignedPct(sel.train)}</text>
-          </g>
-        )}
       </svg>
       <div className="lab-timeline" role="tablist" aria-label="Generations and rounds">
         {data.steps.map((s) => (

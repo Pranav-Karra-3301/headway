@@ -4,7 +4,7 @@
 // door canopies, roof trims, chimneys caps, rooftop units, awning valances, café tables) are detail()-tagged.
 import * as THREE from 'three';
 import type { Role } from '../palettes';
-import { at, box, cone, cyl, detail, dome, prism, prng, rbox, rotX, rotY, rotZ, sphere } from './prims';
+import { at, box, cone, cyl, detail, dome, group, prism, prng, rbox, sphere } from './prims';
 
 export const BUILDING_TYPES = ['small', 'tall', 'hall', 'shop', 'house', 'townhouses', 'cafe', 'dorm', 'library'] as const;
 export type BuildingType = (typeof BUILDING_TYPES)[number];
@@ -178,12 +178,12 @@ function shop(o: Required<BuildingOpts>, rnd: () => number): THREE.Group {
   g.add(onFace(doorUnit({ w: 0.55, canopy: null }), 'front', w, d, 0.78, 0));
   g.add(onFace(windowUnit(1.15, 0.7, rnd() < 0.7, { sill: true }), 'front', w, d, -0.42, 0.6));
   g.add(onFace(awning(2.3, 0.55, o.roof, false), 'front', w, d, 0, 1.36));
-  g.add(onFace(at(box(1.5, 0.24, 0.05, 'paper'), 0, 0, 0.025), 'front', w, d, -0.1, 1.53));
-  g.add(detail(onFace(at(box(1.1, 0.07, 0.02, 'accent'), 0, 0, 0.06), 'front', w, d, -0.1, 1.53)));
+  g.add(onFace(group(at(box(1.5, 0.24, 0.05, 'paper'), 0, 0, 0.025)), 'front', w, d, -0.1, 1.53));
+  g.add(detail(onFace(group(at(box(1.1, 0.07, 0.02, 'accent'), 0, 0, 0.06)), 'front', w, d, -0.1, 1.53)));
   for (const f of ['right', 'back', 'left'] as Face[]) windowRow(g, rnd, f, w, d, [0], 0.85, 0.7, 0.55);
   // Planter by the door.
-  g.add(detail(onFace(at(rbox(0.5, 0.26, 0.26, 0.04, 'brick', 0), 0, 0.13, 0.13), 'front', w, d, 1.12, 0)));
-  g.add(detail(onFace(at(sphere(0.2, 'leaf', 1, 10, 7), 0, 0.36, 0.13), 'front', w, d, 1.12, 0)));
+  g.add(detail(onFace(group(at(rbox(0.5, 0.26, 0.26, 0.04, 'brick', 0), 0, 0.13, 0.13)), 'front', w, d, 1.12, 0)));
+  g.add(detail(onFace(group(at(sphere(0.2, 'leaf', 1, 10, 7), 0, 0.36, 0.13)), 'front', w, d, 1.12, 0)));
   return g;
 }
 
@@ -237,8 +237,8 @@ function cafe(o: Required<BuildingOpts>, rnd: () => number): THREE.Group {
   body.add(onFace(windowUnit(1.25, 0.72, rnd() < 0.8, { sill: false }), 'right', w, d, 0.2, 0.62));
   body.add(onFace(awning(2.6, 0.6, o.roof, true), 'front', w, d, 0, 1.28));
   body.add(onFace(awning(2.1, 0.6, o.roof, true), 'right', w, d, 0.2, 1.28));
-  body.add(onFace(at(box(1.2, 0.22, 0.05, 'paper'), 0, 0, 0.025), 'front', w, d, 0, 1.5));
-  body.add(detail(onFace(at(box(0.8, 0.06, 0.02, 'awning', o.roof), 0, 0, 0.06), 'front', w, d, 0, 1.5)));
+  body.add(onFace(group(at(box(1.2, 0.22, 0.05, 'paper'), 0, 0, 0.025)), 'front', w, d, 0, 1.5));
+  body.add(detail(onFace(group(at(box(0.8, 0.06, 0.02, 'awning', o.roof), 0, 0, 0.06)), 'front', w, d, 0, 1.5)));
   windowRow(body, rnd, 'back', w, d, [-0.7, 0.7], 0.8, 0.5, 0.5);
   windowRow(body, rnd, 'left', w, d, [0], 0.8, 0.5, 0.5);
   body.position.z = z0;
@@ -338,5 +338,6 @@ export function buildingSize(type: BuildingType): { w: number; d: number; h: num
   return s;
 }
 
-// Re-exported for other kit files that decorate facades (station building, clock tower).
-export { doorUnit, onFace, windowUnit, rotX, rotY, rotZ };
+// Facade helpers, also used by landmarks (clock tower windows) and available for custom buildings.
+export { doorUnit, onFace, windowUnit };
+export type { Face };

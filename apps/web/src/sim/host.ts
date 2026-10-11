@@ -2,7 +2,7 @@
 // rAF: runner.frame → renderer.render every frame; HUD feed (setHudFeed) at 4 Hz; snapshot events → toasts.
 // Store ↔ runner/renderer sync: session, paused, speed, palette/detail/light/quality, highlight, selection.
 import { TOWN, createStubSim, stationById, stopById } from '@headway/sim';
-import type { DecisionRecord, QueuePlace, SimSnapshot } from '@headway/sim';
+import type { DecisionRecord, QueuePlace, Sim, SimSnapshot } from '@headway/sim';
 import { TownRenderer } from '../render/index';
 import type { TownRendererApi } from '../render/types';
 import { frame } from '../state/frame';
@@ -12,6 +12,7 @@ import { WaitTracker, buildHud } from '../state/hud';
 import { createEventToaster } from '../state/eventToasts';
 import { SimRunner } from './runner';
 import { createSessionSim } from './session';
+import { FlatTownRenderer } from '../ui/shell/flatRenderer';
 import type { SessionSpec } from './session';
 
 const HUD_INTERVAL_MS = 250;
@@ -26,7 +27,7 @@ export const EMPTY_SNAPSHOT: SimSnapshot = {
 
 export interface HeadwayProbe {
   readonly t: number; readonly simT: number; readonly mode: AppState['mode']; readonly ready: boolean;
-  readonly sim: AppState['simKind']; readonly renderer: 'three' | 'none'; readonly frames: number;
+  readonly sim: AppState['simKind']; readonly renderer: 'three' | 'flat' | 'none'; readonly frames: number;
   readonly session: string | null; readonly error: string | null;
 }
 declare global { interface Window { __headway?: HeadwayProbe } }
@@ -48,8 +49,18 @@ function mapReady(): boolean {
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement; win?: Window }): () => void {
+export interface HostOptions {
+  canvas: HTMLCanvasElement; container: HTMLElement; win?: Window;
+  /** Test seams: build the session sim / the renderer / the crash fallback sim. */
+  makeSim?: (spec: SessionSpec) => ReturnType<typeof createSessionSim>;
+  makeRenderer?: (canvas: HTMLCanvasElement) => TownRendererApi | null;
+  makeFallback?: (spec: SessionSpec) => Sim;
+}
+
+export function startHost(a: HostOptions): () => void {
   const win = a.win ?? window;
+  const makeSim = a.makeSim ?? createSessionSim;
+  const makeFallback = a.makeFallback ?? ((spec: SessionSpec) => createStubSim({ map: TOWN, scenario: spec.scenario }));
   const store = useApp;
   let disposed = false;
   let renderer: TownRendererApi | null = null;
@@ -64,18 +75,36 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
   let lastNext: SimSnapshot | null = null;
   let decisions: DecisionRecord[] = [];
   let decisionsDirty = false;
+  let publishedNext: SimSnapshot | null = null;
+  let publishedT = -1;
   const waits = new WaitTracker();
   const toaster = createEventToaster({ placeName });
 
   // ---------- renderer ----------
   const view = store.getState();
-  if (mapReady()) {
+  let rendererKind: 'three' | 'flat' | 'none' = 'none';
+  if (a.makeRenderer) {
+    renderer = a.makeRenderer(a.canvas);
+    rendererKind = renderer ? 'three' : 'none';
+  } else if (mapReady()) {
     try {
       renderer = new TownRenderer(a.canvas, TOWN, { palette: view.palette, detail: view.detail, light: view.light });
+      rendererKind = 'three';
     } catch (e) {
       lastError = `renderer: ${errText(e)}`;
-      console.warn('[headway] town renderer unavailable:', e);
+      console.warn('[headway] 3D town renderer failed; using the flat map:', e);
       renderer = null;
+    }
+    // No WebGL context on the canvas means the 3D renderer is absent or still a no-op stub: draw the flat map instead.
+    try {
+      const flat = FlatTownRenderer.tryCreate(a.canvas, TOWN);
+      if (flat) {
+        try { renderer?.dispose(); } catch { /* stub */ }
+        renderer = flat;
+        rendererKind = 'flat';
+      }
+    } catch (e) {
+      console.warn('[headway] flat map unavailable:', e);
     }
   } else {
     lastError = 'map not ready';
@@ -106,7 +135,7 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
   let syncedSpeed = store.getState().speed;
 
   const resetFeeds = () => {
-    waits.reset(); toaster.reset(); decisions = []; decisionsDirty = true; lastNext = null;
+    waits.reset(); toaster.reset(); decisions = []; decisionsDirty = true; lastNext = null; publishedNext = null;
   };
 
   const build = (spec: SessionSpec | null) => {
@@ -116,7 +145,7 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
     resetFeeds();
     if (!spec) { runner = null; frame.runner = null; store.getState().setSimInfo('none', null); return; }
     try {
-      const made = createSessionSim(spec);
+      const made = makeSim(spec);
       if (made.kind === 'stub' && made.error) console.warn(`[headway] real sim not ready (${made.error}); running the stub sim`);
       if (runner) runner.reset(() => made.sim);
       else runner = new SimRunner(() => made.sim, store.getState().speed);
@@ -143,8 +172,8 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
     resetFeeds();
     try {
       if (!session || !runner) throw e;
-      const scenario = session.scenario;
-      runner.reset(() => createStubSim({ map: TOWN, scenario }));
+      const spec = session;
+      runner.reset(() => makeFallback(spec));
       store.getState().setSimInfo('stub', msg);
     } catch (e2) {
       runner = null; frame.runner = null;
@@ -153,7 +182,7 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
   };
 
   const onStore = (s: AppState, prev: AppState) => {
-    if (s.session?.key !== builtKey || s.sessionNonce !== builtNonce) build(s.session);
+    if ((s.session?.key ?? null) !== builtKey || s.sessionNonce !== builtNonce) build(s.session);
     applyView(s, prev);
   };
   build(store.getState().session);
@@ -189,6 +218,9 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
 
   const publishHud = () => {
     if (!runner) return;
+    if (runner.next === publishedNext && runner.sim.t === publishedT && !decisionsDirty) return; // nothing new (paused)
+    publishedNext = runner.next;
+    publishedT = runner.sim.t;
     let obs = null;
     try { obs = runner.sim.observe(); } catch { obs = null; }
     const hud = buildHud(runner.next, obs, waits.p95(runner.next.t));
@@ -257,16 +289,9 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
       a.canvas.style.cursor = renderer.pick(e.clientX, e.clientY) ? 'pointer' : '';
     } catch { /* hover is cosmetic */ }
   };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key !== 'Escape' || e.defaultPrevented) return;
-    const t = e.target as HTMLElement | null;
-    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-    if (store.getState().selection) store.getState().select(null);
-  };
   a.canvas.addEventListener('pointerdown', onDown);
   a.canvas.addEventListener('pointerup', onUp);
   a.canvas.addEventListener('pointermove', onMove);
-  win.addEventListener('keydown', onKey);
 
   // ---------- resize ----------
   const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { try { renderer?.resize(); } catch { /* noop */ } }) : null;
@@ -279,7 +304,7 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
     get mode() { return store.getState().mode; },
     get ready() { return ready; },
     get sim() { return store.getState().simKind; },
-    get renderer() { return renderer ? 'three' : 'none'; },
+    get renderer() { return renderer ? rendererKind : 'none'; },
     get frames() { return frames; },
     get session() { return session?.key ?? null; },
     get error() { return lastError; },
@@ -294,7 +319,6 @@ export function startHost(a: { canvas: HTMLCanvasElement; container: HTMLElement
     a.canvas.removeEventListener('pointerdown', onDown);
     a.canvas.removeEventListener('pointerup', onUp);
     a.canvas.removeEventListener('pointermove', onMove);
-    win.removeEventListener('keydown', onKey);
     try { renderer?.dispose(); } catch { /* noop */ }
     if (frame.renderer === renderer) frame.renderer = null;
     if (frame.runner === runner) frame.runner = null;

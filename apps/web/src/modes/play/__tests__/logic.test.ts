@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { DecisionRecord, FailureFinding, Observation, VehicleView } from '@headway/sim';
 import {
   cleanName, differenceFindings, findingKey, fmtMMSS, fmtPaxH, fmtPct, legalActions, lerpDist, localClock,
-  paceAt, paceDelta, trainDwellFor, verdict,
+  paceAt, paceDelta, raceSeries, trainDwellFor, verdict,
 } from '../logic';
 
 type Bus = Observation['buses'][number];
@@ -220,5 +220,16 @@ describe('formatting and misc', () => {
     expect(lerpDist(98, 2, 0.5, 100, true)).toBe(0);
     expect(lerpDist(98, 2, 0.25, 100, true)).toBe(99);
     expect(lerpDist(10, 20, 0.5, 100, false)).toBe(15);
+  });
+});
+
+describe('raceSeries', () => {
+  it('turns jSoFar samples into passenger-hours saved against the baseline', () => {
+    const base = [{ t: 0, j: 0 }, { t: 30, j: 7200 }, { t: 60, j: 14_400 }];
+    const ai = [{ t: 0, j: 0 }, { t: 30, j: 3600 }, { t: 60, j: 7200 }];
+    const you = [{ t: 0, j: 0 }, { t: 45, j: 7200 }];
+    const s = raceSeries(you, ai, base);
+    expect(s.you).toEqual([{ t: 0, v: 0 }, { t: 45, v: 1 }]);
+    expect(s.ai).toEqual([{ t: 0, v: 0 }, { t: 30, v: 1 }, { t: 60, v: 2 }]);
   });
 });

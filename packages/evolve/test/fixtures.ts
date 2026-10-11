@@ -34,17 +34,18 @@ export function runResult(p: Partial<RunResult> = {}): RunResult {
   };
 }
 
-// ---- findings ----
-export function gap(impactS: number, gapS = 840, text = 'Apartments South went 14 min without a Route 2 bus (21:52–22:06).'): FailureFinding {
+// ---- findings (narrowed so tests can spread and override fields) ----
+type F<K extends FailureFinding['kind']> = Extract<FailureFinding, { kind: K }>;
+export function gap(impactS: number, gapS = 840, text = 'Apartments South went 14 min without a Route 2 bus (21:52–22:06).'): F<'service_gap'> {
   return { kind: 'service_gap', impactS, text, stopId: 'stop_apts_south', routeId: 'r2', gapS, fromT: 1320, toT: 2160, affected: 40 };
 }
-export function missed(impactS: number, count = 38, text = '38 riders reached Central from the train just after Route 2 left.'): FailureFinding {
+export function missed(impactS: number, count = 38, text = '38 riders reached Central from the train just after Route 2 left.'): F<'missed_transfer'> {
   return { kind: 'missed_transfer', impactS, text, at: { kind: 'stop', id: 'stop_central_stn' }, from: 'train', to: 'r2', count, window: [600, 900] };
 }
-export function bunching(impactS: number, events = 4, text = 'Route 1 buses bunched 4× (as close as 40 s).'): FailureFinding {
+export function bunching(impactS: number, events = 4, text = 'Route 1 buses bunched 4× (as close as 40 s).'): F<'bunching'> {
   return { kind: 'bunching', impactS, text, routeId: 'r1', stopId: 'stop_downtown', events, minHeadwayS: 40 };
 }
-export function overload(impactS: number, leftBehind = 23, text = '23 people were left behind at Stadium Gate; the queue peaked at 140.'): FailureFinding {
+export function overload(impactS: number, leftBehind = 23, text = '23 people were left behind at Stadium Gate; the queue peaked at 140.'): F<'overload'> {
   return { kind: 'overload', impactS, text, at: { kind: 'stop', id: 'stop_stadium_gate' }, routeId: 'r3', leftBehind, peakQueue: 140 };
 }
 

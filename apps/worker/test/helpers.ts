@@ -80,7 +80,7 @@ export function policy(id: string, parent: string | null, generation: number): P
     meta: { id, parent, generation, author: generation === 0 ? 'human' : 'designer', emphasis: generation === 0 ? 'baseline' : 'transfers', summary: `policy ${id}` },
     params: { allocation: { r1: 2, r2: 2, r3: 2 }, maxHoldS: 90, trainDefaultDwellS: 45 },
     rules: generation === 0 ? [] : [
-      { id: 'hold_for_train', on: 'bus_at_stop', priority: 10, when: [{ f: 'train_eta_s', op: '<=', v: 60 }], do: { type: 'hold', seconds: 30 }, say: 'Holding {seconds}s for the train' },
+      { id: 'hold-for-train', on: 'bus_at_stop', priority: 10, when: [{ f: 'train_eta_s', op: '<=', v: 60 }], do: { type: 'hold', seconds: 30 }, say: 'Holding {seconds}s for the train' },
     ],
     defaults: { bus_at_stop: { type: 'continue' }, bus_at_terminal: { type: 'dispatch' }, train_at_station: { type: 'setTrainDeparture', dwellS: 45 } },
   };

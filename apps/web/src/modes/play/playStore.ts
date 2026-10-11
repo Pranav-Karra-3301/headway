@@ -28,10 +28,12 @@ export interface PlayLocal {
   youPace: PacePoint[];
   spectating: boolean;
   finishing: { from: number; to: number; t: number } | null;
-  nudge: { text: string; n: number } | null;
+  nudge: { text: string; tone: 'info' | 'warn'; n: number } | null;
   submit: { status: 'idle' | 'sending' | 'done' | 'error'; name: string; j: number | null; error: string | null };
   board: { status: 'idle' | 'loading' | 'done' | 'error'; rows: LeaderboardRow[] };
-  /** The sim could not be built (engine and stub both failed). */
+  /** "Play again" is waiting for the host to rebuild the sim. */
+  restarting: boolean;
+  /** The run could not be scored / stepped. */
   error: string | null;
   set(p: Partial<PlayLocal>): void;
 }
@@ -48,6 +50,7 @@ export const usePlay = create<PlayLocal>()((set) => ({
   tour: null,
   ai: freshAi(),
   board: { status: 'idle', rows: [] },
+  restarting: false,
   error: null,
   set: (p) => set(p),
 }));

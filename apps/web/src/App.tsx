@@ -16,7 +16,7 @@
 //   └─ Landing, AboutPanel   mounted directly in .hw-app (modals / title card)
 //
 // Every track component sits in a <Slot> error boundary so one crash cannot blank the app.
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useApp } from './state/store';
 import { startRouter } from './state/router';
 import { startDirector } from './sim/director';
@@ -25,14 +25,18 @@ import { CanvasHost } from './ui/shell/CanvasHost';
 import { TopBar } from './ui/shell/TopBar';
 import { Slot } from './ui/shell/Slot';
 import { WatchMode } from './modes/watch/WatchMode';
-import { PlayMode } from './modes/play/PlayMode';
-import { LabMode } from './modes/lab/LabMode';
 import { QueueMarkers } from './ui/hud/QueueMarkers';
 import { Inspector } from './ui/hud/Inspector';
 import { RouteLegend } from './ui/hud/RouteLegend';
 import { Toasts } from './ui/hud/Toasts';
 import { Landing } from './ui/landing/Landing';
 import { AboutPanel } from './ui/about/AboutPanel';
+
+// Play and Lab load on demand: a smaller first paint, and a broken mode module cannot take down Watch.
+const loadPlay = () => import('./modes/play/PlayMode').then((m) => ({ default: m.PlayMode }));
+const loadLab = () => import('./modes/lab/LabMode').then((m) => ({ default: m.LabMode }));
+const PlayMode = lazy(loadPlay);
+const LabMode = lazy(loadLab);
 
 export function App() {
   const mode = useApp((s) => s.mode);
@@ -42,13 +46,18 @@ export function App() {
   useEffect(() => startRouter(useApp), []);
   useEffect(() => startDirector(), []);
   useEffect(() => applyTheme(palette, light), [palette, light]);
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const id = setTimeout(() => { void loadPlay().catch(() => {}); void loadLab().catch(() => {}); }, 2500);
+    return () => clearTimeout(id);
+  }, []);
 
   const lab = mode === 'lab';
   return (
     <div className="hw-app" data-mode={mode} data-light={light}>
       <CanvasHost />
       {!lab && (
-        <div className="hw-markers" aria-hidden="true">
+        <div className="hw-markers">
           <Slot name="QueueMarkers"><QueueMarkers /></Slot>
         </div>
       )}
@@ -65,8 +74,8 @@ export function App() {
         </div>
         <div className="hw-area hw-area--toasts"><Slot name="Toasts"><Toasts /></Slot></div>
       </div>
-      {mode === 'play' && <Slot name="PlayMode"><PlayMode /></Slot>}
-      {lab && <Slot name="LabMode"><LabMode /></Slot>}
+      {mode === 'play' && <Slot name="PlayMode"><Suspense fallback={null}><PlayMode /></Suspense></Slot>}
+      {lab && <Slot name="LabMode"><Suspense fallback={null}><LabMode /></Suspense></Slot>}
       <Slot name="Landing"><Landing /></Slot>
       <Slot name="AboutPanel"><AboutPanel /></Slot>
     </div>

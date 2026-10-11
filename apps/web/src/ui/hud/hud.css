@@ -9,22 +9,23 @@
   --hud-r2: #f0a830;
   --hud-r3: #8a6bd8;
   --hud-train: #d7443e;
-  --hud-ok: #2a9d6b;
-  --hud-warn: #e8a21c;
-  --hud-bad: #e0533f;
-  --hud-line: color-mix(in srgb, var(--hud-ink) 9%, transparent);
+  /* Shell tokens (styles/tokens.css) win when present, so the HUD and the top bar share one look. */
+  --hud-ok: var(--ok, #22a06b);
+  --hud-warn: var(--warn, #e9a23b);
+  --hud-bad: var(--bad, #e5484d);
+  --hud-line: color-mix(in srgb, var(--hud-ink) 10%, transparent);
   --hud-muted: color-mix(in srgb, var(--hud-ink) 56%, transparent);
   --hud-faint: color-mix(in srgb, var(--hud-ink) 6%, transparent);
-  --hud-glass: color-mix(in srgb, var(--hud-paper) 92%, transparent);
-  --hud-r-lg: 20px;
-  --hud-r-md: 14px;
-  --hud-r-sm: 10px;
-  --hud-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 14px 34px -10px rgba(20, 30, 50, 0.24), 0 2px 6px rgba(20, 30, 50, 0.06);
-  --hud-shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 6px 16px -6px rgba(20, 30, 50, 0.22), 0 1px 3px rgba(20, 30, 50, 0.07);
-  --hud-ease: cubic-bezier(0.23, 1, 0.32, 1);
-  --hud-ease-io: cubic-bezier(0.77, 0, 0.175, 1);
-  --hud-display: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif;
-  --hud-body: "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif;
+  --hud-glass: var(--glass, color-mix(in srgb, var(--hud-paper) 90%, transparent));
+  --hud-r-lg: var(--r-lg, 18px);
+  --hud-r-md: var(--r-md, 14px);
+  --hud-r-sm: var(--r-sm, 10px);
+  --hud-shadow: var(--shadow-2, 0 2px 6px rgb(20 30 50 / 0.07), 0 10px 30px rgb(20 30 50 / 0.12)), var(--highlight, inset 0 1px 0 rgb(255 255 255 / 0.65));
+  --hud-shadow-sm: var(--shadow-1, 0 1px 2px rgb(20 30 50 / 0.08), 0 2px 6px rgb(20 30 50 / 0.06)), var(--highlight, inset 0 1px 0 rgb(255 255 255 / 0.65));
+  --hud-ease: var(--ease-out, cubic-bezier(0.23, 1, 0.32, 1));
+  --hud-ease-io: var(--ease-in-out, cubic-bezier(0.77, 0, 0.175, 1));
+  --hud-display: var(--font-display, "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif);
+  --hud-body: var(--font-ui, "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif);
   color: var(--hud-ink);
   font-family: var(--hud-body);
   -webkit-font-smoothing: antialiased;
@@ -63,8 +64,8 @@
 
 .hud-surface {
   background: var(--hud-glass);
-  -webkit-backdrop-filter: blur(14px) saturate(1.15);
-  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
   border-radius: var(--hud-r-lg);
   box-shadow: var(--hud-shadow);
 }
@@ -221,18 +222,19 @@
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;
-  column-gap: 8px;
-  row-gap: 3px;
+  column-gap: 7px;
+  row-gap: 4px;
   padding: 0 16px;
   border-radius: 999px;
   color: #fff;
   background: var(--hud-bad);
   box-shadow: var(--hud-shadow-sm);
-  transition: background-color 300ms ease;
+  transition: background-color 300ms ease, color 300ms ease;
 }
-.hud-pace[data-ahead="true"] { background: var(--hud-ok); }
-.hud-pace .hud-label { color: rgba(255, 255, 255, 0.82); grid-column: 1 / -1; }
-.hud-pace-value { font-family: var(--hud-display); font-size: 21px; line-height: 1; white-space: nowrap; }
+.hud-pace[data-tone="ahead"] { background: var(--hud-ok); }
+.hud-pace[data-tone="even"] { background: var(--hud-glass); color: var(--hud-ink); }
+.hud-pace .hud-label { color: currentColor; opacity: 0.8; grid-column: 1 / -1; }
+.hud-pace-value { font-family: var(--hud-display); font-size: 21px; line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hud-pace-unit { font-family: var(--hud-display); font-size: 12px; opacity: 0.85; white-space: nowrap; }
 
 /* ---------- route legend (bottom-left) ---------- */
@@ -377,7 +379,16 @@
 }
 .hud-ins-titles { display: grid; gap: 4px; min-width: 0; flex: 1; }
 .hud-ins-title { font-family: var(--hud-display); font-size: 21px; line-height: 1; }
-.hud-ins-sub { font-size: 13px; font-weight: 600; color: var(--hud-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-ins-sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--hud-muted);
+}
 .hud-ins-close {
   display: grid;
   place-items: center;
@@ -416,6 +427,13 @@
 .hud-chip[data-tone="bad"] { background: color-mix(in srgb, var(--hud-bad) 16%, transparent); color: var(--hud-bad); }
 .hud-chip[data-tone="ok"] { background: color-mix(in srgb, var(--hud-ok) 16%, transparent); color: color-mix(in srgb, var(--hud-ok) 75%, var(--hud-ink)); }
 .hud-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rc, var(--hud-ink)); flex: none; }
+.hud-chip--text { font-family: var(--hud-body); font-size: 12.5px; font-weight: 700; }
+.hud-chip--code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 
 .hud-bar { position: relative; height: 10px; border-radius: 999px; background: var(--hud-faint); overflow: hidden; }
 .hud-bar > span {
@@ -495,43 +513,47 @@
 
 .hud-toasts {
   position: fixed;
-  top: var(--hud-top, 88px);
+  top: calc(var(--hud-top, 88px) + var(--hud-toast-offset, 0px));
   left: 50%;
   z-index: 30;
   width: 0;
   height: 0;
   pointer-events: none;
 }
+.hud-toasts[data-offset="true"] { --hud-toast-offset: 56px; } /* below Play's finishing / spectate banner */
 .hud-toast {
   position: absolute;
   top: 0;
   left: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   max-width: min(540px, calc(100vw - 32px));
-  height: 42px;
-  padding: 0 8px 0 7px;
+  height: 38px;
+  padding: 0 6px 0 6px;
   border-radius: 999px;
   white-space: nowrap;
   pointer-events: auto;
-  transform: translate(-50%, calc(var(--i, 0) * 50px)) scale(calc(1 - var(--i, 0) * 0.03));
+  transform: translate(-50%, calc(var(--i, 0) * 45px)) scale(calc(1 - var(--i, 0) * 0.025));
   opacity: calc(1 - var(--i, 0) * 0.12);
   transition: transform 300ms var(--hud-ease), opacity 220ms ease;
+}
+.hud-toast[data-kind="alert"] {
+  box-shadow: var(--hud-shadow), 0 0 0 1.5px color-mix(in srgb, var(--hud-accent) 32%, transparent);
 }
 @starting-style {
   .hud-toast { opacity: 0; transform: translate(-50%, -14px) scale(0.96); }
 }
 .hud-toast[data-exiting="true"] {
   opacity: 0;
-  transform: translate(-50%, calc(var(--i, 0) * 50px - 10px)) scale(0.97);
+  transform: translate(-50%, calc(var(--i, 0) * 45px - 10px)) scale(0.97);
   transition: transform 160ms ease-out, opacity 140ms ease-out;
 }
 .hud-toast-icon {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   flex: none;
   border-radius: 50%;
   color: #fff;
@@ -541,7 +563,8 @@
 .hud-toast[data-kind="transfer"] { --tk: var(--hud-ok); }
 .hud-toast[data-kind="missed"] { --tk: var(--hud-warn); }
 .hud-toast[data-kind="walkaway"] { --tk: var(--hud-bad); }
-.hud-toast-text { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.hud-toast-text { font-size: 13.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.hud-toast[data-kind="alert"] .hud-toast-text { font-weight: 800; }
 .hud-toast-time { font-family: var(--hud-display); font-size: 12px; color: var(--hud-muted); }
 .hud-toast-x {
   display: grid;

@@ -285,3 +285,87 @@ describe('designer diversity (spec §8.2)', () => {
     expect(s.llm.calls[0]!.user).toContain('Rejected: validation worse');
   });
 });
+
+describe('robustness', () => {
+  it('asks for a repair when the proposal is identical to the champion', async () => {
+    const s = setup({ script: [[reply(POLICY), reply(variant(6))], VALID[1]!, VALID[2]!] });
+    const { round } = await runRound(s.deps);
+    expect(round.proposals[0]!.valid).toBe(true);
+    expect(statuses(s.events, 0)).toEqual(['requested', 'received', 'repaired']);
+    const errs = (s.events.find((e) => e.type === 'proposal' && e.designer === 0 && e.status === 'received') as { errors?: string[] }).errors!;
+    expect(errs.join(' ')).toMatch(/identical to the champion/);
+  });
+
+  it('records both errors when the repair call itself fails', async () => {
+    const s = setup({ script: [[reply(broken()), new Error('rate limited')], VALID[1]!, VALID[2]!] });
+    const { round } = await runRound(s.deps);
+    const a = round.proposals[0]!;
+    expect(a).toMatchObject({ valid: false, policy: null, train: null });
+    expect(a.errors.join('\n')).toContain('train_eta');
+    expect(a.errors.join('\n')).toContain('rate limited');
+    expect(a.narrative).toMatch(/^Invalid: /);
+    expect(statuses(s.events, 0)).toEqual(['requested', 'received', 'invalid']);
+  });
+
+  it('records the model that actually answered (fallback) and stamps it as the author', async () => {
+    const s = setup({ table: { 'r1-b': { train: 900, val: 400 } } });
+    const inner = s.deps.llm;
+    s.deps.llm = { complete: async (req) => ({ ...(await inner.complete(req)), model: req.temperature === 0.7 ? 'deepseek/deepseek-v4-pro' : req.model }) };
+    const { round, generation: gen } = await runRound(s.deps);
+    expect(round.proposals.map((p) => p.model)).toEqual([s.deps.model, 'deepseek/deepseek-v4-pro', s.deps.model]);
+    expect(round.proposals[1]!.policy!.meta.author).toBe('deepseek/deepseek-v4-pro');
+    expect(gen!.policy.meta.author).toBe('deepseek/deepseek-v4-pro');
+    const received = s.events.find((e) => e.type === 'proposal' && e.designer === 1 && e.status === 'received');
+    expect(received).toMatchObject({ model: 'deepseek/deepseek-v4-pro' });
+  });
+
+  it('accepts a policy sent as a JSON string and keeps the listed changes in the rationale', async () => {
+    const text = JSON.stringify({ summary: 'S', rationale: 'Because.', changes: ['first change.', 'second'], policy: JSON.stringify(variant(6)) });
+    const s = setup({ script: [[text], VALID[1]!, VALID[2]!] });
+    const { round } = await runRound(s.deps);
+    expect(round.proposals[0]).toMatchObject({ valid: true, summary: 'S', rationale: 'Because. Changes: first change; second.' });
+  });
+
+  it('fails the round cleanly when the champion cannot be evaluated', async () => {
+    const s = setup({});
+    s.deps.evaluate = async () => { throw new Error('engine missing'); };
+    const { round, generation: gen } = await runRound(s.deps);
+    expect(gen).toBeNull();
+    expect(round).toMatchObject({ status: 'failed', championAfter: 'g0', proposals: [] });
+    expect(round.finishedAt).not.toBeNull();
+    expect(s.llm.calls).toHaveLength(0);
+    expect(s.events.map((e) => e.type)).toEqual(['round_start', 'error', 'decision']);
+    expect((s.events[1] as { message: string }).message).toContain('engine missing');
+    expect(s.store.rounds.at(-1)).toEqual(round);
+  });
+
+  it('keeps going when the event listener throws', async () => {
+    const s = setup({ table: { 'r1-a': { train: 950, val: 490 } } });
+    s.deps.emit = () => { throw new Error('stream closed'); };
+    const { round, generation: gen } = await runRound(s.deps);
+    expect(round.status).toBe('done');
+    expect(gen?.id).toBe('g1');
+  });
+
+  it('gives the second-best its attempt when validating the best crashes', async () => {
+    const s = setup({ table: { 'r1-a': { train: 950, val: 400 }, 'r1-b': { train: 970, val: 450 } } });
+    const evaluate = s.deps.evaluate;
+    s.deps.evaluate = async (p, split) => { if (p.meta.id === 'r1-a' && split === 'val') throw new Error('val blew up'); return evaluate(p, split); };
+    const { round, generation: gen } = await runRound(s.deps);
+    expect(gen?.fromProposal).toBe('r1-b');
+    expect(round.proposals[0]!.narrative).toContain('Rejected: validation failed to run.');
+    expect(round.proposals[0]!.errors.join(' ')).toContain('val blew up');
+    expect(s.events.some((e) => e.type === 'error' && e.message.includes('val blew up'))).toBe(true);
+  });
+
+  it('promotes nothing when the champion cannot be validated', async () => {
+    const s = setup({ table: { 'r1-a': { train: 950, val: 400 } } });
+    const evaluate = s.deps.evaluate;
+    s.deps.evaluate = async (p, split) => { if (p.meta.id === 'g0' && split === 'val') throw new Error('no val seeds'); return evaluate(p, split); };
+    const { round, generation: gen } = await runRound(s.deps);
+    expect(gen).toBeNull();
+    expect(round).toMatchObject({ status: 'done', championAfter: 'g0' });
+    expect(round.proposals[0]!.narrative).toContain('Not promoted: validation could not run.');
+    expect((s.events.at(-1) as { reason: string }).reason).toMatch(/validation could not run/);
+  });
+});

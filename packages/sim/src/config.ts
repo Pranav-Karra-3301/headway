@@ -1,5 +1,27 @@
-// Owner: Task M. SimConfig defaults (spec §5.3). Stub until filled.
+// Owner: Task M. SimConfig defaults (spec §5.3, all tunable).
 import type { SimConfig } from './contracts';
 
-export const DEFAULT_CONFIG = {} as SimConfig;
-export function withConfig(p?: Partial<SimConfig>): SimConfig { return { ...DEFAULT_CONFIG, ...p } as SimConfig; }
+export const DEFAULT_CONFIG: SimConfig = {
+  simVersion: '1',
+  bus: { count: 6, capacity: 40, speed: 0.3, boardS: 2, alightS: 1.5, minDwellS: 8 },
+  train: {
+    capacity: 160, speed: 0.75, minDwellS: 30, maxDwellS: 120, defaultDwellS: 45,
+    boardS: 0.5, alightS: 0.4, carSpacing: 4.6,
+  },
+  walk: { meanSpeed: 0.05, sdSpeed: 0.01, minSpeed: 0.03, maxSpeed: 0.07, detourFactor: 1.25, accessRadius: 14 },
+  limits: { maxHoldS: 90, maxHoldPerLoopS: 180, maxLayoverS: 300, minBusesPerRoute: 1 },
+  objective: { unfinishedPenaltyS: 2700, missedWindowS: 120, bunchingFraction: 0.25 },
+};
+
+/** Fresh config: defaults overlaid group by group (a partial group only overrides the keys it names). */
+export function withConfig(p?: Partial<SimConfig>): SimConfig {
+  const d = DEFAULT_CONFIG;
+  return {
+    simVersion: p?.simVersion ?? d.simVersion,
+    bus: { ...d.bus, ...p?.bus },
+    train: { ...d.train, ...p?.train },
+    walk: { ...d.walk, ...p?.walk },
+    limits: { ...d.limits, ...p?.limits },
+    objective: { ...d.objective, ...p?.objective },
+  };
+}

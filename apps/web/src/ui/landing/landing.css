@@ -20,25 +20,28 @@
   opacity: 0;
   pointer-events: none;
 }
+/* The card takes focus programmatically (Enter → Watch); it is a container, not a control, so no ring. */
+.hwl.hwl:focus,
+.hwl.hwl:focus-visible { outline: none; }
 
 .hwl-scrim {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(110% 85% at 50% 44%,
-      color-mix(in srgb, var(--hwl-bg) 62%, transparent) 0%,
-      color-mix(in srgb, var(--hwl-bg) 84%, transparent) 58%,
-      color-mix(in srgb, var(--hwl-bg) 94%, transparent) 100%);
-  -webkit-backdrop-filter: blur(6px) saturate(1.06);
-  backdrop-filter: blur(6px) saturate(1.06);
+    radial-gradient(70% 62% at 50% 46%,
+      color-mix(in srgb, var(--hwl-bg) 80%, transparent) 0%,
+      color-mix(in srgb, var(--hwl-bg) 64%, transparent) 62%,
+      color-mix(in srgb, var(--hwl-bg) 46%, transparent) 100%);
+  -webkit-backdrop-filter: blur(3px) saturate(1.04);
+  backdrop-filter: blur(3px) saturate(1.04);
   animation: hwl-fade 320ms ease-out both;
 }
 .hwl[data-light="dusk"] .hwl-scrim {
   background:
-    radial-gradient(110% 85% at 50% 44%,
-      color-mix(in srgb, var(--hwl-dusk) 48%, transparent) 0%,
-      color-mix(in srgb, var(--hwl-dusk) 78%, transparent) 60%,
-      color-mix(in srgb, var(--hwl-dusk) 90%, transparent) 100%);
+    radial-gradient(70% 62% at 50% 46%,
+      color-mix(in srgb, var(--hwl-dusk) 84%, transparent) 0%,
+      color-mix(in srgb, var(--hwl-dusk) 68%, transparent) 62%,
+      color-mix(in srgb, var(--hwl-dusk) 50%, transparent) 100%);
 }
 
 .hwl-stage {
@@ -92,7 +95,7 @@
   margin: 20px 0 14px;
   font-family: var(--hwl-display);
   font-weight: 400;
-  font-size: clamp(76px, 11.5vw, 156px);
+  font-size: clamp(76px, 10.5vw, 140px);
   line-height: 0.86;
   letter-spacing: 0.012em;
   color: var(--hwl-ink);

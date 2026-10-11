@@ -54,7 +54,7 @@ interface ModeCard { mode: Mode; tone: 'r1' | 'r2' | 'r3'; kicker: string; title
 
 const CARDS: ModeCard[] = [
   {
-    mode: 'watch', tone: 'r1', kicker: 'Watch', title: 'Watch the AI dispatch', icon: <BusIcon />,
+    mode: 'watch', tone: 'r1', kicker: 'Watch', title: 'Watch the AI', icon: <BusIcon />,
     body: 'The current champion rulebook runs the town live. Click any bus to read the rule behind its last move.',
     cta: 'Start watching',
   },

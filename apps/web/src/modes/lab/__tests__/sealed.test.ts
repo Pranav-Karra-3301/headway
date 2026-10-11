@@ -70,16 +70,16 @@ describe('loadSealed', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to /data/sealed.json when the API fails, and to [] when both fail', async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/sealed') return new Response('{"error":"not implemented yet"}', { status: 501 });
-      if (url === '/data/sealed.json') return new Response(JSON.stringify({ g0: { J: 7 } }), { status: 200 });
-      return new Response('', { status: 404 });
-    });
+  it('returns [] when the API fails or is unreachable (no static fallback)', async () => {
+    const fetchMock = vi.fn(async () => new Response('{"error":"not implemented yet"}', { status: 501 }));
     vi.stubGlobal('fetch', fetchMock);
-    expect((await loadSealed()).map((r) => r.J)).toEqual([7]);
+    expect(await loadSealed()).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
+    expect(await loadSealed()).toEqual([]);
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<!doctype html><html></html>', { status: 200, headers: { 'content-type': 'text/html' } })));
     expect(await loadSealed()).toEqual([]);
   });
 });

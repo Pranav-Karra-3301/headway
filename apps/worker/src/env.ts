@@ -16,6 +16,9 @@ export interface AppEnv {
   SEALED_TEST_SEEDS?: string;
 }
 
+/** The plan's name for the bindings type. */
+export type Env = AppEnv;
+
 /** Things tests swap out. Defaults are the real runtime globals. */
 export interface AppDeps {
   /** Outbound fetch for upstream APIs (OpenRouter/Jev, Luminal). */

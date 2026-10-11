@@ -29,28 +29,40 @@ describe('HUD containers render with an empty store (no sim yet)', () => {
 describe('MetricsView', () => {
   const hud = {
     t: 660, clock: '21:41', phase: 'running' as const, meanWaitS: 192, completionPct: 64.4, missedConnections: 12,
-    waitingNow: 143, ridingNow: 88, jSoFar: 50000,
+    waitingNow: 143, ridingNow: 88, jSoFar: 50000, p95WaitS: 545,
   };
-  it('shows mean wait, completion, missed connections and waiting now', () => {
-    const s = html(<MetricsView hud={hud} pace={null} paceClock={null} />);
+  it('shows mean wait, p95 wait, completion and missed connections (spec §10)', () => {
+    const s = html(<MetricsView hud={hud} />);
     expect(s).toContain('Mean wait');
     expect(s).toContain('3:12');
+    expect(s).toContain('P95 wait');
+    expect(s).toContain('9:05');
     expect(s).toContain('64%');
     expect(s).toContain('Missed');
     expect(s).toContain('>12<');
-    expect(s).toContain('143');
     expect(s).toContain('data-sev="warn"');
+    expect(s).toContain('data-sev="bad"');
     expect(s).not.toContain('vs AI');
   });
-  it('shows the Play pace chip, green when ahead', () => {
-    const s = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 6.24, vsBaselinePaxH: 9.1, ahead: true, t: 660 }} paceClock="21:41" />);
-    expect(s).toContain('vs AI');
-    expect(s).toContain('+6.2');
-    expect(s).toContain('pax-h');
-    expect(s).toContain('data-ahead="true"');
+  it('shows the Play pace chip: green when ahead, red when behind, neutral when even', () => {
+    const ahead = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 6.24, vsBaselinePaxH: 9.1, ahead: true, tone: 'ahead', t: 660 }} paceClock="21:41" />);
+    expect(ahead).toContain('You vs AI at 21:41');
+    expect(ahead).toContain('+6.2');
+    expect(ahead).toContain('pax-h');
+    expect(ahead).toContain('data-tone="ahead"');
+    const behind = html(<MetricsView hud={hud} pace={{ vsAiPaxH: -1.26, vsBaselinePaxH: null, ahead: false, tone: 'behind', t: 660 }} paceClock={null} />);
+    expect(behind).toContain('−1.3');
+    expect(behind).toContain('data-tone="behind"');
+    const even = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 0.01, vsBaselinePaxH: null, ahead: false, tone: 'even', t: 660 }} paceClock={null} />);
+    expect(even).toContain('even');
+    expect(even).not.toContain('pax-h');
+  });
+  it('shows a dash for p95 when the feed does not carry it', () => {
+    const { p95WaitS: _drop, ...rest } = hud;
+    expect(html(<MetricsView hud={rest} />)).toContain('—');
   });
   it('shows placeholders before the first HUD tick', () => {
-    expect(html(<MetricsView hud={null} pace={null} paceClock={null} />)).toContain('—');
+    expect(html(<MetricsView hud={null} />)).toContain('—');
   });
 });
 

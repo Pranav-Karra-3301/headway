@@ -19,7 +19,9 @@ const TOWN = `Town (fixed): 8 stops, 3 bus routes with 6 buses (capacity 40), a 
 - r3 Stadium: stadium_gate → stadium_stn → old_main → downtown (terminal Stadium Gate)
 - Rail loop: stadium → university → central. Each station pairs with a bus stop (stop_stadium_stn, stop_university_stn, stop_central_stn).
 - r1 and r2 share the Central terminal, so moving a bus between them is instant; reassigning to or from r3 deadheads empty along the roads.
-- Scenarios: stadium_exit (about 1,200 fans leave the stadium after the advertised closing; most head to the apartments) and class_change (two pulses of students leaving campus halls).`;
+- Scenarios (training runs 4 seeds of each; J sums all runs):
+  - stadium_exit (clock 21:30): the stadium closing is advertised for t = 600 s (event_in_s counts down to it); about 1,200 fans then leave over roughly 10 minutes, mostly to the apartments, then downtown, campus and Central; plus light background trips.
+  - class_change (clock 11:45): class changes advertised at t = 300 s and t = 1,500 s release two pulses of about 350 students from the campus halls to downtown, the apartments and University station; plus background trips.`;
 
 const CONTRACT = `Output contract: reply with ONE json object and nothing else (no markdown, no code fences, no commentary):
 {

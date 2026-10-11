@@ -1,6 +1,7 @@
 // Owner: T3b. Pure HUD helpers: names (town map first, spec fallbacks), colours, time and number formatting.
 import { TOWN } from '@headway/sim';
 import type { Action, QueuePlace, RouteId, StationId, StopId, TownMap, VehicleState } from '@headway/sim';
+import type { CSSProperties } from 'react';
 import { PALETTES } from '../../render/palettes';
 import type { PaletteId } from '../../render/types';
 
@@ -75,13 +76,13 @@ export function routeColor(id: RouteId, palette: PaletteId): string {
 }
 
 /** CSS custom properties that theme every HUD root from the active palette. */
-export function hudVars(palette: PaletteId): Record<string, string> {
+export function hudVars(palette: PaletteId): CSSProperties {
   const p = PALETTES[palette] ?? PALETTES.a;
   return {
     '--hud-ink': p.ink, '--hud-paper': p.paper, '--hud-accent': p.accent, '--hud-bg': p.bg,
     '--hud-r1': p.route[0] ?? '#1FA99A', '--hud-r2': p.route[1] ?? '#F0A830', '--hud-r3': p.route[2] ?? '#8A6BD8',
     '--hud-train': p.train,
-  };
+  } as CSSProperties;
 }
 
 // ---------- time & numbers ----------

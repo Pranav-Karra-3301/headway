@@ -1,5 +1,6 @@
-// Owner: T3b. Live pace vs the AI (Play): the Web Worker samples champion / baseline jSoFar every 30 sim-s
-// into store.play.pace (T3c); the HUD compares them with the live run's jSoFar at the current sim time.
+// Owner: T3b. Live pace vs the AI (Play): the Web Worker's champion / baseline jSoFar curves arrive on a 30 sim-s grid
+// in store.play.pace (T3c game.ts); the HUD compares them with the live run's jSoFar at the current sim time.
+// `you` in the samples may be NaN (future) and is not used here.
 import type { PaceSample } from '../../state/store';
 
 type Key = 'you' | 'champion' | 'baseline';
@@ -24,18 +25,26 @@ export function jAt(samples: readonly PaceSample[], key: Key, t: number): number
   return a[key] + (b[key] - a[key]) * f;
 }
 
+/** Below this many passenger-hours either way the race reads as even. */
+export const EVEN_PAX_H = 0.05;
+
 export interface PaceModel {
-  /** Passenger-hours the player is ahead of the champion (positive = ahead, J is lower-is-better). */
+  /** Passenger-hours the player is ahead of the champion (positive = ahead; J is lower-is-better). */
   vsAiPaxH: number;
   vsBaselinePaxH: number | null;
   ahead: boolean;
+  tone: 'ahead' | 'behind' | 'even';
   t: number;
 }
 
 export function paceModel(samples: readonly PaceSample[], t: number, youJ: number): PaceModel | null {
   const ai = jAt(samples, 'champion', t);
-  if (ai == null) return null;
+  if (ai == null || !Number.isFinite(ai) || !Number.isFinite(youJ)) return null;
   const base = jAt(samples, 'baseline', t);
   const vsAiPaxH = (ai - youJ) / 3600;
-  return { vsAiPaxH, vsBaselinePaxH: base == null ? null : (base - youJ) / 3600, ahead: vsAiPaxH > 0, t };
+  const tone = Math.abs(vsAiPaxH) < EVEN_PAX_H ? 'even' : vsAiPaxH > 0 ? 'ahead' : 'behind';
+  return {
+    vsAiPaxH, vsBaselinePaxH: base == null || !Number.isFinite(base) ? null : (base - youJ) / 3600,
+    ahead: tone === 'ahead', tone, t,
+  };
 }

@@ -1,4 +1,5 @@
 // Owner: T3b. Scenario name + clock, with a mini run timeline (advertised events, clearing period).
+import type { CSSProperties } from 'react';
 import type { AdvertisedEvent } from '@headway/sim';
 import { useApp } from '../../state/store';
 import { hudVars, localClock, mmss } from './format';
@@ -14,7 +15,9 @@ export interface ScenarioViewProps {
   events: AdvertisedEvent[];
   clockStart: string;
   paused?: boolean;
-  style?: Record<string, string>;
+  /** Overrides the computed status line. */
+  status?: string;
+  style?: CSSProperties;
 }
 
 export function scenarioStatus(p: Pick<ScenarioViewProps, 't' | 'durationS' | 'phase' | 'events' | 'clockStart'>): string {
@@ -46,7 +49,7 @@ export function ScenarioView(p: ScenarioViewProps) {
               style={{ left: `${Math.min(1, e.t / total) * 100}%` }} title={`${e.label} · ${localClock(p.clockStart, e.t)}`} />
           ))}
         </span>
-        <span className="hud-scn-status">{p.paused && p.phase !== 'done' ? 'Paused' : scenarioStatus(p)}</span>
+        <span className="hud-scn-status">{p.status ?? (p.paused && p.phase !== 'done' ? 'Paused' : scenarioStatus(p))}</span>
       </span>
     </div>
   );
@@ -61,7 +64,7 @@ export function ScenarioChip() {
   if (!sc) {
     return (
       <ScenarioView name="Loading town" clock="--:--" t={0} durationS={1} clearingS={0} phase="running" events={[]}
-        clockStart="00:00" paused style={hudVars(palette)} />
+        clockStart="00:00" paused status="Starting the sim" style={hudVars(palette)} />
     );
   }
   const t = hud?.t ?? obs.t;

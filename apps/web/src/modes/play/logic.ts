@@ -106,6 +106,12 @@ export function paceAt(samples: readonly PacePoint[], t: number): number | null 
 
 export const MINUS = '−';
 
+/** Passenger-hours saved against the baseline over time, for you (at your samples) and the AI (at its samples). */
+export function raceSeries(you: readonly PacePoint[], ai: readonly PacePoint[], base: readonly PacePoint[]) {
+  const saved = (p: PacePoint) => ({ t: p.t, v: ((paceAt(base, p.t) ?? p.j) - p.j) / 3600 });
+  return { you: you.map(saved), ai: ai.map(saved) };
+}
+
 /** Positive = you are ahead (fewer passenger-hours spent so far than the AI). */
 export function paceDelta(youJ: number, aiJ: number): { paxH: number; ahead: boolean; even: boolean; text: string } {
   const paxH = (aiJ - youJ) / 3600;

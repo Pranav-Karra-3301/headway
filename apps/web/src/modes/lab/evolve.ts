@@ -16,6 +16,16 @@ function saveToken(t: string | null): void {
   } catch { /* private mode */ }
 }
 
+/** The spec's Free-plan path: no live evolution on this deployment → say rounds run offline (spec §11). */
+export function friendlyEvolveError(message: string): string {
+  if (/token/i.test(message)) return 'The admin token was rejected.';
+  if (/not available|does not provide|HTTP (404|405|501)|not implemented|offline|could not be reached|failed to fetch|networkerror/i.test(message)) {
+    return 'Live evolution is not available on this deployment. Rounds run offline with pnpm evolve --publish and appear here once published.';
+  }
+  if (/409|already running|running round/i.test(message)) return 'A round is already running; try again in a minute.';
+  return message;
+}
+
 export async function runEvolve(token: string): Promise<void> {
   const app = useApp.getState();
   if (app.lab.evolving) return;
@@ -29,7 +39,7 @@ export async function runEvolve(token: string): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     rejected = /token/i.test(message);
     if (rejected) saveToken(null);
-    useApp.getState().appendEvolveEvent({ type: 'error', message });
+    useApp.getState().appendEvolveEvent({ type: 'error', message: friendlyEvolveError(message) });
   } finally {
     useApp.getState().setLab({ evolving: false });
   }

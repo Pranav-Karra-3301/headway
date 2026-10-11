@@ -30,7 +30,7 @@ export interface PolicyDiff {
 
 const ROUTES: RouteId[] = ['r1', 'r2', 'r3'];
 const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station'];
-const RULE_FIELDS: Array<Exclude<RuleField, 'do'> | 'do'> = ['on', 'priority', 'do', 'say'];
+const RULE_FIELDS: RuleField[] = ['on', 'priority', 'do', 'say'];
 
 /** Order-insensitive structural equality for small JSON values. */
 export function sameJson(a: unknown, b: unknown): boolean {

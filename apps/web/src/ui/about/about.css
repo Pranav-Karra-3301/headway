@@ -42,6 +42,9 @@
     0 8px 24px rgba(31, 42, 68, 0.1);
   animation: hwa-in 320ms var(--hwa-drawer) both;
 }
+/* The sheet takes focus programmatically when it opens; it is a container, not a control, so no ring. */
+.hwa .hwa-sheet:focus,
+.hwa .hwa-sheet:focus-visible { outline: none; }
 .hwa[data-closing] .hwa-scrim { animation: hwa-fade-out 160ms ease-out forwards; }
 .hwa[data-closing] .hwa-sheet { animation: hwa-out 160ms ease-out forwards; }
 
@@ -55,7 +58,7 @@
   box-shadow: 0 1px 0 color-mix(in srgb, var(--hwa-ink) 7%, transparent);
 }
 .hwa-eyebrow {
-  margin: 0 0 4px;
+  margin: 2px 0 10px;
   font-family: var(--hwa-display);
   font-size: 13px;
   letter-spacing: 0.08em;
@@ -66,7 +69,7 @@
   margin: 0;
   font-family: var(--hwa-display);
   font-weight: 400;
-  font-size: 34px;
+  font-size: 32px;
   line-height: 1;
   color: var(--hwa-ink);
 }
@@ -101,7 +104,9 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--hwa-ink) 20%, transparent) transparent;
-  padding: 18px 28px 28px;
+  padding: 18px 28px 40px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
   font-size: 15px;
   line-height: 1.6;
   color: var(--hwa-text);

@@ -1,5 +1,5 @@
 // Owner: T4. Pure helpers over RunResult[]: split scores, worst gaps, finding keys.
-import type { FailureFinding, Metrics, QueuePlace, RunResult, SplitScore } from '@headway/sim';
+import type { FailureFinding, Metrics, QueuePlace, RouteId, RunResult, SplitScore, StopId } from '@headway/sim';
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
@@ -38,11 +38,22 @@ export function aggregateResults(results: RunResult[]): SplitScore {
   };
 }
 
+/** The worst per-stop maximum service gap over all runs, stops and routes, or null when no gap was recorded. */
+export function worstGap(results: RunResult[]): { gapS: number; stopId: StopId; routeId: RouteId } | null {
+  let worst: { gapS: number; stopId: StopId; routeId: RouteId } | null = null;
+  for (const r of results) {
+    for (const s of r.stops) {
+      for (const [routeId, g] of Object.entries(s.maxGapS)) {
+        if (typeof g === 'number' && g > (worst?.gapS ?? -1)) worst = { gapS: g, stopId: s.id, routeId: routeId as RouteId };
+      }
+    }
+  }
+  return worst;
+}
+
 /** Worst per-stop maximum service gap over all runs, stops and routes (seconds). */
 export function worstGapS(results: RunResult[]): number {
-  let worst = 0;
-  for (const r of results) for (const s of r.stops) for (const g of Object.values(s.maxGapS)) if (typeof g === 'number' && g > worst) worst = g;
-  return worst;
+  return worstGap(results)?.gapS ?? 0;
 }
 
 export function placeKey(p: QueuePlace): string {
