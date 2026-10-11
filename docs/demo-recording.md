@@ -24,3 +24,12 @@ Live: **https://headway.pranavkarra.me** (fallback https://headway.pranavkarra00
 - 16 evolution rounds, 48 proposals from DeepSeek V4.1 Flash on Luminal; only 2 survived the tests — the loop rejects anything that doesn't measurably help.
 - The language models are never retrained — the dispatch rulebook evolves. Jev (TypeSafe) can decide station holds in ~0.2 s.
 - Deterministic sim (~10 ms per scenario) — the same result in your browser and on the server, so leaderboard scores are verified. Three.js + Cloudflare Workers + D1, built in one day.
+
+## 90-second script (say this)
+- **0:00–0:10 Title card** (`/?intro`, then click Watch the AI): "This is Headway — a little college town whose bus dispatcher is designed by AI. You can watch it, play against it, and see how it learned."
+- **0:10–0:25 The town** (pan campus → stadium → lake; moon for dusk): "Everything here is simulated: every person has a trip, buses run three routes, and a regional train runs through the ridge and across the bay."
+- **0:25–0:45 Watch** (click a bus; switch Who's dispatching? Baseline → AI champion): "When you click a bus, you see the exact rule it just followed — no black box. And on the same crowd, the AI's rules get people home faster than the baseline."
+- **0:45–1:10 Play** (Start → click a bus → Move a bus here on Stadium → click the train to wait → Finish): "Now I'm the dispatcher. The stadium is about to empty, so I move a bus to the stadium route and hold the train for transfers. Same crowd, same tools as the AI — and here's my score against it."
+- **1:10–1:25 Lab** (−6% headline, g0 → g2): "Between games, DeepSeek designers on Luminal propose rule changes. The simulator tests each one and keeps only what holds up on crowds it's never seen: six percent less total travel time, beating the hand-written plan."
+- **1:25–1:30 Close**: "Headway — headway.pranavkarra.me."
+Tip: if a crowd's comparison bars don't favour the AI, click New crowd (it wins on average, not on every crowd).
