@@ -483,7 +483,7 @@ T2.2 composes: base `SCENERY` (Task M) only where no district provides items (di
 | Track | Owns | Delivers |
 |---|---|---|
 | K0 pipeline (first) | `src/render/assets/kenney/**` (seam signatures fixed), plus the `await preloadKenney` lines in `src/render/assets/dev.ts`, `src/render/districts/dev.ts`, `src/render/world/dev.ts` | GLTFLoader cache, material-name → role remap for the nature kit, harmonised colormaps for the other kits, clay tweak, per-kit `KENNEY_SCALE` measured from the manifest, `KENNEY_CARS` / `KENNEY_BOATS` lists, `/assets-dev.html?family=kenney` preview; tests for the remap/scale tables |
-| K1 vegetation (after K0) | `src/render/assets/families/kenney.ts` (vegetation part) | upgrade `veg.oak`, `veg.maple`, `veg.birch`, `veg.poplar`, `veg.cherry`, `veg.bush`, `veg.hedge`, `veg.flowerbed`, `veg.planter` with Kenney models: per placement pick among 2–4 fitting models (`k.rand()`), scale jitter 0.85–1.2, random yaw, gentle colour variation, `_fall` models for palette c; **keep A5's `veg.pine` unchanged**; keep `sway`. PUBLISH "assets-vegetation-v2" |
+| K1 vegetation (after K0) | `src/render/assets/families/kenney.ts` (vegetation part) | upgrade `veg.oak`, `veg.maple`, `veg.birch`, `veg.poplar`, `veg.cherry`, `veg.bush`, `veg.hedge`, `veg.flowerbed`, `veg.planter` with Kenney models — **and `veg.pine` too (Kenney pines; v7 Kenney-first policy)**: per placement pick among 2–4 fitting models (`k.rand()`), scale jitter 0.85–1.2, random yaw, gentle colour variation, `_fall` models for palette c; keep `sway`. PUBLISH "assets-vegetation-v2" |
 | K2 vehicles + boats (after K0) | `src/render/assets/families/kenney-vehicles.ts` (imported by `families/kenney.ts`) | `kn.car.*` and `kn.boat.*` kinds with catalog footprints (append entries to `catalog.ts`), car colour variety harmonised to the palette, PUBLISH "assets-kenney-vehicles" |
 | K3 buildings + props (after K0) | `src/render/assets/families/kenney-buildings.ts` (imported by `families/kenney.ts`) | `kn.house.*` (suburban, roofs recoloured to palette roles), low-rise `kn.shop.*` (≤ 3 storeys only), a few `kn.works.*` industrial pieces for an outskirts works yard, `kn.prop.*` street/survival props; catalog entries appended; PUBLISH "assets-kenney-buildings" |
 
@@ -523,3 +523,23 @@ T2.2 composes: base `SCENERY` (Task M) only where no district provides items (di
 | G5 integration (after G1–G4) | `src/render/greater/index.ts`, `src/render/greater/dev.ts`, `apps/web/greater-dev.html` | `createGreaterTownLayer(map)`, a preview of the full region with the town board, a recommendation for `world/layout.ts` margins (terrain and water start beyond the ring); PUBLISH "greater-town-v1" (full region) and "greater-town-v1-close" |
 
 Kenney models load through `src/render/assets/kenney` (K0): `await preloadKenney([...])` before building; use the road tile names from `apps/web/src/render/assets/kenney/manifest.json` (`city-kit-roads`). If K0 is not finished when you start, load the GLBs with three's `GLTFLoader` behind a tiny local helper and switch to K0's API when it exists.
+
+
+---
+
+## v7 Kenney-first policy (user: "assume the Kenney kits are better — don't keep our own models unless needed; no sunk cost")
+
+**Default: use the Kenney model wherever an equivalent exists**; keep ours only where Kenney has none or gameplay/identity needs it. Applies to every track that has not finished and to the grand integration / art loop.
+
+| Use Kenney (override our kinds via the registry, falling back until preloaded) | Keep ours (no Kenney equivalent, or gameplay/identity) |
+|---|---|
+| all `veg.*` incl. pine (nature-kit trees/pines/bushes/flowers/plants), rocks, logs | buses (Kenney has no city bus) |
+| `st.lamp` → `city-kit-roads` light-curved/light-square; `st.trafficLight` → traffic-light*; signs, power poles + wires, construction props, dumpsters | bus stops (route chips + queue area are gameplay) |
+| `st.fence` / `veg.hedge` → suburban/nature fences and hedges where they read better | stations + platforms, people (gameplay readability) |
+| cars, trucks, emergency vehicles, boats (`car-kit`, `watercraft-pack`) | campus halls, library, chapel, Old Main clock tower, stadium (State College identity) |
+| `res.house`, `res.townhouses` → `city-kit-suburban` houses (roofs recoloured to palette); `res.tower`/`res.garden` → `city-kit-commercial` mid-rises if they read as apartments | red-brick downtown rows (`dt.*`) unless a Kenney low-rise reads as college-town brick |
+| outer-town buildings: suburban, low-rise commercial, industrial | the rail track along the curved loop (procedural) |
+| road tiles, bridges, pillars, highway signs | |
+| **train:** K2 evaluates `train-kit` passenger sets; if a 2-car unit with clear front/rear looks better, export `KENNEY_TRAIN = { front, rear }` and T2.2/the integration uses it | |
+
+Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (buildings, street furniture overrides: `st.*`, `res.house`, `res.townhouses`, optional `res.tower`/`res.garden`, props). The registry's family order makes Kenney overrides win. Core-town streets: if `TOWN.roads` centrelines sit on the 4 u greater-town grid, G5 / the grand integration renders them with the same Kenney road tiles (S1 then keeps only sidewalks where tiles lack them, plazas, footpaths, lawns and parking).
