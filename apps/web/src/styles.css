@@ -1,0 +1,32 @@
+@font-face {
+  font-family: "Gumball Rounded";
+  src: local("GumballRounded"), local("Gumball Rounded"), url("/fonts/GumballRounded.ttf") format("truetype");
+  font-display: block;
+}
+
+:root {
+  --bg: #ddefe5;
+  --ink: #1f3a33;
+  --font-display: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif;
+  --font-ui: "Avenir Next Rounded Std", "Nunito", ui-rounded, system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}

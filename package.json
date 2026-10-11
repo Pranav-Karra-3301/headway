@@ -1,0 +1,24 @@
+{
+  "name": "headway",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @headway/web dev",
+    "build": "pnpm --filter @headway/web build",
+    "test": "vitest run",
+    "typecheck": "pnpm -r typecheck",
+    "evolve": "tsx packages/evolve/src/cli/evolve.ts",
+    "sim:run": "tsx packages/evolve/src/cli/sim-run.ts",
+    "deploy": "pnpm build && pnpm --filter @headway/worker run deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

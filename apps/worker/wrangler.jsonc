@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "headway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "account_id": "ed61a2220d42b5b8a61059cce9af9980",
+  "observability": {
+    "enabled": true
+  },
+  "limits": {
+    "cpu_ms": 60000
+  },
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "SIM_VERSION": "1",
+    "LUMINAL_BASE_URL": "https://flash.luminal.cloud/v1",
+    "LUMINAL_MODEL": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+    "JEV_MODEL": "typesafe/jev-1.13"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "headway",
+      "database_id": "937d486e-7771-4338-a7fd-536e0faa09dc",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
