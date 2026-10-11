@@ -7,3 +7,5 @@ dist/
 .superpowers/
 *.log
 .DS_Store
+apps/web/public/fonts/*.ttf
+apps/web/public/fonts/*.otf
