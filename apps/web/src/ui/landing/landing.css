@@ -397,3 +397,10 @@
 .hwl-cta { color: #fff !important; }
 .hwl-foot, .hwl-claims, .hwl-q { color: rgba(231, 235, 245, 0.75) !important; }
 .hwl .hw-step__text { color: #eef1f8 !important; }
+.hwl .hw-step {
+  background: rgba(18, 26, 50, 0.58) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22) !important; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.hwl .hw-step__n { color: rgba(231, 235, 245, 0.6) !important; }
+.hwl .hw-step__text { color: #f3f1ea !important; font-weight: 500; }
+.hwl-card { min-height: 0 !important; gap: 14px !important; }
