@@ -31,7 +31,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
   a: {
     name: 'Wooden Toy',
     bg: '#DDEFE5', duskBg: '#2F3A5E',
-    board: '#A8D8B9', boardEdge: '#7FBF98', lawn: '#8FCB9B', road: '#F4EBDD', mark: '#FFFFFF', curb: '#E6DCCB',
+    board: '#A8D8B9', boardEdge: '#7FBF98', lawn: '#8FCB9B', road: '#515566', mark: '#FFFFFF', curb: '#B9BDC9',
     ballast: '#D9CBB3', ties: '#B08B63', rail: '#7E848E',
     wall: ['#F6EEDC', '#F1E4C8', '#FBF6EA'], brick: ['#D98A6C', '#C97A5E'], roof: ['#E9785A', '#3FA796', '#F2C14E'],
     window: '#2C3A55', windowGlow: '#FFD27A', frame: '#FFFFFF', door: '#9B6B43', trim: '#E6D8BE',
@@ -50,7 +50,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
   b: {
     name: 'Miniature Railway',
     bg: '#F3ECDD', duskBg: '#30354A',
-    board: '#EADFC8', boardEdge: '#D6C6A6', lawn: '#B9C99A', road: '#D3CABA', mark: '#F7F2E8', curb: '#C7BCA8',
+    board: '#EADFC8', boardEdge: '#D6C6A6', lawn: '#B9C99A', road: '#55575E', mark: '#F7F2E8', curb: '#BDB6A8',
     ballast: '#C9BBA2', ties: '#8C6B4E', rail: '#6F7279',
     wall: ['#C8694C', '#B5553C', '#E3CBA8'], brick: ['#A9503A', '#93452F'], roof: ['#5E6B73', '#8F3F2C', '#4A4F55'],
     window: '#2A2F3A', windowGlow: '#FFD68A', frame: '#F5EFE3', door: '#5A3A2A', trim: '#EADCC4',
@@ -69,7 +69,7 @@ export const PALETTES: Record<PaletteId, Palette> = {
   c: {
     name: 'State College Autumn',
     bg: '#EEF0F4', duskBg: '#262E48',
-    board: '#E7E2CF', boardEdge: '#CFC6AE', lawn: '#A9C48A', road: '#DAD7D0', mark: '#FFFFFF', curb: '#C9C5BC',
+    board: '#E7E2CF', boardEdge: '#CFC6AE', lawn: '#A9C48A', road: '#4F535E', mark: '#FFFFFF', curb: '#C2C4C9',
     ballast: '#CBC4B4', ties: '#7B5B43', rail: '#6B7280',
     wall: ['#A8483A', '#EADFC9', '#F5F2EA'], brick: ['#A8483A', '#8F3C30'], roof: ['#3E4B5C', '#1E3A6E', '#5B6573'],
     window: '#1F2A3C', windowGlow: '#FFD889', frame: '#FFFFFF', door: '#6B4A35', trim: '#F5F2EA',

@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { KitContext, RoleColors } from './types';
 
 const BASE_A: Record<string, string | string[]> = {
-  board: '#A8D8B9', lawn: '#8FCB9B', road: '#F4EBDD', mark: '#FFFFFF',
+  board: '#A8D8B9', lawn: '#8FCB9B', road: '#515566', curb: '#B9BDC9', mark: '#FFFFFF',
   wall: ['#F6EEDC', '#F1E4C8', '#FBF6EA'], brick: ['#C8694C', '#B5553C', '#D27A5A'], stone: '#E6DCC6',
   roof: ['#E9785A', '#3FA796', '#F2C14E'], window: '#2C3A55', glass: '#3B5878', door: '#9B6B43', trim: '#FFFFFF',
   awning: ['#E9785A', '#3FA796', '#F2C14E', '#5A8BD6'], metal: '#7E848E', dark: '#3D4250',

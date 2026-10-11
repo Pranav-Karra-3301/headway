@@ -51,7 +51,7 @@ if (!TOWN.roads) {
   const b = TOWN.bounds;
   const board = new THREE.Mesh(new THREE.BoxGeometry(b.maxX - b.minX, 0.6, b.maxZ - b.minZ), new THREE.MeshStandardMaterial({ color: '#A8D8B9', roughness: 0.9 }));
   board.position.set((b.minX + b.maxX) / 2, -0.3, (b.minZ + b.maxZ) / 2); board.receiveShadow = true; scene.add(board);
-  for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#F4EBDD', 0.02);
+  for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#515566', 0.02);
   strip(TOWN.rail.loop.points, true, 1.6, '#C9B79C', 0.03);
   const registry = createRegistry();
   await preloadKenney(kenneyIdsFor(DISTRICTS.flatMap((d) => d.items.map((it) => it.kind)))); // Kenney-backed builders need their models first

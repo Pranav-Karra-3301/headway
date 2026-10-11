@@ -30,7 +30,7 @@ if (!TOWN.roads) {
       seg.position.set((a.x + c.x) / 2, y, (a.z + c.z) / 2); seg.rotation.y = -Math.atan2(c.z - a.z, c.x - a.x); seg.receiveShadow = true; scene.add(seg);
     }
   };
-  for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#F4EBDD', 0.02);
+  for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#515566', 0.02);
   strip(TOWN.rail.loop.points, true, 1.6, '#C9B79C', 0.03);
   const registry = createRegistry();
   await preloadKenney(kenneyIdsFor(ds.flatMap((d) => d.items.map((it) => it.kind)))); // Kenney-backed builders need their models first

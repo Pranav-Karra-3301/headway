@@ -16,7 +16,7 @@ const turn = q.get('rot') === '1' ? Math.PI : 0;
 const registry = createRegistry();
 const kit = createBasicKit(registry.roles, palette, Number(q.get('seed') ?? 7));
 const GROUND = [
-  { board: '#A8D8B9', road: '#F4EBDD', walk: '#E6DCCB', mark: '#FFFFFF' },
+  { board: '#A8D8B9', road: '#515566', walk: '#B9BDC9', mark: '#FFFFFF' },
   { board: '#EADFC8', road: '#D3CABA', walk: '#C7BCA8', mark: '#F7F2E8' },
   { board: '#E7E2CF', road: '#DAD7D0', walk: '#C9C5BC', mark: '#FFFFFF' },
 ][palette]!;
