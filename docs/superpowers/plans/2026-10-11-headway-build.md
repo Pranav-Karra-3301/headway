@@ -572,3 +572,14 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 **Typography & UX:** Gumball Rounded only for the wordmark, headings and titles; **General Sans** (self-hosted `/fonts/GeneralSans-*.otf`) for all other UI text, labels, chips and numbers. Explainers are short and visual (icons, small diagrams, one-line captions), never walls of text; follow good UX practice (clear hierarchy, generous spacing, progressive disclosure).
 
 **Version control:** the coordinator commits after every completed track; agents still never run git.
+
+---
+
+## v10 (18:15) sim tuning landed — read before touching rail, camera, Jev or copy
+
+- `simVersion` is now **'2'** (sim + Worker `SIM_VERSION`); results cached under '1' are stale.
+- **Rail:** regional line, 234.5 u, travel order Stadium → Central → University, train speed 1.2 u/s, advertised headway 330 s. It leaves the board: `RAIL_SPANS` (packages/sim) gives the **ridge tunnel (dist 169.0–216.3)** and the **bay bridge (27.8–54.7)** — world agents place the tunnel portals and bridge exactly there; the renderer hides the train inside the tunnel span.
+- **Camera fit** must frame the transit network *inside the board* (stops, stations, on-board rail), not the off-board rail spans.
+- **Transfers now matter:** g0 stadium_exit ≈ 9 % of riders change between train and bus, 63 missed connections per run at Central/University; REF beats g0 by 5.1 %; a sensible human beats g0 by ~7 %. Central is the r1/r2 terminal, so "hold for the train at Central" is a human move; **Jev decides holds at University (r1) and Stadium (r3)**.
+- **Copy:** the stadium crowd is ~1,030 fans; trains every 5½ min. Read numbers from `SCENARIOS`/`TOWN`, never hard-code.
+- Known web test breakages from the new rail (owners fix in their tracks or the integration fixes): traffic level-crossing count, camera fit, terrain tunnel/triangle bound, water plan (a beach lamp sits on the track).
