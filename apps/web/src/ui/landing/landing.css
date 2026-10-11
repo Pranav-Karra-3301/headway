@@ -368,3 +368,32 @@
 .hwl-steps .hw-step { background: color-mix(in srgb, var(--hwl-paper) 88%, transparent); box-shadow: 0 6px 18px rgba(31, 42, 68, 0.08); }
 .hwl-steps .hw-step__text { color: var(--hwl-ink); }
 .hwl-cards { margin-top: 28px; }
+
+/* v1.1 landing (user, 19:40): Gumball for the HEADWAY title only; darker glass over the live town; one cobalt accent. */
+.hwl { --hwl-title: var(--font-title, "Gumball Rounded", system-ui, sans-serif); color: #f3f1ea; }
+.hwl-scrim {
+  background: linear-gradient(180deg, rgba(14, 22, 42, 0.72) 0%, rgba(14, 22, 42, 0.4) 46%, rgba(14, 22, 42, 0.8) 100%) !important;
+  -webkit-backdrop-filter: blur(1.5px) saturate(1.1) !important;
+  backdrop-filter: blur(1.5px) saturate(1.1) !important;
+}
+.hwl-wordmark { font-family: var(--hwl-title) !important; color: #fff8ec !important; text-shadow: 0 6px 28px rgba(0, 0, 0, 0.35); }
+.hwl-pitch { color: rgba(243, 241, 234, 0.9) !important; }
+.hwl-eyebrow, .hwl-champion {
+  background: rgba(255, 255, 255, 0.1) !important; color: #e7ebf5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14); font-family: var(--hwl-body) !important;
+}
+.hwl-champion b { color: #fff !important; }
+.hwl-card {
+  background: rgba(18, 26, 50, 0.62) !important; border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #eef1f8 !important; box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28) !important;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.hwl-card:hover { background: rgba(26, 38, 72, 0.76) !important; border-color: color-mix(in srgb, var(--tone, #2e5bda) 70%, transparent) !important; }
+.hwl-card-title, .hwl-kicker, .hwl-kbd, .hwl-cta, .hwl-foot, .hwl-about, .hwl-eyebrow { font-family: var(--hwl-body) !important; }
+.hwl-card-title { color: #fff !important; font-weight: 600 !important; }
+.hwl-card-body { color: rgba(238, 241, 248, 0.78) !important; }
+.hwl-kicker { color: color-mix(in srgb, var(--tone, #2e5bda) 50%, white) !important; font-weight: 600 !important; }
+.hwl-kbd { background: rgba(255, 255, 255, 0.12) !important; color: #dce2f0 !important; }
+.hwl-cta { color: #fff !important; }
+.hwl-foot, .hwl-claims, .hwl-q { color: rgba(231, 235, 245, 0.75) !important; }
+.hwl .hw-step__text { color: #eef1f8 !important; }
