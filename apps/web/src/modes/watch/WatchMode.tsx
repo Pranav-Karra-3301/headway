@@ -9,7 +9,6 @@ import type { WatchController } from '../../state/store';
 import { safeClock } from '../../state/hud';
 import { showcaseInstances } from '../../sim/session';
 import { NextIcon } from '../../ui/shell/icons';
-import { Segmented } from '../../ui/shell/Segmented';
 import { cachedComparison, compareCacheKey, compareCrowd } from './compare';
 import type { CompareRow } from './compare';
 import './watch.css';
@@ -66,11 +65,20 @@ const LeaveIcon = () => <svg {...icon}><circle cx="10" cy="5" r="2.2" /><path d=
 const HomeIcon = () => <svg {...icon}><path d="M4 11l8-7 8 7M6.5 9.5V20h11V9.5M10 20v-5h4v5" /></svg>;
 
 const CONTROLLERS: WatchController[] = ['g0', 'ref', 'champion'];
-const METRICS: Array<{ label: string; icon: ReactNode; get(r: CompareRow): number; fmt(v: number): string; hint: string }> = [
-  { label: 'Average wait', icon: <ClockIcon />, get: (r) => r.waitS, fmt: (v) => `${(v / 60).toFixed(1)} min`, hint: 'lower is better' },
-  { label: 'Gave up', icon: <LeaveIcon />, get: (r) => r.gaveUp, fmt: (v) => String(Math.round(v)), hint: 'riders who walked away — lower is better' },
-  { label: 'Got home', icon: <HomeIcon />, get: (r) => r.homePct, fmt: (v) => `${Math.round(v)}%`, hint: 'higher is better' },
+type Metric = { label: string; icon: ReactNode; get(r: CompareRow): number; fmt(v: number): [string, string]; hint: string; best: 'low' | 'high'; badge: string };
+const METRICS: Metric[] = [
+  { label: 'Avg wait', icon: <ClockIcon />, get: (r) => r.waitS, fmt: (v) => [(v / 60).toFixed(1), 'min'], hint: 'lower is better', best: 'low', badge: 'Fastest' },
+  { label: 'Gave up', icon: <LeaveIcon />, get: (r) => r.gaveUp, fmt: (v) => [String(Math.round(v)), ''], hint: 'riders who walked away, lower is better', best: 'low', badge: 'Fewest' },
+  { label: 'Got home', icon: <HomeIcon />, get: (r) => r.homePct, fmt: (v) => [String(Math.round(v)), '%'], hint: 'higher is better', best: 'high', badge: 'Most' },
 ];
+
+/** Friendly crowd name: never show a seed. Showcase crowds cycle Crowd 1..3; the Play seed is tonight's game crowd. */
+function crowdName(scenario: ScenarioInstance, showcase: ScenarioInstance[], playSeed: number): string {
+  const i = showcase.findIndex((c) => c.scenarioId === scenario.scenarioId && c.seed === scenario.seed);
+  if (i >= 0) return `Crowd ${(i % 3) + 1}`;
+  if (playSeed && scenario.seed === playSeed) return 'Tonight\u2019s game crowd';
+  return 'Crowd';
+}
 
 /** All three controllers on this crowd (cached per crowd; computed after paint so the panel never blocks). */
 function useComparison(scenario: ScenarioInstance | undefined, champion: Policy | null): CompareRow[] | null | undefined {
@@ -99,6 +107,7 @@ export function WatchMode() {
   const latest = useApp((s) => s.decisions[0]);
   const setController = useApp((s) => s.setWatchController);
   const nextShowcase = useApp((s) => s.nextShowcase);
+  const playSeed = useApp((s) => s.play.seed);
   const setMode = useApp((s) => s.setMode);
 
   const crowds = showcaseInstances();
@@ -112,6 +121,7 @@ export function WatchMode() {
     { value: 'champion', label: 'AI champion', title: champPolicy?.meta.summary ?? 'The best rules the AI has evolved so far' },
   ];
   const name = (k: WatchController) => options.find((o) => o.value === k)!.label;
+  const runKey = scenario ? compareCacheKey(scenario, champPolicy) : '';
 
   return (
     <section className="hw-card hw-watch hw-watch--cmp" aria-label="Watch">
@@ -119,7 +129,7 @@ export function WatchMode() {
         <h2 className="hw-watch__h">
           Who&rsquo;s dispatching?
           <span className="hw-watch__crowd">
-            {scenario ? `${scenarioName(scenario.scenarioId, scenarioLabel)} · crowd ${scenario.seed}` : 'Loading the town…'}
+            {scenario ? `${scenarioName(scenario.scenarioId, scenarioLabel)} · ${crowdName(scenario, crowds, playSeed)}` : 'Loading the town…'}
           </span>
         </h2>
         {override && <span className="hw-watch__pill" title={override.policy.meta.summary}>{override.label}</span>}
@@ -136,33 +146,49 @@ export function WatchMode() {
         </button>
       </div>
 
-      <div className="hw-cmp">
-        <span />
-        <Segmented label="Who's dispatching?" value={selected} options={options} onChange={setController} />
+      <div className="hw-cmp" data-sel={selected ?? ''}>
+        <span className="hw-cmp__corner">Same crowd</span>
+        {options.map((o) => (
+          <button
+            key={o.value} type="button" className="hw-cmp__who" data-k={o.value} data-on={o.value === selected}
+            aria-pressed={o.value === selected} title={o.title} onClick={() => setController(o.value)}
+          >
+            <i aria-hidden="true" />{o.label}
+          </button>
+        ))}
         {rows === null ? null : rows === undefined ? (
           <span className="hw-cmp__pending" aria-hidden="true" />
         ) : (
-          METRICS.map((m) => {
+          METRICS.map((m, mi) => {
             const vals = CONTROLLERS.map((k) => m.get(rows.find((r) => r.key === k)!));
             const max = Math.max(...vals, 1e-9);
+            const top = m.best === 'low' ? Math.min(...vals) : Math.max(...vals);
+            const tie = vals.every((v) => v === top);
+            const last = mi === METRICS.length - 1;
             return [
               <span key={`${m.label}:l`} className="hw-cmp__label" title={m.hint}>{m.icon}{m.label}</span>,
-              <div key={`${m.label}:c`} className="hw-cmp__cells">
-                {CONTROLLERS.map((k, i) => (
+              ...CONTROLLERS.map((k, i) => {
+                const [num, unit] = m.fmt(vals[i]!);
+                const win = !tie && vals[i] === top;
+                return (
                   <div
-                    key={k} className="hw-cmp__cell" data-on={k === selected}
-                    title={`${name(k)}: ${m.fmt(vals[i]!)} (${m.hint})`}
+                    key={`${m.label}:${k}`} className="hw-cmp__cell" data-k={k} data-on={k === selected} data-last={last}
+                    title={`${name(k)}: ${num}${unit ? ` ${unit}` : ''} (${m.hint})`}
                     onClick={() => setController(k)}
                   >
-                    <span className="hw-cmp__track"><span className="hw-cmp__fill" style={{ display: 'block', width: `${Math.max(4, (100 * vals[i]!) / max)}%` }} /></span>
-                    <span className="hw-cmp__val">{m.fmt(vals[i]!)}</span>
+                    <span className="hw-cmp__val">
+                      <b>{num}</b>{unit && <small>{unit}</small>}
+                      {win && <em key={runKey} className="hw-cmp__badge">{m.badge}</em>}
+                    </span>
+                    <span className="hw-cmp__track">
+                      <span key={runKey} className="hw-cmp__fill" style={{ width: `${Math.max(6, (100 * vals[i]!) / max)}%`, animationDelay: `${mi * 70 + i * 40}ms` }} />
+                    </span>
                   </div>
-                ))}
-              </div>,
+                );
+              }),
             ];
           })
         )}
-        {rows && <span className="hw-cmp__caption">Same crowd · different dispatcher</span>}
       </div>
 
       <Ticker rec={latest} clockStart={clockStart} preview={simKind === 'stub'} />

@@ -56,7 +56,7 @@ describe('LabView (server render with fixtures)', () => {
     setup({ focusRoundId: champRound.id });
     const t = render();
     for (const l of ['Spacing fix', 'Fleet move', 'Train link']) expect(t).toContain(l);
-    expect(t).toContain('Promoted');
+    expect(t).toContain('Kept → g4');
   });
 
   it('shows the rules of g0 when the baseline is picked', () => {

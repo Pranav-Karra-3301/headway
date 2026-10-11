@@ -1005,3 +1005,66 @@
 }
 .lab-path__chip .lab-genid { padding: 1px 8px; border-radius: 8px; font-size: 13px; line-height: 1.3; }
 .lab-path__chip { min-width: 200px; }
+
+/* ---- Chart v3: passenger-hours, stepped champion line, kept/rejected round marks ---- */
+.lab-chart__axis { fill: var(--lab-ink-3); font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em; }
+.lab-chart__dash { stroke-width: 1.6; stroke-dasharray: 6 5; }
+.lab-chart__dash--g0 { stroke: var(--lab-ink-3); }
+.lab-chart__dash--ref { stroke: var(--lab-ref); }
+.lab-chart__lbl { font-size: 12px; font-weight: 600; }
+.lab-chart__lbl--g0 { fill: var(--lab-ink-2); }
+.lab-chart__lbl--ref { fill: var(--lab-ref); }
+.lab-chart__lbl--now { fill: var(--lab-accent); font-weight: 700; }
+.lab-chart__step {
+  fill: none; stroke: var(--lab-accent); stroke-width: 4.5; stroke-linejoin: round; stroke-linecap: round;
+}
+.lab-chart__drop {
+  fill: color-mix(in srgb, var(--lab-good) 82%, #000); font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums; paint-order: stroke; stroke: var(--lab-card); stroke-width: 4px; stroke-linejoin: round;
+}
+.lab-chart__pt .lab-chart__dot { fill: var(--lab-accent); stroke: var(--lab-card); stroke-width: 2.5; }
+.lab-chart__pt:not([data-promoted]) .lab-chart__dot { fill: var(--lab-card); stroke: var(--lab-accent); stroke-width: 2.2; }
+.lab-chart__pt[data-promoted] .lab-chart__dot { fill: var(--lab-accent); }
+.lab-tl__id { font-size: 12.5px; font-weight: 600; }
+.lab-tl[data-kind="rejected"] .lab-tl__id::after { content: none; }
+.lab-timeline { height: 30px; }
+.lab-legend__step { width: 20px; height: 4px; border-radius: 2px; background: var(--lab-accent); }
+.lab-legend__kept, .lab-legend__rej { width: 10px; height: 10px; border-radius: 50%; }
+.lab-legend__kept { background: var(--lab-accent); }
+.lab-legend__rej { box-shadow: inset 0 0 0 2px var(--lab-accent); background: var(--lab-card); }
+
+/* ---- Proposal rows: focus chip · what changed · result · verdict · replay ---- */
+.lab-prows { display: flex; flex-direction: column; gap: 6px; }
+.lab-prow {
+  position: relative; display: grid; grid-template-columns: 96px minmax(0, 1fr) 76px 190px 30px; align-items: center; gap: 12px;
+  padding: 9px 10px 9px 12px; border-radius: 12px; background: var(--lab-card);
+  box-shadow: 0 0 0 1px var(--lab-line); animation: lab-card-in 260ms calc(var(--i, 0) * 50ms) var(--lab-ease) both;
+}
+.lab-prow[data-outcome="promoted"] { box-shadow: 0 0 0 2px color-mix(in srgb, var(--lab-good) 55%, transparent); }
+.lab-prow[data-focused] { box-shadow: 0 0 0 2px var(--lab-ink); }
+.lab-prow__hit { position: absolute; inset: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .lab-prow__hit:hover { background: var(--lab-wash); } }
+.lab-prow__chip {
+  justify-self: start; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  background: color-mix(in srgb, var(--em, var(--lab-ink-3)) 18%, var(--lab-card)); color: color-mix(in srgb, var(--em, var(--lab-ink)) 70%, #000);
+  pointer-events: none;
+}
+.lab-prow__what { font-size: 13.5px; color: var(--lab-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.lab-prow__delta { justify-self: end; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; pointer-events: none; }
+.lab-prow__delta[data-tone="good"] { color: color-mix(in srgb, var(--lab-good) 85%, #000); }
+.lab-prow__delta[data-tone="bad"] { color: var(--lab-bad); }
+.lab-prow__delta[data-tone="flat"] { color: var(--lab-ink-4); }
+.lab-prow__verdict { font-size: 12.5px; color: var(--lab-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.lab-prow__verdict[data-outcome="promoted"] { color: color-mix(in srgb, var(--lab-good) 82%, #000); font-weight: 700; }
+.lab-prow__play {
+  position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--lab-wash); color: var(--lab-ink-2); cursor: pointer; transition: transform 140ms var(--lab-ease), background-color 150ms ease;
+}
+.lab-prow__play:active { transform: scale(0.94); }
+@media (hover: hover) and (pointer: fine) { .lab-prow__play:hover { background: var(--lab-accent); color: #fff; } }
+.lab-rt__best { font-size: 15px; font-weight: 700; }
+.lab-rt__best[data-tone="bad"] { color: var(--lab-bad); }
+@media (max-width: 760px) {
+  .lab-prow { grid-template-columns: auto minmax(0, 1fr) auto 30px; }
+  .lab-prow__verdict { grid-column: 2 / 4; grid-row: 2; }
+}

@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 import type { Generation } from '@headway/sim';
 import { emphasisLabel, fmtSignedPct, plainChange } from '../format';
 import { pctVs } from '../model';
-import { IconArrow, IconCheck, IconPlay, IconSpark } from './icons';
+import { IconArrow, IconCheck, IconPlay, IconPen } from './icons';
 
 const tone = (x: number | null) => (x === null || Math.abs(x) < 0.05 ? 'flat' : x < 0 ? 'good' : 'bad');
 
@@ -63,7 +63,7 @@ export function ChampionCard({ gen, gens, refPct, selectedId, onPick, onReplay }
       </ol>
 
       <p className="lab-how" aria-label="How evolution works">
-        <span><IconSpark /> AI designers propose</span><i aria-hidden="true">→</i>
+        <span><IconPen /> AI designers propose</span><i aria-hidden="true">→</i>
         <span><IconBus /> simulator tests</span><i aria-hidden="true">→</i>
         <span><IconCheck /> only real gains survive</span>
       </p>

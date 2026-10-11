@@ -123,7 +123,7 @@ export function LabView({ lab, local, admin = false }: { lab: LabState; local: L
 
             <section className="lab-card lab-chartcard">
               <header className="lab-card__head">
-                <h3 className="lab-h3">Total passenger time by round<span className="lab-h3__sub">vs the start · lower is better</span></h3>
+                <h3 className="lab-h3">Total passenger time by round<span className="lab-h3__sub">lower is better</span></h3>
               </header>
               <JChart data={chart} selectedStep={selectedStep?.step ?? null} onPick={pickStep}
                 emphasisOf={(id) => emphasis.get(id) ?? null} />

@@ -1,115 +1,125 @@
-// Owner: T3d. J_train / J_val by round (% vs g0, lower is better) with g0 + ref lines, every candidate proposal,
-// and the generation timeline as the x axis (spec §10 Lab).
-import type { CSSProperties } from 'react';
+// Owner: T3d. Total passenger time by round, in passenger-hours (lower is better): dashed "Baseline (g0)" and
+// "Hand-written" lines, the champion as a bold stepped line, one mark per round (filled = kept, hollow = rejected),
+// and each kept drop annotated with its %. The generation/round timeline is the x axis (spec §10 Lab).
 import type { Emphasis } from '@headway/sim';
 import type { ChartData, ChartStep } from '../model';
 import { fmtPaxH, fmtSignedPct } from '../format';
 
 const W = 720;
-const H = 180;
-const PAD = { l: 46, r: 98, t: 18, b: 14 };
-const EMPH: Emphasis[] = ['transfers', 'spacing', 'allocation'];
+const H = 230;
+const PAD = { l: 62, r: 118, t: 26, b: 14 };
 
-function tickLabel(v: number): string {
-  if (Math.abs(v) < 1e-9) return '0%';
-  const s = Number.isInteger(v) ? String(Math.abs(v)) : Math.abs(v).toFixed(1);
-  return `${v < 0 ? '−' : '+'}${s}%`;
+const hours = (j: number) => j / 3600;
+
+/** 3–5 round ticks over [lo, hi] (1/2/5 × 10^k steps). */
+function hourTicks(lo: number, hi: number): number[] {
+  const span = Math.max(hi - lo, 1);
+  const mag = 10 ** Math.floor(Math.log10(span / 4));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= 4.5) ?? 10 * mag;
+  const out: number[] = [];
+  for (let v = Math.floor(lo / step) * step; v <= hi + step * 1e-6; v += step) out.push(Math.round(v * 1e6) / 1e6);
+  if (out[out.length - 1]! < hi) out.push(out[out.length - 1]! + step);
+  return out;
+}
+
+/** Spread right-edge labels so they never overlap (min 14px apart). */
+function spread<T extends { y: number }>(labels: T[]): T[] {
+  const s = [...labels].sort((a, b) => a.y - b.y);
+  for (let i = 1; i < s.length; i++) if (s[i]!.y - s[i - 1]!.y < 14) s[i] = { ...s[i]!, y: s[i - 1]!.y + 14 };
+  return s;
 }
 
 export interface JChartProps {
   data: ChartData;
   selectedStep: number | null;
   onPick(step: ChartStep): void;
-  /** Emphasis per proposal id (for candidate colours). */
-  emphasisOf(proposalId: string): Emphasis | null;
+  /** Emphasis per proposal id (unused by this chart; kept for callers). */
+  emphasisOf?(proposalId: string): Emphasis | null;
 }
 
-export function JChart({ data, selectedStep, onPick, emphasisOf }: JChartProps) {
-  const n = data.steps.length;
-  const [lo, hi] = data.domain;
+export function JChart({ data, selectedStep, onPick }: JChartProps) {
+  const steps = data.steps;
+  const n = steps.length;
+  const base = steps[0]?.trainJ ?? 0;
+  const refJ = data.ref !== null && base > 0 ? base * (1 + data.ref / 100) : null;
+  const vals = [...steps.map((s) => hours(s.trainJ)), ...(refJ === null ? [] : [hours(refJ)])];
+  const lo0 = vals.length ? Math.min(...vals) : 0;
+  const hi0 = vals.length ? Math.max(...vals) : 1;
+  const pad = Math.max((hi0 - lo0) * 0.12, 1);
+  const ticks = hourTicks(lo0 - pad, hi0 + pad * 0.6);
+  const lo = ticks[0]!; const hi = ticks[ticks.length - 1]!;
   const innerW = W - PAD.l - PAD.r;
   const innerH = H - PAD.t - PAD.b;
   const x = (step: number) => PAD.l + (n <= 1 ? innerW / 2 : (step * innerW) / (n - 1));
-  const y = (v: number) => PAD.t + ((hi - v) / (hi - lo || 1)) * innerH;
-  const train = data.steps.map((s) => [x(s.step), y(s.train)] as const);
-  const val = data.steps.filter((s) => s.val !== null).map((s) => [x(s.step), y(s.val!)] as const);
-  const line = (pts: ReadonlyArray<readonly [number, number]>) => pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
-  const area = train.length > 1 ? `${line(train)}L${train[train.length - 1]![0].toFixed(1)},${(H - PAD.b).toFixed(1)}L${train[0]![0].toFixed(1)},${(H - PAD.b).toFixed(1)}Z` : '';
-  const sel = selectedStep === null ? null : data.steps[selectedStep] ?? null;
-  const best = data.steps.reduce<ChartStep | null>((b, s) => (!b || s.train < b.train ? s : b), null);
+  const y = (h: number) => PAD.t + ((hi - h) / (hi - lo || 1)) * innerH;
+  const yJ = (j: number) => y(hours(j));
+
+  // Champion stepped line: flat until a kept round, then a vertical drop.
+  let d = '';
+  steps.forEach((s, i) => {
+    const px = x(s.step).toFixed(1); const py = yJ(s.trainJ).toFixed(1);
+    if (i === 0) d = `M${px},${py}`;
+    else d += `H${px}V${py}`;
+  });
+  const last = steps[n - 1];
+  if (last) d += `H${(W - PAD.r).toFixed(1)}`;
+
+  const drops = steps.slice(1).map((s, i) => ({ s, prev: steps[i]! }))
+    .filter(({ s, prev }) => s.promoted && s.trainJ < prev.trainJ)
+    .map(({ s, prev }) => ({ s, prev, pct: (s.trainJ / prev.trainJ - 1) * 100 }));
+
+  const labels = spread([
+    { key: 'g0', cls: 'g0', y: yJ(base), text: 'Baseline (g0)' },
+    ...(refJ === null ? [] : [{ key: 'ref', cls: 'ref', y: yJ(refJ), text: 'Hand-written' }]),
+    ...(last && last.step > 0 ? [{ key: 'now', cls: 'now', y: yJ(last.trainJ), text: `Now (${last.genId})` }] : []),
+  ]);
+  const sel = selectedStep === null ? null : steps[selectedStep] ?? null;
 
   return (
     <div className="lab-chart">
-      <svg className="lab-chart__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Total passenger time by round, relative to the start; lower is better">
-        <defs>
-          <linearGradient id="lab-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="var(--lab-accent)" stopOpacity="0.16" />
-            <stop offset="1" stopColor="var(--lab-accent)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {data.ticks.map((t) => (
+      <svg className="lab-chart__svg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Total passenger time by round, in passenger-hours; lower is better">
+        <text className="lab-chart__axis" x={PAD.l} y={PAD.t - 14}>passenger-hours</text>
+        {ticks.map((t) => (
           <g key={t} className="lab-chart__tick">
             <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} />
-            <text x={PAD.l - 10} y={y(t)} dy="0.34em" textAnchor="end">{tickLabel(t)}</text>
+            <text x={PAD.l - 10} y={y(t)} dy="0.34em" textAnchor="end">{Math.round(t).toLocaleString('en-US')}</text>
           </g>
         ))}
-        <g className="lab-chart__ref lab-chart__ref--g0">
-          <line x1={PAD.l} x2={W - PAD.r + 4} y1={y(0)} y2={y(0)} />
-          <text x={W - PAD.r + 10} y={y(0)} dy="0.34em">start</text>
-        </g>
-        {data.ref !== null && (
-          <g className="lab-chart__ref lab-chart__ref--ref">
-            <line x1={PAD.l} x2={W - PAD.r + 4} y1={y(data.ref)} y2={y(data.ref)} />
-            <text x={W - PAD.r + 10} y={y(data.ref)} dy="0.34em">hand-written {tickLabel(Math.round(data.ref * 10) / 10)}</text>
-          </g>
-        )}
+        <line className="lab-chart__dash lab-chart__dash--g0" x1={PAD.l} x2={W - PAD.r} y1={yJ(base)} y2={yJ(base)} />
+        {refJ !== null && <line className="lab-chart__dash lab-chart__dash--ref" x1={PAD.l} x2={W - PAD.r} y1={yJ(refJ)} y2={yJ(refJ)} />}
+        {labels.map((l) => (
+          <text key={l.key} className={`lab-chart__lbl lab-chart__lbl--${l.cls}`} x={W - PAD.r + 10} y={l.y} dy="0.34em">{l.text}</text>
+        ))}
         {sel && <line className="lab-chart__guide" x1={x(sel.step)} x2={x(sel.step)} y1={PAD.t - 6} y2={H - PAD.b} />}
-        {area && <path className="lab-chart__area" d={area} />}
-        {val.length > 1 && <path className="lab-chart__val" d={line(val)} pathLength={1} />}
-        {train.length > 1 && <path className="lab-chart__train" d={line(train)} pathLength={1} />}
-        {data.candidates.filter((c) => !c.promoted).map((c) => {
-          const e = emphasisOf(c.proposalId);
-          const cx = x(c.step) + ((c.designer ?? 1) - 1) * 9;
-          const cy = y(Math.min(c.pct, hi));
-          return (
-            <g key={c.proposalId} className="lab-chart__cand" data-emphasis={e ?? undefined}
-              style={{ '--d': `${c.step * 40 + 300}ms` } as CSSProperties}>
-              <circle cx={cx} cy={cy} r={4.2} />
-              {c.clipped && <path d={`M${cx - 4},${cy + 9}l4,-4l4,4`} className="lab-chart__clip" />}
-              <title>{`${c.proposalId}${e ? ` (${e})` : ''}: ${fmtSignedPct(c.pct)} passenger time vs start`}</title>
-            </g>
-          );
-        })}
-        {val.map(([px, py], i) => <circle key={`v${i}`} className="lab-chart__vdot" cx={px} cy={py} r={3.2} />)}
-        {data.steps.map((s) => (
+        {n > 1 && <path className="lab-chart__step" d={d} />}
+        {drops.map(({ s, prev, pct }) => (
+          <text key={`d${s.step}`} className="lab-chart__drop" x={x(s.step) + 8} y={(yJ(prev.trainJ) + yJ(s.trainJ)) / 2} dy="0.34em">
+            {fmtSignedPct(pct)}
+          </text>
+        ))}
+        {steps.map((s) => (
           <g key={s.step} className="lab-chart__pt" data-promoted={s.promoted || undefined} data-running={s.running || undefined}
             data-selected={s.step === selectedStep || undefined} onClick={() => onPick(s)}
-            role="button" tabIndex={-1} aria-label={`${s.label}: ${fmtSignedPct(s.train)} vs g0`}>
-            <circle className="lab-chart__hit" cx={x(s.step)} cy={y(s.train)} r={14} />
-            <circle className="lab-chart__dot" cx={x(s.step)} cy={y(s.train)} r={s.promoted ? 5.6 : 4} />
-            <title>{`${s.label}${s.promoted ? '' : ` (champion ${s.genId})`}: J_train ${fmtPaxH(s.trainJ)} pax-h, ${fmtSignedPct(s.train)} vs g0${s.val !== null ? `; J_val ${fmtSignedPct(s.val)}` : ''}`}</title>
+            role="button" tabIndex={-1} aria-label={`${s.label}: ${fmtPaxH(s.trainJ)} passenger-hours`}>
+            <circle className="lab-chart__hit" cx={x(s.step)} cy={yJ(s.trainJ)} r={14} />
+            <circle className="lab-chart__dot" cx={x(s.step)} cy={yJ(s.trainJ)} r={s.promoted ? 6 : 5} />
+            <title>{`${s.label}: ${fmtPaxH(s.trainJ)} passenger-hours${s.step > 0 ? ` (${fmtSignedPct(s.train)} vs g0)` : ''}${s.promoted ? '' : ` · rejected, ${s.genId} kept`}`}</title>
           </g>
         ))}
       </svg>
       <div className="lab-timeline" role="tablist" aria-label="Generations and rounds">
-        {data.steps.map((s) => (
+        {steps.map((s) => (
           <button key={s.step} type="button" role="tab" aria-selected={s.step === selectedStep}
             className="lab-tl" data-kind={s.promoted ? 'gen' : s.running ? 'running' : 'rejected'}
-            data-best={best?.step === s.step || undefined}
             style={{ left: `${(x(s.step) / W) * 100}%` }} onClick={() => onPick(s)}>
             <span className="lab-tl__id">{s.label}</span>
-            <span className="lab-tl__sub">{s.running ? 'live' : s.promoted ? (s.step === 0 ? 'start' : fmtSignedPct(s.train)) : 'kept ' + s.genId}</span>
           </button>
         ))}
       </div>
       <ul className="lab-legend" aria-hidden="true">
-        <li><i className="lab-legend__train" />Training</li>
-        <li><i className="lab-legend__val" />Unseen crowds</li>
-        <li><i className="lab-legend__ref" />Hand-written plan</li>
-        <li className="lab-legend__cands">
-          {EMPH.map((e) => <i key={e} className="lab-legend__cand" data-emphasis={e} />)}
-          AI ideas
-        </li>
+        <li><i className="lab-legend__step" />Champion</li>
+        <li><i className="lab-legend__kept" />Kept</li>
+        <li><i className="lab-legend__rej" />Rejected</li>
       </ul>
     </div>
   );

@@ -6,10 +6,10 @@ import { ProposalCard } from './RoundCard';
 
 function outcomeText(r: Round): string {
   const o = roundOutcome(r);
-  if (o === 'promoted') return `${r.championBefore} → ${r.championAfter}`;
+  if (o === 'promoted') return `${r.championBefore} → ${r.championAfter} · new champion`;
   if (o === 'running') return `running on ${r.championBefore}`;
   if (o === 'failed') return `failed · ${r.championBefore} kept`;
-  return `rejected · ${r.championBefore} kept`;
+  return `rejected · ${r.championBefore} stays`;
 }
 
 export function RoundTimeline({ rounds, generations, openRoundId, focusProposalId, onToggle, onFocus, onReplay }: {
@@ -20,7 +20,7 @@ export function RoundTimeline({ rounds, generations, openRoundId, focusProposalI
   return (
     <section className="lab-card lab-rt" aria-label="Rounds">
       <header className="lab-card__head">
-        <h3 className="lab-h3">Rounds<span className="lab-h3__sub">newest first · open a round to see its three proposals</span></h3>
+        <h3 className="lab-h3">Rounds<span className="lab-h3__sub">newest first · 3 ideas each</span></h3>
       </header>
       {list.length === 0 && <p className="lab-empty">No rounds are published yet.</p>}
       <ol className="lab-rt__list">
@@ -37,11 +37,11 @@ export function RoundTimeline({ rounds, generations, openRoundId, focusProposalI
                 <span className="lab-rt__n">Round {r.number}</span>
                 <span className="lab-rt__out">{outcomeText(r)}</span>
                 <span className="lab-rt__best" data-tone={best === null ? 'flat' : best < 0 ? 'good' : 'bad'}>
-                  {best === null ? '—' : `best ${fmtSignedPct(best)}`}
+                  {best === null ? '—' : fmtSignedPct(best)}
                 </span>
               </button>
               {open && (
-                <div className="lab-props lab-rt__props">
+                <div className="lab-prows lab-rt__props">
                   {proposals.map((p, i) => (
                     <ProposalCard key={p.id} p={p} round={r} generations={generations} index={i}
                       focused={p.id === focusProposalId} onFocus={onFocus} onReplay={onReplay} />

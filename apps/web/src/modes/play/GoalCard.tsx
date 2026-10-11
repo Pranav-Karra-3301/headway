@@ -7,7 +7,6 @@ import { Steps } from '../../ui/landing/Steps';
 import { BusIcon, ClockIcon, PlayIcon, ScaleIcon, playFacts } from './ui';
 
 export function GoalCard() {
-  const seed = useApp((s) => s.play.seed);
   const simKind = useApp((s) => s.simKind);
   const ai = usePlay((s) => s.ai);
   const scenario = playScenario();
@@ -20,7 +19,7 @@ export function GoalCard() {
       <div className="pl-goal hw-card">
         <div className="pl-goal__eyebrow">
           <span className="hw-label">Play · {facts.name} · tonight {facts.clockStart}</span>
-          <span className="pl-seed hw-num">crowd #{seed || scenario.seed}</span>
+          <span className="pl-seed">Tonight&rsquo;s game crowd</span>
         </div>
         <h1 id="pl-goal-title" className="pl-goal__title">
           Get the crowd home.

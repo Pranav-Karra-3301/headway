@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { runEvolve, savedToken } from '../evolve';
 import { useLab } from '../labStore';
-import { IconSpark } from './icons';
+import { IconArrow } from './icons';
 
 export function EvolveButton({ evolving, round }: { evolving: boolean; round: number | null }) {
   const open = useLab((s) => s.tokenOpen);
@@ -25,7 +25,7 @@ export function EvolveButton({ evolving, round }: { evolving: boolean; round: nu
     <div className="lab-evolve" ref={wrap}>
       <button type="button" className="lab-btn lab-btn--primary lab-btn--evolve" disabled={evolving} aria-expanded={open}
         onClick={() => useLab.setState({ tokenOpen: !open })}>
-        {evolving ? <span className="lab-spin" aria-hidden="true" /> : <IconSpark />}
+        {evolving ? <span className="lab-spin" aria-hidden="true" /> : <IconArrow />}
         {evolving ? `Evolving${round !== null ? ` round ${round}` : ''}…` : 'Evolve next generation'}
       </button>
       {open && !evolving && (

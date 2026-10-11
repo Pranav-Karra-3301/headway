@@ -140,13 +140,12 @@ function Leaderboard() {
   const board = usePlay((s) => s.board);
   const submit = usePlay((s) => s.submit);
   const you = usePlay((s) => s.you);
-  const seed = useApp((s) => s.play.seed);
   const [name, setName] = useState(submit.name);
   useEffect(() => { if (board.status === 'idle') void loadBoard(); }, [board.status]);
   const rows = [...board.rows].sort((a, b) => a.j - b.j).slice(0, 8);
   return (
     <aside className="pl-board hw-card" aria-label="Leaderboard">
-      <header className="pl-board__head"><span className="pl-board__title">Leaderboard</span><span className="pl-muted hw-num">crowd #{seed}</span></header>
+      <header className="pl-board__head"><span className="pl-board__title">Leaderboard</span><span className="pl-muted">Tonight&rsquo;s game crowd</span></header>
       {board.status === 'loading' && rows.length === 0 ? <p className="pl-muted"><i className="pl-dot" /> Loading</p>
         : rows.length === 0 ? <p className="pl-muted">No scores on this crowd yet. Be the first.</p>
         : (
@@ -180,7 +179,6 @@ export function Results() {
   const error = usePlay((s) => s.error);
   const clockStart = usePlay((s) => s.obs?.scenario.clockStart) ?? playFacts(playScenario().scenarioId).clockStart;
   const champion = useApp((s) => s.champion);
-  const seed = useApp((s) => s.play.seed);
   const facts = playFacts(playScenario().scenarioId);
   const aiRes = ai.champion?.result ?? null;
   const baseRes = ai.baseline?.result ?? null;
@@ -193,7 +191,7 @@ export function Results() {
     <div className="pl-results" role="dialog" aria-modal="true" aria-labelledby="pl-res-title">
       <div className="pl-results__inner">
         <header className="pl-res-head">
-          <span className="hw-label">Results · {facts.name} · crowd #{seed}</span>
+          <span className="hw-label">Results · {facts.name} · Tonight&rsquo;s game crowd</span>
           <h1 id="pl-res-title" data-tone={v?.tone ?? 'none'}>{v?.headline ?? (you ? 'Run complete' : 'Scoring your run…')}</h1>
           <p className="pl-res-head__line">
             {error ?? v?.line ?? (ai.status === 'error' ? 'The AI comparison is unavailable right now.' : 'Waiting for the AI’s run on this crowd…')}
