@@ -3,7 +3,7 @@
 //                            kn.car.random, a service corner, and a marina of kn.boat.* — everything through the registry
 //   ?scene=lineup            every kn.car.* / kn.boat.* kind in rows next to our bus, kit car and people, plus the
 //                            v7 train evaluation (our train vs Kenney train-kit passenger sets)
-//   &p=a|b|c palette  &still=1 (screenshots: render a few frames, then stop)  &view=<ortho size>  &raw=1 (no models)
+//   &at=x,z camera target  &p=a|b|c palette  &still=1 (screenshots: render a few frames, then stop)  &view=<ortho size>  &raw=1 (no models)
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { bakeGeometry, makeBoard, makeBus, makeCar, makePerson, makeRoad, makeStop, makeStreetLamp, makeTrain, TRAIN } from '../../../kit';
@@ -14,7 +14,7 @@ import { createBasicKit } from '../../basicKit';
 import { CATALOG_BY_KIND } from '../../catalog';
 import { devScene } from '../../devScene';
 import { createRegistry } from '../../index';
-import { kenneyColor, kenneyIdsFor, kenneyModel, kenneyReady, preloadKenney, setKenneyPalette, type KenneyId } from '../../kenney';
+import { kenneyColor, kenneyIdsFor, kenneyModel, kenneyReady, kenneyTemplate, preloadKenney, setKenneyPalette, type KenneyId } from '../../kenney';
 import type { PlacedAsset } from '../../types';
 import { register as registerVehicles, VEHICLE_KINDS } from '../kenney-vehicles';
 
@@ -45,7 +45,9 @@ const TRAINS: KenneyId[] = [
 if (!raw) await preloadKenney([...kenneyIdsFor(VEHICLE_KINDS), ...DECOR, ...(scene === 'lineup' ? TRAINS : [])]);
 
 const view = Number(q.get('view') ?? (scene === 'street' ? 22 : 36));
-const center = scene === 'street' ? new THREE.Vector3(0.3, 0, 0.6) : new THREE.Vector3(0, 0, 2);
+const at0 = (q.get('at') ?? '').split(',').map(Number);
+const center = at0.length === 2 && at0.every(Number.isFinite) ? new THREE.Vector3(at0[0], 0, at0[1])
+  : scene === 'street' ? new THREE.Vector3(0.3, 0, 0.6) : new THREE.Vector3(0, 0, 2);
 const { renderer, scene: s3, camera, loop } = devScene(view, center);
 s3.background = new THREE.Color(P.bg);
 const fit = () => { // keep canvas + ortho frustum in sync with the viewport (headless screenshots resize after load)
@@ -87,6 +89,19 @@ const label = (text: string, x: number, z: number, cls = 'l') => {
 };
 
 if (scene === 'street') street(); else lineup();
+
+// &debug=1: part table of every K2 model (role, source block, shade, triangles, paint) for chrome --dump-dom
+if (q.get('debug') === '1') {
+  const pre = document.createElement('pre'); pre.id = 'dbg'; pre.style.display = 'none';
+  pre.textContent = JSON.stringify(Object.fromEntries(kenneyIdsFor(VEHICLE_KINDS).map((id) => {
+    const t = kenneyTemplate(id);
+    return [id, t ? t.parts.map((p) => {
+      const b = p.geometry.boundingBox!;
+      return `${p.info.role}${p.info.paint ? '*' : ''} ${p.info.source} s${p.info.shade} t${p.tris} y${b.min.y.toFixed(2)}..${b.max.y.toFixed(2)}`;
+    }) : null];
+  })), null, 1);
+  document.body.append(pre);
+}
 
 function street(): void {
   const LAND = 3.2; // land z −10…3.2, water beyond
@@ -189,7 +204,7 @@ function lineup(): void {
     }
   };
   const reg = (kind: string, y = 0) => ({
-    w: Math.max(1.5, (CATALOG_BY_KIND.get(kind)?.d ?? 2) + 0.5), label: kind.replace(/^kn\./, ''), yaw: ALONG, y,
+    w: Math.max(1.9, (CATALOG_BY_KIND.get(kind)?.d ?? 2) + 0.9), label: kind.replace(/^kn\./, ''), yaw: ALONG, y,
     make: () => registry.build(createBasicKit(registry.roles, PI[pal], seed++), { kind, x: 0, z: 0 }),
   });
   const baked = (root: THREE.Object3D) => () => { const m = new THREE.Mesh(bakeGeometry(root, pal).geometry, kitMat); m.castShadow = true; return m; };

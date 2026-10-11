@@ -6,7 +6,7 @@
 // Draw calls: ≤ 5 — mountains (terrain + road portals, one mesh), rail tunnel (rail portals + any on-board spur and
 // its trees, one mesh with its own KitMaterial so the composer can x-ray-fade it: `material.fade.value`), pines,
 // broadleaf and rocks (InstancedMeshes; trees sway). Everything is vertex-coloured KitMaterial; palettes repaint in
-// place. Terrain beyond the board casts no realtime shadow (bible §3.6); the instanced trees do.
+// place. Meshes cast shadows, but only the board + 4 u shadow frustum ever receives them (portals ground on the board).
 import * as THREE from 'three';
 import type { TownMap } from '@headway/sim';
 import { recolorBaked, type Baked, bakeGeometry } from '../../kit/bake';

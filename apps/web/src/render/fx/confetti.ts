@@ -85,7 +85,7 @@ export interface Confetti {
   dispose(): void;
 }
 
-const COUNT = 220;
+const COUNT = 260;
 
 function paletteColors(p: PaletteId): THREE.Color[] {
   const P = PALETTES[p];
@@ -95,7 +95,7 @@ function paletteColors(p: PaletteId): THREE.Color[] {
 
 export function createConfetti(palette: PaletteId = 'a'): Confetti {
   const sim = new ConfettiSim(COUNT);
-  const geo = new THREE.PlaneGeometry(0.15, 0.09);
+  const geo = new THREE.PlaneGeometry(0.21, 0.13);
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0, side: THREE.DoubleSide });
   mat.onBeforeCompile = (s) => {
     s.uniforms.uDusk = shared.uDusk;

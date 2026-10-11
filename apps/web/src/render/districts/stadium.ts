@@ -174,7 +174,7 @@ const PLATFORM_EDGE = 1.05, PLATFORM_BACK = 3.55, BUILDING_EDGE = 1.12, CLEAR = 
 const BUILDING: Record<string, string> = { stn_central: 'lm.stationCentral' };
 /** A station's frame: rail point at the platform centre, direction of travel, unit vectors along the platform
  *  (toward the queue point = the arrival end) and inward (toward the platform), and the queue point's offset along. */
-interface Frame { s: Station; R: Vec2; t: Vec2; along: Vec2; inward: Vec2; aQ: number; kind: string; w: number; d: number; rot: number }
+interface Frame { s: Station; R: Vec2; t: Vec2; along: Vec2; inward: Vec2; aQ: number; kind: string; w: number; d: number; rot: number; scale: number; edge: number }
 function frameOf(s: Station): Frame {
   const rail = pointAt(loop, s.dist);
   const R = v(rail.x, rail.z);
@@ -185,13 +185,33 @@ function frameOf(s: Station): Frame {
   const along = v(-s.queueDir.x, -s.queueDir.z); // the queue grows from the arrival end toward the platform centre
   const kind = BUILDING[s.id] ?? 'lm.stationHalt';
   const c = CATALOG_BY_KIND.get(kind)!;
-  return { s, R, t, along, inward, aQ: dot(toPlatform, along), kind, w: c.w, d: c.d, rot: quarter(v(-inward.x, -inward.z)) };
+  const f: Frame = { s, R, t, along, inward, aQ: dot(toPlatform, along), kind, w: c.w, d: c.d, rot: quarter(v(-inward.x, -inward.z)), scale: 1, edge: BUILDING_EDGE };
+  // Where the track curves away just past a platform (Central, v10 line) the full-size building would clip it: step its
+  // front back from the platform edge a little, then shrink it slightly, until it clears the rail.
+  fit: for (const scale of [1, 0.95, 0.9, 0.85, 0.8]) for (const edge of [BUILDING_EDGE, 1.2, 1.3, 1.38]) {
+    const g = { ...f, scale, edge, w: c.w * scale, d: c.d * scale };
+    const it = make(kind, at(g, buildingAlong(g), buildingIn(g)), g.rot, undefined, scale < 1 ? scale : undefined);
+    if (!validatePlacements(TOWN, [it]).some((e) => / on (rail|road)/.test(e))) { Object.assign(f, g); break fit; }
+  }
+  return f;
 }
-const frames = TOWN.rail.stations.map(frameOf);
 const at = (f: Frame, a: number, n: number): Vec2 => add(add(f.R, f.along, a), f.inward, n);
 /** Building centre: arrival side past the queue point; front (local +z) on the platform edge, facing the track. */
 const buildingAlong = (f: Frame) => f.aQ + CLEAR + f.w / 2;
-const buildingIn = (f: Frame) => BUILDING_EDGE + f.d / 2;
+const buildingIn = (f: Frame) => f.edge + f.d / 2;
+const frames = TOWN.rail.stations.map(frameOf);
+function railDist(p: Vec2): number { const q = pointAt(loop, distOn(p)); return Math.hypot(q.x - p.x, q.z - p.z); }
+/** Platform edge offset at `a` along the platform: PLATFORM_EDGE, pushed inward where the track curves toward it. */
+function platformEdge(f: Frame, a: number, extra = 0): number {
+  let n = PLATFORM_EDGE + extra;
+  while (n < PLATFORM_BACK - 0.6 && railDist(at(f, a, n)) < 1.02 + extra) n += 0.02;
+  return n;
+}
+/** The platform's track edge as a polyline from a0 to a1 (1 u steps), following the track where it curves. */
+function platformEdgeLine(f: Frame, a0: number, a1: number, extra = 0): Vec2[] {
+  const k = Math.max(1, Math.ceil(Math.abs(a1 - a0)));
+  return Array.from({ length: k + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / k; return at(f, a, platformEdge(f, a, extra)); });
+}
 /** Platform extent along the track: from beyond the queue's far end to the building's far end. */
 const platformFrom = (f: Frame) => f.aQ - QUEUE_LEN - 1.6;
 const platformTo = (f: Frame) => buildingAlong(f) + f.w / 2;
@@ -204,7 +224,7 @@ function roadReach(f: Frame, a0: number, a1: number, from: number): number {
 
 // ---------------------------------------------------------------- core pieces
 place('lm.stadium', S);
-for (const f of frames) place(f.kind, at(f, buildingAlong(f), buildingIn(f)), f.rot);
+for (const f of frames) place(f.kind, at(f, buildingAlong(f), buildingIn(f)), f.rot, undefined, f.scale < 1 ? f.scale : undefined);
 // A4's crossing has the road along local z and the track along local x; a half turn is the same crossing.
 for (const c of atGrade) place('lm.levelCrossing', c.p, ((quarter(c.dir) % Math.PI) + Math.PI) % Math.PI);
 
@@ -256,8 +276,8 @@ for (const dx of [-4.6, -3.0, -1.4, 1.4, 3.0, 4.6]) dress('veg.poplar', v(S.x + 
 for (const f of frames) {
   const aB = buildingAlong(f), nB = buildingIn(f), a0 = platformFrom(f), a1 = platformTo(f);
   const P = (a: number, n: number) => at(f, a, n);
-  areas.push({ kind: 'plaza', polygon: [P(a0, PLATFORM_EDGE), P(a1, PLATFORM_EDGE), P(a1, PLATFORM_BACK), P(a0, PLATFORM_BACK)].map(r2v) });
-  paths.push({ kind: 'plaza-edge', width: 0.18, points: [P(a0, PLATFORM_EDGE + 0.12), P(a1, PLATFORM_EDGE + 0.12)].map(r2v) });
+  areas.push({ kind: 'plaza', polygon: [...platformEdgeLine(f, a0, a1), P(a1, PLATFORM_BACK), P(a0, PLATFORM_BACK)].map(r2v) });
+  paths.push({ kind: 'plaza-edge', width: 0.18, points: platformEdgeLine(f, a0, a1, 0.12).map(r2v) });
   // footpath from the paired bus stop across to the platform queue
   const stop = TOWN.stops.find((x) => x.id === f.s.stopId);
   if (stop) paths.push({ kind: 'footpath', width: 1.2, points: [add(stop.p, stop.queueDir, 0.6), P(f.aQ, PLATFORM_BACK - 0.05)].map(r2v) });

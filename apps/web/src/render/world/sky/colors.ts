@@ -13,7 +13,7 @@ import { RIDGE_FOOT_Y } from './ridges';
 /** Positions (u above the horizon) of the five gradient stops: deep haze, haze, horizon (lightest), upper, top. */
 export const SKY_T = [-50, -14, 0, 9, 26] as const;
 /** Valley mist on the distant ridges glows like the sky at this height (never darker): see `ridgeMist`. */
-export const MIST_T = -5;
+export const MIST_T = -6;
 /** Aerial perspective of the three distant ridge layers, near → far. */
 export const RIDGE_HAZE = [0.35, 0.55, 0.75] as const;
 
@@ -38,7 +38,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
     day: {
       stops: ['#EDF0E2', '#E4F1E8', '#F7F7EC', '#DDEFE5', '#C6E4D6'],
       ridgeBase: '#5C947C', haze: '#DDEFE5', rim: '#FFFFFF', rimAmt: 0,
-      cloudLit: '#FFFFFF', cloudShade: '#DDEDE6', shadow: '#A3BDB3', shadowAmt: 0.5, stars: 0,
+      cloudLit: '#FFFFFF', cloudShade: '#C9DDD5', shadow: '#A3BDB3', shadowAmt: 0.5, stars: 0,
     },
     dusk: {
       stops: ['#3A3D62', '#655779', '#E6A78C', '#8A6E96', '#2F3A5E'],
@@ -50,7 +50,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
     day: {
       stops: ['#F0E9D9', '#EEEADB', '#FAF5E9', '#EAE8D9', '#D8DFCB'],
       ridgeBase: '#7C8C6B', haze: '#F3ECDD', rim: '#FFFFFF', rimAmt: 0,
-      cloudLit: '#FFFDF8', cloudShade: '#E6E1D3', shadow: '#BDB4A0', shadowAmt: 0.45, stars: 0,
+      cloudLit: '#FFFDF8', cloudShade: '#DAD3C1', shadow: '#BDB4A0', shadowAmt: 0.45, stars: 0,
     },
     dusk: {
       stops: ['#383A5A', '#625672', '#E2A68B', '#856C86', '#2E3550'],
@@ -62,7 +62,7 @@ export const SKY_LOOKS: Record<PaletteId, { day: SkyLook; dusk: SkyLook }> = {
     day: {
       stops: ['#EEEDEB', '#E6EAF0', '#F8F5EF', '#E3E9F1', '#CCD8E8'],
       ridgeBase: '#7F7E95', haze: '#EEF0F4', rim: '#FFFFFF', rimAmt: 0,
-      cloudLit: '#FFFFFF', cloudShade: '#DEE3EC', shadow: '#ADB4C1', shadowAmt: 0.45, stars: 0,
+      cloudLit: '#FFFFFF', cloudShade: '#CFD7E4', shadow: '#ADB4C1', shadowAmt: 0.45, stars: 0,
     },
     dusk: {
       stops: ['#363A62', '#615679', '#E5A68A', '#856B94', '#262E48'],

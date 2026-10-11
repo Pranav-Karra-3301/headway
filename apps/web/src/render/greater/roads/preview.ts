@@ -111,8 +111,8 @@ function landStandIns(grid: ReturnType<typeof greaterGrid>): THREE.Group {
     if (grid.use[r]![c] !== 'hill') continue;
     const p = { x: grid.origin.x + (c + 0.5) * grid.tile, z: grid.origin.z + (r + 0.5) * grid.tile };
     const m = new THREE.Mesh(mound, mat);
-    const h = 1.6 + ((c * 7 + r * 13) % 5) * 0.35;
-    m.scale.set(3.1, h, 3.1);
+    const h = 1.3 + ((c * 7 + r * 13) % 5) * 0.3;
+    m.scale.set(3.5, h, 3.5);
     m.position.set(p.x, -0.2, p.z);
     m.castShadow = true;
     m.receiveShadow = true;

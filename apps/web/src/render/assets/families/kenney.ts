@@ -10,6 +10,7 @@
 // discrete choices named in root.userData.variant (equal key = identical geometry). Every builder falls back to the
 // A5 builder until its models are preloaded (declared with declareKenney → kenneyIdsFor → preloadKenney).
 import * as THREE from 'three';
+import { mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PALETTES } from '../../palettes';
 import { CATALOG_BY_KIND } from '../catalog';
 import { declareKenney, KENNEY_ROLES, kenneyReady, kenneyTemplate, type KenneyId } from '../kenney';
@@ -22,11 +23,12 @@ import { VEG_ROLES } from './vegetation/roles';
 import { buildBirch, buildCherry, buildMaple, buildOak, buildPine, buildPoplar } from './vegetation/trees';
 import { choices, int, type Rng } from './vegetation/util';
 import * as vehicles from './kenney-vehicles'; // K2: kn.car.* + kn.boat.*
+import * as buildings from './kenney-buildings'; // K3: kn.house.* + kn.shop.* + kn.works.* + kn.prop.*, res.house/res.townhouses
 
 // ======================================================================= K1 vegetation: roles
 
 /** OKLab hue (radians) / lightness / chroma nudges: base, warmer + lighter, cooler + darker. */
-const TONES: readonly (readonly [dh: number, dL: number, dc: number])[] = [[0, 0, 1], [-0.2, 0.035, 1.06], [0.17, -0.03, 0.95]];
+const TONES: readonly (readonly [dh: number, dL: number, dc: number])[] = [[0, 0, 1], [-0.12, 0.03, 1.04], [0.14, -0.03, 0.96]];
 
 /** A colour nudged in OKLab hue (radians), lightness and chroma. */
 export function nudgeHex(hex: string, dh: number, dL: number, dc = 1): string {
@@ -109,9 +111,24 @@ function pickModel(ids: readonly KenneyId[], want: number): { id: KenneyId; prep
   return undefined;
 }
 
+/** Foliage normals are crease-smoothed (70°): Kenney's faceted crowns read as soft clay, silhouettes unchanged. */
+const LEAF_CREASE = (70 * Math.PI) / 180;
+const smoothed = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
+function smooth(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  let out = smoothed.get(g);
+  if (!out) {
+    const src = g.clone();
+    src.deleteAttribute('uv');
+    out = mergeVertices(toCreasedNormals(src, LEAF_CREASE));
+    src.dispose();
+    smoothed.set(g, out);
+  }
+  return out;
+}
+
 /** A mesh of one model part through the kit material of `role`/`idx`. */
 function partMesh(k: KitContext, p: PrepPart, role: string, idx: number): THREE.Mesh {
-  const m = new THREE.Mesh(p.geometry, k.mat(role, idx));
+  const m = new THREE.Mesh(p.leafy ? smooth(p.geometry) : p.geometry, k.mat(role, idx));
   m.castShadow = true;
   m.receiveShadow = true;
   return m;
@@ -153,7 +170,7 @@ export const KENNEY_TREES: readonly TreeSpec[] = [
   { kind: 'veg.pine', models: [N('tree_pineDefaultA'), N('tree_pineRoundA'), N('tree_pineRoundE'), N('tree_pineTallC_detailed')], leaf: 'knvPine', fallback: buildPine },
   { kind: 'veg.birch', models: [N('tree_simple_fall'), N('tree_thin_fall'), N('tree_small_fall'), N('tree_default_fall')], leaf: 'knvBirch', fallback: buildBirch },
   { kind: 'veg.poplar', models: [N('tree_tall'), N('tree_simple'), N('tree_cone')], leaf: 'knvPoplar', fallback: buildPoplar },
-  { kind: 'veg.cherry', models: [N('tree_oak'), N('tree_plateau'), N('tree_detailed'), N('tree_fat')], leaf: 'knvBlossom', fallback: buildCherry },
+  { kind: 'veg.cherry', models: [N('tree_oak'), N('tree_plateau'), N('tree_detailed'), N('tree_thin')], leaf: 'knvBlossom', fallback: buildCherry },
 ];
 
 function buildTree(spec: TreeSpec, k: KitContext, params: AssetParams): THREE.Object3D {
@@ -176,7 +193,9 @@ function buildTree(spec: TreeSpec, k: KitContext, params: AssetParams): THREE.Ob
 // ======================================================================= K1 vegetation: bushes, hedges, beds, planters
 
 /** Crowns reused as low shrubs (leaf parts only, squashed onto the ground). */
-const BUSH_CROWNS: KenneyId[] = [N('tree_oak'), N('tree_fat'), N('tree_detailed'), N('tree_default')];
+const BUSH_CROWNS: KenneyId[] = [N('tree_oak'), N('tree_fat')]; // single rounded crowns (flat-topped ones squash into discs)
+/** Planter shrubs: the bush crowns plus Kenney's cube-cluster crown (reads as a little topiary in a pot). */
+const PLANTER_CROWNS: KenneyId[] = [N('tree_oak'), N('tree_detailed'), N('tree_fat')];
 
 /** The foliage parts of a model as a group: crown centred on x/z, bottom at y = 0, scaled to (w, h, d). */
 function crown(k: KitContext, pr: Prep, role: string, idx: number, w: number, h: number, d: number): THREE.Group {
@@ -190,20 +209,39 @@ function crown(k: KitContext, pr: Prep, role: string, idx: number, w: number, h:
   return g;
 }
 
+/** Bush: a main crown and 1–2 smaller ones (a low cluster), each squashed onto the ground. */
+const BUSH_CLUSTER: readonly (readonly [x: number, z: number, w: number, h: number, yaw: number])[] = [
+  [0.07, 0.05, 0.7, 0.7, 0], [-0.25, -0.12, 0.48, 0.48, 2.1], [0.16, -0.3, 0.38, 0.4, 4.2],
+];
+
 function kBush(k: KitContext, params: AssetParams): THREE.Object3D {
   const r = choices(k, params);
   const mi = modelIndex(params, r, BUSH_CROWNS.length);
-  const tone = int(r, toneCount('knvBush')), size = int(r, SIZE_STEPS), yaw = int(r, YAW_STEPS);
+  const tone = int(r, toneCount('knvBush')), size = int(r, SIZE_STEPS), yaw = int(r, YAW_STEPS), extra = int(r, 2);
   const pick = pickModel(BUSH_CROWNS, mi);
   if (!pick) return buildBush(k, params);
   const c = pick.prep.crown;
-  const j = sizeOf(size);
-  // widest side ≈ 0.9 u × jitter (kept inside the 1 × 1 footprint at any yaw), height 0.62 u × jitter
-  const sxz = Math.min((0.9 * j) / Math.max(c.w, c.d), fitScale('veg.bush', c.radius));
+  const j = Math.min(sizeOf(size), 1.1);
   const body = new THREE.Group();
   body.rotation.y = (yaw / YAW_STEPS) * Math.PI * 2;
-  body.add(crown(k, pick.prep, 'knvBush', tone, c.w * sxz, 0.62 * j, c.d * sxz));
-  return root('veg.bush', `${pick.id.slice(11)}.${tone}.${size}.${yaw}`, body);
+  const n = 2 + extra, tones = toneCount('knvBush'), base = tone % (tones / 3);
+  const aspect = c.d / Math.max(1e-3, c.w);
+  // shrink the cluster in x/z (not height) until every crown stays inside the 1 × 1 footprint (±10 %) at any yaw
+  let reach = 0;
+  for (let i = 0; i < n; i++) {
+    const [x, z, w] = BUSH_CLUSTER[i]!;
+    reach = Math.max(reach, (c.radius * w * j) / Math.max(1e-3, c.w) + Math.hypot(x, z) * j);
+  }
+  const f = Math.min(1, (0.55 * 0.98) / Math.max(1e-3, reach));
+  for (let i = 0; i < n; i++) {
+    const [x, z, w, h, a] = BUSH_CLUSTER[i]!;
+    // the crown's other tones of the same base colour: main, warmer, cooler
+    const g = crown(k, pick.prep, 'knvBush', (base + i * (tones / 3)) % tones, w * j * f, h * j, w * j * f * aspect);
+    g.position.set(x * j * f, 0, z * j * f);
+    g.rotation.y = a;
+    body.add(g);
+  }
+  return root('veg.bush', `${pick.id.slice(11)}.${tone}.${size}.${yaw}.${extra}`, body);
 }
 
 /** Hedge: a row of overlapping squashed crowns (clipped, slightly lumpy), params.length along x (default 3). */
@@ -216,24 +254,24 @@ function kHedge(k: KitContext, params: AssetParams): THREE.Object3D {
   const tone = int(r, toneCount('knvHedge')), lump = int(r, 4);
   const pick = pickModel(HEDGE_CROWNS, mi);
   if (!pick) return buildHedge(k, params);
-  const n = Math.max(1, Math.round(len / 1.15));
+  const n = Math.max(1, Math.round(len / 1.4));
   const seg = len / n, H = 0.74, D = 0.72;
   const body = new THREE.Group();
   for (let i = 0; i < n; i++) {
     const h = H * (1 - 0.06 * ((i * 7 + lump * 3) % 4) / 3);
-    const c = crown(k, pick.prep, 'knvHedge', tone, Math.min(len, seg * 1.22), h, D);
-    c.position.x = -len / 2 + seg * (i + 0.5);
+    const c = crown(k, pick.prep, 'knvHedge', tone, Math.min(len, seg * 1.45), h, D);
+    c.position.x = n === 1 ? 0 : -len / 2 + c.scale.x * pick.prep.crown.w / 2 + (i * (len - c.scale.x * pick.prep.crown.w)) / (n - 1);
     if ((i + lump) % 2) c.rotation.y = Math.PI;
     body.add(c);
   }
   return root('veg.hedge', `${pick.id.slice(11)}.${tone}.${lump}.L${len.toFixed(2)}`, body);
 }
 
-/** Flowerbed: rounded stone edging + soil, 2 staggered rows of Kenney flowers in a 2–3 colour scheme. */
+/** Flowerbed: oval stone edging + soil (as A5's), a staggered row of 6 Kenney flowers in a 2–3 colour scheme. */
 const FLOWERS: KenneyId[] = [N('flower_redA'), N('flower_yellowA'), N('flower_purpleA'), N('flower_redC'), N('flower_yellowC'), N('flower_purpleC')];
 /** vegFlower colour schemes (indices into A5's 5 flower colours). */
 const SCHEMES: readonly (readonly number[])[] = [[0, 1], [3, 2], [4, 1], [0, 2, 3], [1, 4]];
-const BED_SPOTS: readonly (readonly [number, number])[] = [[-0.62, -0.2], [-0.2, 0.2], [0.2, -0.2], [0.62, 0.2], [-0.62, 0.22], [0.62, -0.22]];
+const BED_SPOTS: readonly (readonly [number, number])[] = [[-0.58, 0.06], [-0.3, -0.18], [-0.05, 0.16], [0.22, -0.16], [0.48, 0.14], [0.66, -0.06]];
 
 function flower(k: KitContext, pr: Prep, colour: number, scale: number): THREE.Group {
   const g = new THREE.Group();
@@ -254,19 +292,18 @@ function kFlowerbed(k: KitContext, params: AssetParams): THREE.Object3D {
   const ids = FLOWERS.slice(shape * 3, shape * 3 + 3);
   if (!ids.every(kenneyReady)) return buildFlowerbed(k, params);
   const body = new THREE.Group();
-  const top = 0.15;
-  const edge = k.rbox(2, 0.14, 1, 0.05, k.mat('vegEdge'));
+  const edge = k.cyl(1, 1, 0.14, k.mat('vegEdge'), 16);
   edge.position.y = 0.07;
-  const soil = k.rbox(1.82, 0.04, 0.82, 0.015, k.mat('vegSoil'));
+  edge.scale.set(0.98, 1, 0.48);
+  const soil = k.cyl(1, 1, 0.04, k.mat('vegSoil'), 16);
   soil.position.y = 0.13;
+  soil.scale.set(0.9, 1, 0.41);
   body.add(edge, soil);
   const cols = SCHEMES[scheme]!;
   BED_SPOTS.forEach(([x, z], i) => {
-    const id = ids[(i + yaw) % ids.length]!;
-    const pr = prep(id)!;
-    const s = Math.min(0.85, 0.3 / (pr.all.maxY - pr.all.minY));
-    const f = flower(k, pr, cols[i % cols.length]!, s);
-    f.position.set(x, top + f.position.y, z);
+    const pr = prep(ids[(i + yaw) % ids.length]!)!;
+    const f = flower(k, pr, cols[i % cols.length]!, Math.min(0.85, 0.3 / (pr.all.maxY - pr.all.minY)));
+    f.position.set(x, 0.15 + f.position.y, z);
     f.rotation.y = ((i * 5 + yaw) % 8) * (Math.PI / 4);
     body.add(k.detail(f));
   });
@@ -280,7 +317,7 @@ function kPlanter(k: KitContext, params: AssetParams): THREE.Object3D {
   const r = choices(k, params);
   const pot = modelIndex(params, r, POTS.length), colour = int(r, 4), tone = int(r, toneCount('knvBush')), shrub = int(r, 3), yaw = int(r, 4);
   const potPick = pickModel(POTS, pot);
-  const shrubPick = pickModel(BUSH_CROWNS, shrub);
+  const shrubPick = pickModel(PLANTER_CROWNS, shrub);
   if (!potPick || !shrubPick || potPick.id !== POTS[pot]) return buildPlanter(k, params);
   const pp = potPick.prep.all;
   // box planter ≈ 0.9 u wide, round pot ≈ 0.7 u wide
@@ -310,7 +347,7 @@ const GARDEN: Record<string, { build: Builder; sway: boolean; ids: KenneyId[] }>
   'veg.bush': { build: kBush, sway: true, ids: BUSH_CROWNS },
   'veg.hedge': { build: kHedge, sway: false, ids: HEDGE_CROWNS },
   'veg.flowerbed': { build: kFlowerbed, sway: false, ids: FLOWERS },
-  'veg.planter': { build: kPlanter, sway: false, ids: [...POTS, ...BUSH_CROWNS] },
+  'veg.planter': { build: kPlanter, sway: false, ids: [...POTS, ...PLANTER_CROWNS] },
 };
 
 /** Every veg.* kind this family upgrades, with the Kenney models it needs. */
@@ -341,4 +378,5 @@ export function register(r: AssetRegistry): void {
   r.addRoles(ROLES);
   registerKenneyVegetation(r);
   vehicles.register(r); // K2
+  buildings.register(r); // K3
 }

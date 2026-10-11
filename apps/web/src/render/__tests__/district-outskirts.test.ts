@@ -2,7 +2,9 @@
 // few houses, the water tower, fields/gardens as areas, hedges and fences, a lakeside promenade. Checks the district
 // contract (region, registered kinds that build, validatePlacements, 2 u around stops/platforms/queues, stations and
 // level crossings left to D4, no overlap with the other districts), the composition rules (nothing tall on the
-// camera/water side, nothing hiding a stop, platform or queue line from the default camera) and the content.
+// camera/water side, nothing hiding a stop, platform or queue line from the default camera), the content and the
+// countryside read (pine-led forest rims with stands and gaps, hedged fields, the knoll gate path, a hamlet on an
+// arterial, rare blossom pinks) plus a build-time guard (it runs at module load).
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { stationPlacement, TOWN } from '@headway/sim';
@@ -317,26 +319,60 @@ describe('D5 outskirts: composition', () => {
   });
 });
 
-describe('DEBUG', () => {
-  it('knoll debug', async () => {
-    const { OutskirtsTown } = await import('../districts/outskirts');
-    const t = new OutskirtsTown(TOWN, DISTRICTS.filter((d) => d.id !== 'outskirts'));
-    for (const [x, z, rot, len] of [[-31.2, -20.3, 0, 4.7], [-33.6, -17.9, Math.PI / 2, 4.7], [-28.8, -16.425, Math.PI / 2, 1.7]] as const) {
-      const it = { kind: 'st.fence', x, z, rot, params: { length: len, style: 'rail' } };
-      const f = footprintOf(it); const r = { x0: x - f.w / 2, x1: x + f.w / 2, z0: z - f.d / 2, z1: z + f.d / 2 };
-      console.log('KN', x, z, 'ground', t.groundFree(r, 2.2, 1.3), 'road', t.nearRoad(r, 2.2), 'rail', t.nearRail(r, 1.3), 'fits', t.fits(it, { inArea: true, rail: 1.3 }));
-    }
+describe('D5 outskirts: countryside', () => {
+  const exits = TOWN.roads.edges.filter((e) => e.path.points.some((p) => p.x <= B.minX + 0.5 || p.x >= B.maxX - 0.5 || p.z <= B.minZ + 0.5 || p.z >= B.maxZ - 0.5));
+  const near = (p: Vec2, pts: Vec2[]) => Math.min(...pts.slice(1).map((q, i) => segDist(p, pts[i]!, q)));
+
+  it('the mountain edges read as forest: dense, pine-led, with stands and gaps', () => {
+    const rim = items.filter((it) => TREES.has(it.kind) && (it.z < B.minZ + 4 || it.x < B.minX + 4));
+    expect(rim.length).toBeGreaterThanOrEqual(30);
+    const by = new Map<string, number>();
+    for (const it of rim) by.set(it.kind, (by.get(it.kind) ?? 0) + 1);
+    const top = [...by.entries()].sort((a, b) => b[1] - a[1])[0]!;
+    expect(top[0]).toBe('veg.pine');
+    expect(by.size).toBeGreaterThanOrEqual(3); // mixed, not a monoculture
+    // not one unbroken row: along the north edge there are gaps of at least 2.5 u between neighbouring trees
+    const north = rim.filter((it) => it.z < B.minZ + 4).map((it) => it.x).sort((a, b) => a - b);
+    const gaps = north.slice(1).filter((x, i) => x - north[i]! > 2.5).length;
+    expect(gaps).toBeGreaterThanOrEqual(3);
   });
-  it('dump plan', async () => {
-    const fs = await import('node:fs');
-    const t0 = performance.now(); buildOutskirts(TOWN, DISTRICTS.filter((d) => d.id !== 'outskirts')); console.log('build ms', performance.now() - t0);
-    const by: Record<string, number> = {}; for (const it of items) by[it.kind] = (by[it.kind] ?? 0) + 1; console.log(items.length, JSON.stringify(by)); console.log('HEDGE/FENCE', items.filter((i) => i.kind === 'veg.hedge' || i.kind === 'st.fence').map((i) => `${i.kind} ${i.x},${i.z} r${(i.rot ?? 0).toFixed(2)} ${JSON.stringify(i.params)}`).join(' | ')); console.log('HOUSES', items.filter((i) => i.kind === 'res.house').map((i) => `${i.x},${i.z} r${(i.rot ?? 0).toFixed(2)}`).join(' | '));
-    const fp = (it: PlacedAsset) => ({ ...it, f: footprintOf(it), h: H(it) });
-    fs.writeFileSync('/tmp/d5/plan.json', JSON.stringify({
-      bounds: B, roads: TOWN.roads.edges.map((e) => ({ id: e.id, pts: e.path.points })), rail: TOWN.rail.loop.points,
-      stops: TOWN.stops.map((s) => ({ p: s.p, q: s.queueDir })), platforms: TOWN.rail.stations.map((s) => ({ p: s.platform, q: s.queueDir })),
-      hoods: TOWN.neighborhoods, zones: TOWN.zones.map((z) => z.door),
-      districts: DISTRICTS.map((d) => ({ id: d.id, region: d.region, items: d.items.map(fp), areas: d.areas, paths: d.paths })),
-    }));
+
+  it('has crop fields with hedgerows, and a fenced water-tower knoll with a path from the road', () => {
+    const big = OUTSKIRTS.areas.filter((a) => a.kind === 'garden' && Math.abs(a.polygon.reduce((s, p, i) => { const q = a.polygon[(i + 1) % a.polygon.length]!; return s + p.x * q.z - q.x * p.z; }, 0) / 2) >= 12);
+    expect(big.length).toBeGreaterThanOrEqual(1);
+    const hedges = items.filter((it) => it.kind === 'veg.hedge');
+    for (const f of big) {
+      const xs = f.polygon.map((p) => p.x), zs = f.polygon.map((p) => p.z);
+      const box = { x0: Math.min(...xs) - 1, x1: Math.max(...xs) + 1, z0: Math.min(...zs) - 1, z1: Math.max(...zs) + 1 };
+      expect(hedges.some((h) => h.x > box.x0 && h.x < box.x1 && h.z > box.z0 && h.z < box.z1), 'a hedgerow borders the field').toBe(true);
+    }
+    const tower = items.find((it) => it.kind === 'lm.waterTower')!;
+    const fences = items.filter((it) => it.kind === 'st.fence' && Math.abs(it.x - tower.x) < 3 && Math.abs(it.z - tower.z) < 3);
+    expect(fences.length).toBeGreaterThanOrEqual(4); // three sides + the split gate side
+    const path = OUTSKIRTS.paths.find((p) => Math.min(...p.points.map((q) => Math.hypot(q.x - tower.x, q.z - tower.z))) < 3.2);
+    expect(path, 'a path leads from the knoll gate').toBeDefined();
+    const roads = TOWN.roads.edges.map((e) => e.path.points);
+    const end = path!.points[path!.points.length - 1]!;
+    expect(Math.min(...roads.map((pts) => near(end, pts)))).toBeLessThan(2.6);
+  });
+
+  it('the town carries on along its arterials: at least one house fronts a road that leaves the board', () => {
+    const hamlet = items.filter((it) => HOUSES.has(it.kind)).filter((h) => {
+      const rot = h.rot ?? 0, front = { x: h.x + Math.sin(rot) * 4, z: h.z + Math.cos(rot) * 4 };
+      return exits.some((e) => near(front, e.path.points) < 1.6);
+    });
+    expect(hamlet.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps blossom pinks rare (gameplay owns saturation)', () => {
+    const trees = items.filter((it) => TREES.has(it.kind));
+    expect(items.filter((it) => it.kind === 'veg.cherry').length / trees.length).toBeLessThan(0.12);
+  });
+
+  it('builds fast enough to run at module load', () => {
+    const others = DISTRICTS.filter((d) => d.id !== 'outskirts');
+    const t0 = performance.now();
+    buildOutskirts(TOWN, others);
+    expect(performance.now() - t0).toBeLessThan(1500);
   });
 });

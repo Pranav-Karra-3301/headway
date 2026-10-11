@@ -25,7 +25,7 @@ export const WATER_COLORS: Record<PaletteId, WaterColors> = {
   // that never out-shouts the buses); sand #ECDCBD.
   a: {
     shallow: '#AEE4DF', mid: '#82CCD5', deep: '#5EAFC4', foam: '#FFFDF7',
-    duskNear: '#5B5E96', duskFar: '#2E3A72', glow: '#FFC77A',
+    duskNear: '#5A5E8E', duskFar: '#2F3A6A', glow: '#FFC77A',
     sand: '#EEDDBD', wetSand: '#DFC9A2', bedSand: '#C9B793',
   },
   b: {

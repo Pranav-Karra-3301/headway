@@ -5,7 +5,7 @@ import { G0, REF, validatePolicy } from '@headway/sim';
 import type { Emphasis, EvolveEvent, FailureFinding, Generation, Policy, Proposal, Round, RunResult, SplitScore } from '@headway/sim';
 import { topFindings, worstGap } from './aggregate';
 import { buildDigest, signedPct } from './digest';
-import { policyBody, runProbes, type ProbeResult } from './evaluate';
+import { policyBody, runProbes, sampleFeatures, type FeatureSamples, type ProbeResult } from './evaluate';
 import { extractJson } from './extract';
 import type { LlmClient, LlmRequest } from './llm';
 import { proposalNarrative } from './narrative';
@@ -22,6 +22,10 @@ export interface RoundDeps {
   llm: LlmClient; model: string; store: EvolveStore; emit(e: EvolveEvent): void; now(): string;
   evaluate(policy: Policy, split: 'train' | 'val'): Promise<{ score: SplitScore; results: RunResult[] }>;
   temperatures?: [number, number, number];
+  /** Decision-point feature vectors of a policy on the training split (default: the real engine). */
+  sampleFeatures?(policy: Policy): FeatureSamples | Promise<FeatureSamples>;
+  /** Most one-change probes per round (default 50; 0 turns probes off, e.g. where CPU time is tight). */
+  probeLimit?: number;
 }
 
 // ---------- settings (spec §7, §8.2) ----------
@@ -32,6 +36,8 @@ const DESIGNERS = [0, 1, 2] as const;
 const MAX_TOKENS = 8000;
 const TIMEOUT_MS = 90_000;
 const HISTORY_PROPOSALS = 12;      // the last 4 rounds × 3 designers
+const PROBE_LIMIT = 50;
+const NEW_RULE_DESIGNER = 2;       // designer 'c' must add at least one new rule each round
 const MIN_GAIN_PCT = 1;            // J_train at least 1% better (tunable)
 const MAX_COMPLETION_DROP = 1;     // percentage points
 const GAP_FLOOR_S = 900;           // worst gap ≤ max(champion's worst, 900 s)
@@ -73,7 +79,7 @@ function pctChange(value: number, base: number): number {
 }
 
 /** Extract, stamp and validate one designer reply (spec §8.3). Meta is always stamped by the runner. */
-function parseReply(text: string, meta: Omit<Policy['meta'], 'summary'>, championBody: string): Parsed {
+function parseReply(text: string, meta: Omit<Policy['meta'], 'summary'>, championBody: string, championRuleIds?: Set<string>): Parsed {
   const json = extractJson(text);
   if (!isRecord(json)) {
     return { ok: false, summary: '', errors: ['reply contained no JSON object: answer with one JSON object {"summary", "rationale", "changes", "policy"}'] };
@@ -89,7 +95,10 @@ function parseReply(text: string, meta: Omit<Policy['meta'], 'summary'>, champio
   const v = validatePolicy({ ...raw, meta: { ...meta, summary } });
   if (!v.ok) return { ok: false, summary, errors: v.errors };
   if (policyBody(v.policy) === championBody) {
-    return { ok: false, summary, errors: ['the policy is identical to the champion: make 1 to 3 focused changes'] };
+    return { ok: false, summary, errors: ['the policy is identical to the champion: make 1 or 2 focused changes'] };
+  }
+  if (championRuleIds && !v.policy.rules.some((r) => !championRuleIds.has(r.id))) {
+    return { ok: false, summary, errors: ['you must add at least one NEW rule (a new id with its own conditions and action), not only threshold, allocation or default edits'] };
   }
   const changes = Array.isArray(json.changes) ? json.changes.map(str).filter(Boolean).slice(0, 5).map(noDot) : [];
   const rationale = clip([str(json.rationale), changes.length ? `Changes: ${changes.join('; ')}.` : ''].filter(Boolean).join(' '), MAX_RATIONALE);
@@ -124,8 +133,10 @@ async function design(ctx: Ctx, i: Designer): Promise<Draft> {
   const meta = (): Omit<Policy['meta'], 'summary'> =>
     ({ id: d.id, parent: champion.id, generation: champion.number + 1, author: d.model, emphasis: d.emphasis });
 
+  const requireNewRule = i === NEW_RULE_DESIGNER;
+  const ruleIds = requireNewRule ? new Set(champion.policy.rules.map((r) => r.id)) : undefined;
   const req: LlmRequest = {
-    model: deps.model, system: ctx.system, user: designerUserPrompt({ emphasis: d.emphasis, champion: champion.policy, digest: ctx.digest }),
+    model: deps.model, system: ctx.system, user: designerUserPrompt({ emphasis: d.emphasis, champion: champion.policy, digest: ctx.digest, requireNewRule }),
     temperature: ctx.temps[i], maxTokens: MAX_TOKENS, json: true, timeoutMs: TIMEOUT_MS,
   };
   let text: string;
@@ -136,7 +147,7 @@ async function design(ctx: Ctx, i: Designer): Promise<Draft> {
   } catch (e) {
     return fail([`designer call failed: ${errText(e)}`], '');
   }
-  let parsed = parseReply(text, meta(), ctx.championBody);
+  let parsed = parseReply(text, meta(), ctx.championBody, ruleIds);
   event('received', { ...(parsed.summary ? { summary: parsed.summary } : {}), ...(parsed.ok ? {} : { errors: parsed.errors }) });
 
   if (!parsed.ok) {
@@ -145,7 +156,7 @@ async function design(ctx: Ctx, i: Designer): Promise<Draft> {
     try {
       const res = await deps.llm.complete({ ...req, user });
       d.model = res.model;
-      parsed = parseReply(res.text, meta(), ctx.championBody);
+      parsed = parseReply(res.text, meta(), ctx.championBody, ruleIds);
     } catch (e) {
       return fail([...first.errors, `repair call failed: ${errText(e)}`], first.summary);
     }
@@ -207,9 +218,16 @@ export async function runRound(deps: RoundDeps): Promise<{ round: Round; generat
   }
   const history = await deps.store.history(HISTORY_PROPOSALS).catch((): Proposal[] => []);
   // sensitivity probes: one-step variants of the champion, training split only (logged as 'eval' events)
-  const probes: ProbeResult[] = await runProbes(deps.evaluate, champion.policy, champTrain.score.J, (r, runs) =>
-    emit({ type: 'eval', proposalId: `probe: ${r.label} → ΔJ ${signedPct(r.deltaPct)}`, split: 'train', done: runs, total: runs }),
-  ).catch((): ProbeResult[] => []);
+  const probeLimit = deps.probeLimit ?? PROBE_LIMIT;
+  const probes: ProbeResult[] = probeLimit <= 0 ? [] : await (async () => {
+    const samples = await (deps.sampleFeatures ? deps.sampleFeatures(champion.policy) : sampleFeatures(champion.policy));
+    return runProbes(deps.evaluate, champion.policy, champTrain.score.J, (r, runs) =>
+      emit({ type: 'eval', proposalId: `probe: ${r.label} → ΔJ ${signedPct(r.deltaPct)}`, split: 'train', done: runs, total: runs }),
+    { results: champTrain.results, samples, limit: probeLimit });
+  })().catch((e: unknown): ProbeResult[] => {
+    emit({ type: 'error', message: `probes failed: ${errText(e)}` });
+    return [];
+  });
   const ctx: Ctx = {
     deps, n, champion, emit, system: designerSystemPrompt(), temps: deps.temperatures ?? TEMPERATURES,
     digest: buildDigest({ champion: { policy: champion.policy, results: champTrain.results }, baseline, reference, history, probes }),

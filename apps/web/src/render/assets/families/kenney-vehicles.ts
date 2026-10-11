@@ -3,7 +3,9 @@
 //   kn.boat.*  moored boats, a buoy and a cargo ship. Bow faces +z. Origin = the WATERLINE (hulls sink below y = 0):
 //              place them at the water level (e.g. world/water WATER_LEVEL).
 // Everyday cars and marina boats get a per-placement paint from the palette `car` role (harmonised with the kit cars,
-// follows palette switches, bakes through bakeGeometry); taxis, service vehicles and the tractor keep their colours.
+// follows palette switches, bakes through bakeGeometry); taxis, service vehicles, the tractor and wooden rowing boats
+// keep their colours. Car windows (Kenney's white glass) take the palette `glass` role like our bus and kit cars; the
+// cargo ship's loud containers are toned to palette paints.
 // params:
 //   model: number  pick the model of a mixed kind (kn.car.random, kn.boat.random) instead of k.rand()
 //   paint: number  palette `car` colour index; -1 keeps the pipeline colour
@@ -29,16 +31,25 @@ export interface VehicleSpec {
   w: number; d: number; h: number;
   /** Recolour the paint part to the palette `car` role. */
   paint: boolean;
+  /** Extra part roles that take the paint too (e.g. the delivery truck's green box). */
+  paintRoles?: readonly string[];
+  /** Fixed per-role recolours (role → [palette role, idx]), applied before paint. */
+  recolor?: Readonly<Record<string, readonly [string, number]>>;
   /** Boats: how deep the keel sits below the waterline (u), per model or one value. */
   sink?: number | readonly number[];
   boat?: boolean;
   note: string;
 }
 
-const car = (kind: string, ids: KenneyId[], w: number, d: number, h: number, paint: boolean, note: string, weights?: number[]): VehicleSpec =>
-  ({ kind, ids, w, d, h, paint, note, ...(weights ? { weights } : {}) });
-const boat = (kind: string, ids: KenneyId[], w: number, d: number, h: number, sink: number | number[], paint: boolean, note: string, weights?: number[]): VehicleSpec =>
-  ({ kind, ids, w, d, h, sink, paint, boat: true, note, ...(weights ? { weights } : {}) });
+const car = (kind: string, ids: KenneyId[], w: number, d: number, h: number, paint: boolean, note: string, extra: Partial<VehicleSpec> = {}): VehicleSpec =>
+  ({ kind, ids, w, d, h, paint, note, ...extra });
+const boat = (kind: string, ids: KenneyId[], w: number, d: number, h: number, sink: number | number[], paint: boolean, note: string, extra: Partial<VehicleSpec> = {}): VehicleSpec =>
+  ({ kind, ids, w, d, h, sink, paint, boat: true, note, ...extra });
+
+/** Models that never take a paint even inside a painted kind (wooden rowing boats stay wood). */
+export const NO_PAINT: ReadonlySet<KenneyId> = new Set(['watercraft-pack/boat-row-small', 'watercraft-pack/boat-row-large']);
+/** car-kit glass: Kenney's white windows (the lighter of the two white blocks) → our vehicle glass. */
+const isCarGlass = (role: string, shade: number) => role === 'knWhite' && Math.abs(shade + 0.03) < 1e-6;
 
 /** Everyday parked cars (kn.car.random) with relative frequency. */
 const EVERYDAY: KenneyId[] = [
@@ -64,25 +75,27 @@ export const VEHICLE_SPECS: readonly VehicleSpec[] = [
   car('kn.car.pickup', ['car-kit/truck'], 1.0, 1.95, 0.95, true, 'Kenney pickup truck, palette paint'),
   car('kn.car.flatbed', ['car-kit/truck-flat'], 1.0, 1.8, 0.95, true, 'Kenney flatbed truck, palette paint'),
   car('kn.car.taxi', ['car-kit/taxi'], 1.0, 1.8, 1.05, false, 'Kenney taxi (keeps yellow)'),
-  car('kn.car.delivery', ['car-kit/delivery'], 1.0, 2.15, 1.65, true, 'Kenney box delivery truck, palette paint'),
+  car('kn.car.delivery', ['car-kit/delivery'], 1.0, 2.15, 1.65, true, 'Kenney box delivery truck, palette paint', { paintRoles: ['knGreen'] }),
   car('kn.car.police', ['car-kit/police'], 1.0, 1.9, 0.9, false, 'Kenney police car'),
   car('kn.car.ambulance', ['car-kit/ambulance'], 1.0, 2.15, 1.25, false, 'Kenney ambulance'),
   car('kn.car.firetruck', ['car-kit/firetruck'], 1.0, 2.15, 1.2, false, 'Kenney fire truck'),
   car('kn.car.garbage', ['car-kit/garbage-truck'], 1.05, 2.25, 1.15, false, 'Kenney garbage truck'),
   car('kn.car.tractor', ['car-kit/tractor'], 0.9, 1.3, 1.25, false, 'Kenney farm tractor (outskirts fields)'),
-  car('kn.car.random', EVERYDAY, 1.0, 1.95, 1.05, true, 'random everyday car per placement (parking lots, driveways)', EVERYDAY_W),
+  car('kn.car.random', EVERYDAY, 1.0, 1.95, 1.05, true, 'random everyday car per placement (parking lots, driveways)', { weights: EVERYDAY_W }),
   boat('kn.boat.sail', ['watercraft-pack/boat-sail-a'], 1.2, 2.5, 2.55, 0.2, true, 'sailboat, tall mast (moored: place at water level)'),
   boat('kn.boat.sailLarge', ['watercraft-pack/boat-sail-b'], 1.2, 2.65, 2.1, 0.2, true, 'longer sailboat with cabin'),
   boat('kn.boat.speed', ['watercraft-pack/boat-speed-a'], 1.2, 2.2, 1.0, 0.17, true, 'speedboat with windscreen'),
   boat('kn.boat.runabout', ['watercraft-pack/boat-speed-c'], 1.2, 2.1, 0.85, 0.17, true, 'small open runabout'),
   boat('kn.boat.fishing', ['watercraft-pack/boat-fishing-small'], 1.2, 2.55, 1.7, 0.2, true, 'small fishing boat with wheelhouse'),
-  boat('kn.boat.row', ['watercraft-pack/boat-row-small'], 1.8, 1.55, 0.55, 0.08, true, 'rowing boat with oars'),
-  boat('kn.boat.rowLarge', ['watercraft-pack/boat-row-large'], 1.8, 1.9, 0.55, 0.08, true, 'larger rowing boat with oars'),
+  boat('kn.boat.row', ['watercraft-pack/boat-row-small'], 1.8, 1.55, 0.55, 0.08, false, 'wooden rowing boat with oars'),
+  boat('kn.boat.rowLarge', ['watercraft-pack/boat-row-large'], 1.8, 1.9, 0.55, 0.08, false, 'larger wooden rowing boat with oars'),
   boat('kn.boat.tug', ['watercraft-pack/boat-tug-b'], 1.2, 1.9, 1.5, 0.2, false, 'harbour tug'),
   boat('kn.boat.house', ['watercraft-pack/boat-house-a'], 1.75, 3.05, 1.45, 0.18, false, 'house boat'),
   boat('kn.boat.buoy', ['watercraft-pack/buoy'], 0.6, 0.6, 1.2, 0.25, false, 'channel buoy'),
-  boat('kn.boat.cargoShip', ['watercraft-pack/ship-cargo-a'], 2.55, 6.9, 2.2, 0.35, false, 'coastal cargo ship (far out in the bay)'),
-  boat('kn.boat.random', MARINA, 1.8, 2.65, 2.55, MARINA_SINK, true, 'random marina boat per placement (moorings)', MARINA_W),
+  boat('kn.boat.cargoShip', ['watercraft-pack/ship-cargo-a'], 2.55, 6.9, 2.2, 0.35, false, 'coastal cargo ship (far out in the bay)', {
+    recolor: { knYellow: ['car', 1], knRed: ['car', 0], knGreen: ['car', 3], knBlue: ['car', 2] },
+  }),
+  boat('kn.boat.random', MARINA, 1.8, 2.65, 2.55, MARINA_SINK, true, 'random marina boat per placement (moorings)', { weights: MARINA_W }),
 ];
 export const VEHICLE_KINDS: readonly string[] = VEHICLE_SPECS.map((s) => s.kind);
 const SPEC_BY_KIND = new Map(VEHICLE_SPECS.map((s) => [s.kind, s] as const));
@@ -112,7 +125,7 @@ export function vehicleChoice(spec: VehicleSpec, k: Pick<KitContext, 'rand'>, pa
   const modelRoll = k.rand();
   const paintRoll = k.rand();
   const index = typeof params.model === 'number' ? mod(params.model, spec.ids.length) : pickIndex(spec, modelRoll);
-  const paint = !spec.paint ? -1 : typeof params.paint === 'number' ? (params.paint < 0 ? -1 : mod(params.paint, CAR_PAINTS)) : Math.min(CAR_PAINTS - 1, Math.floor(paintRoll * CAR_PAINTS));
+  const paint = !spec.paint || NO_PAINT.has(spec.ids[index]!) ? -1 : typeof params.paint === 'number' ? (params.paint < 0 ? -1 : mod(params.paint, CAR_PAINTS)) : Math.min(CAR_PAINTS - 1, Math.floor(paintRoll * CAR_PAINTS));
   return { id: spec.ids[index]!, index, paint };
 }
 
@@ -136,7 +149,13 @@ function buildVehicle(spec: VehicleSpec, k: KitContext, params: AssetParams): TH
     return g;
   }
   const m = kenneyModel(id);
-  if (paint >= 0) recolorKenney(m, (p) => (p.paint ? { role: 'car', idx: paint, shade: 0 } : null));
+  const fixed = spec.recolor, extra = spec.paintRoles, glass = !spec.boat;
+  recolorKenney(m, (p) => {
+    if (paint >= 0 && (p.paint || extra?.includes(p.role))) return { role: 'car', idx: paint, shade: 0 };
+    if (glass && isCarGlass(p.role, p.shade)) return { role: 'glass', idx: 0, shade: 0 };
+    const f = fixed?.[p.role];
+    return f ? { role: f[0], idx: f[1], shade: 0 } : null;
+  });
   m.position.y = -sink;
   g.add(m);
   g.userData.variant = `${id}#${paint}`;

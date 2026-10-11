@@ -209,7 +209,7 @@ describe('district stadium: railway', () => {
       expect(dot(f, toRail), s.id).toBeGreaterThan(0);
       expect(Math.abs(dot(f, t)), s.id).toBeLessThan(1e-6);
       // front edge on the platform edge (1.0–1.4 u from the rail centreline), building on the town side
-      const frontEdge = { x: b.x + f.x * (c.d / 2), z: b.z + f.z * (c.d / 2) };
+      const frontEdge = { x: b.x + f.x * ((c.d * (b.scale ?? 1)) / 2), z: b.z + f.z * ((c.d * (b.scale ?? 1)) / 2) };
       const fe = railDist(frontEdge);
       expect(fe, s.id).toBeGreaterThanOrEqual(1.0);
       expect(fe, s.id).toBeLessThanOrEqual(1.4);
@@ -234,7 +234,7 @@ describe('district stadium: railway', () => {
 
   it('has a level crossing on every road/rail crossing outside the rail tunnel, road along its local z', () => {
     const crossings = roadRailCrossings();
-    expect(crossings.length).toBeGreaterThanOrEqual(3);
+    expect(crossings.length).toBeGreaterThanOrEqual(2); // v10 regional line: Atherton St north + the South Rd east
     const lc = ofKind('lm.levelCrossing');
     const atGrade = crossings.filter((c) => !inTunnel(nearestDist(loop, c.p), 2));
     expect(lc).toHaveLength(atGrade.length);

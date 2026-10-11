@@ -116,8 +116,14 @@ describe('buildLaneGraph', () => {
     for (const c of at) for (const d of at) if (c !== d && (c.from === d.from || c.to === d.to)) expect(c.conflicts.has(d.id)).toBe(true);
   });
 
-  it('finds the level crossings where exit roads cross the rail loop', () => {
-    expect(graph.crossings.length).toBe(8); // 4 exit roads × 2 directions
+  it('finds the level crossings where roads cross the rail loop (both directions), none inside junction boxes', () => {
+    expect(graph.crossings.length).toBeGreaterThan(0);
+    expect(graph.crossings.length % 2).toBe(0);
+    const byEdge = new Map<string, number>();
+    for (const x of graph.crossings) byEdge.set(x.lane.edgeId, (byEdge.get(x.lane.edgeId) ?? 0) + (x.lane.forward ? 1 : -1));
+    for (const v of byEdge.values()) expect(v).toBe(0);
+    // Turns never cross the track unprotected: no connector comes near the rail.
+    for (const c of graph.connectors) for (const p of c.poly.points) expect(projectOnPolyline(TOWN.rail.loop, p).d).toBeGreaterThan(0.8);
     for (const x of graph.crossings) {
       const p = pointAt(x.lane.poly, x.s);
       const r = pointAt(TOWN.rail.loop, x.railDist);

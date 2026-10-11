@@ -9,7 +9,7 @@ import { AssetRegistry } from '../assets/registry';
 import type { AssetParams, KitContext } from '../assets/types';
 import { PALETTES } from '../palettes';
 
-const ENTRIES = CATALOG.filter((c) => c.family === 'street');
+const ENTRIES = CATALOG.filter((c) => c.family === 'street' && c.kind.startsWith('st.')); // kn.car.* / kn.boat.* (K2) share the family id
 const BUDGET = 600;
 const SEEDS = [1, 2, 3, 7, 11, 23, 42, 99];
 

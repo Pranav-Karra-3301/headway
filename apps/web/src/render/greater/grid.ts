@@ -1,35 +1,70 @@
-// Owner: G0. Greater-town grid seam: the visual-only ring of town (28 u wide on every side) around the playable
-// board, laid out on Kenney city-kit-roads tiles. Pure data — no three.js, no DOM, deterministic. Every G track
-// builds on it; the sim never sees it.
+// Owner: G0. Greater-town grid seam: the visual-only town around the playable board, laid out on Kenney
+// city-kit-roads tiles and shaped by the town map (rail, ridge, bay). Pure data — no three.js, no DOM, deterministic.
+// Every G track builds on it; the sim never sees it.
 //
-//   import { greaterGrid, cellCenter, cellOf } from '../grid';
+//   import { greaterGrid, cellCenter, cellOf, isWater } from '../grid';
 //   const g = greaterGrid(TOWN);                 // memoised per map
 //
 // FRAME  x east, z south, y up (board top y = 0). One road tile = g.tile = 4 u. Cell (c, r) spans
-//        x ∈ [origin.x + 4c, origin.x + 4c + 4), z likewise with r. 32 cols × 27 rows, origin = bounds.min − 28 u.
-//        The board covers g.board (cols 7–24 × rows 7–19); rows 0–3 (g.highway) belong to G1's highway band.
-// USE    g.use[r][c]: 'board' | 'highway' | 'road' | 'free'. Only 'free' cells may be dressed (G2/G3).
-// ROADS  g.roads: every placed tile — Kenney model id (or null for the procedural east-exit connector), footprint,
-//        centre + rotation about +y, open sides. Rendered by ./roads (createGreaterRoadsLayer).
-// NETWORK (built from the exits of the town map):
-//        - a roundabout where every board exit road leaves the board (N, W, S abut the board; E sits one cell out,
-//          joined by an S-bend because the town's east exit is 1.4 u off the cell centre),
-//        - the Ring Road (orbital, 6 u off the board; 10 u on the east), Foothill Rd on the west, the Lakeshore
-//          Parkway along the south and east (waterfront strip beyond it), radial streets, local streets,
-//        - a gateway roundabout where the west radial meets Foothill Rd (it runs on into the mountains) and a
-//          harbour roundabout on the parkway with a short pier road to the shore.
+//        x ∈ [origin.x + 4c, origin.x + 4c + 4), z likewise with r. 32 cols × 27 rows, origin = bounds.min − 28 u
+//        → g.bounds = x −64..64, z −54..54. The board covers g.board (cols 7–24 × rows 7–19).
+// USE    g.use[r][c]: 'board' | 'highway' (rows 0–3, G1's band) | 'road' | 'rail' (off-board rail on the beach: keep
+//        clear) | 'hill' (ridge spur over the rail tunnel: E1 terrain / forest) | 'water' (the bay) | 'free'.
+//        Only 'free' cells may be built on (G2 / G3, via g.blocks).
+// LAND   v9 organic city: the BAY (water south-east of g.shore, polygon g.water, isWater()) holds the rail bridge; the
+//        shore hugs the board's south-east 4 u out (the beach the rail runs on), leaves an NE headland and SW land.
+//        The RIDGE SPUR covers the rail's west tunnel from the rail to the board edge (portals there); Main St cuts it.
+// ROADS  g.roads: every placed tile — Kenney model id (or null for the procedural east-exit S-bend), footprint, centre
+//        + rotation about +y, open sides; `bridge` = causeway over the bay, `railCrossing` = level crossing (square-on).
+//        Rendered by ./roads (createGreaterRoadsLayer, 3 draw calls).
+// NETWORK every board exit continues into a roundabout: North Gate Circle (its north arm → G1's highway), Foothill
+//        Circle (Main St, beyond the spur; west arm → off the grid into the mountains), South Gate Circle (Atherton
+//        St, after crossing the rail on the beach; south arm → causeway off the grid), Lakeside Circle (South Rd via
+//        an S-bend; east arm → causeway off the grid). Ring Rd (north + east), Foothill Rd (west), Lakeshore Pkwy
+//        (south-west shore), locals (Hillside Ave, Quarry Rd, Stadium Way, Mill St, Harbor St, Marina Rd, Bayview Ave).
 // STREETS g.streets: named centrelines per stretch (lamps, poles, trees along the kerb). Cross-section: lanes at
 //        ±KERB.lane, curb at ±KERB.carriage, sidewalk outer edge at ±KERB.walk (sidewalk top y = KERB.walkTop).
-// JUNCTIONS g.junctions (tee / cross / roundabout / end, with arms; `signals` marks major junctions for traffic
-//        lights) and g.roundabouts (centre, island radius for a statue/tree/fountain, lane + kerb radii).
+// JUNCTIONS g.junctions (tee / cross / roundabout / end, with arms; `signals` marks junctions for traffic lights) and
+//        g.roundabouts (centre, island radius for a statue / tree / fountain, lane + kerb radii).
 // LANES  g.lanes: directed lane centrelines for visual traffic (right-hand; roundabouts run anticlockwise seen from
 //        above), each with a cruise speed hint, `next` successors and `yield` at give-way points. Lanes join where
 //        one ends and another starts: add your own (G1 highway, ramps) and call linkLanes(all) to relink.
-// PORTS  g.ports: where lanes leave the grid — 'board' (the town's exit roads: spawn/despawn here), 'edge' (off
-//        the diorama: the west radial into the mountain tunnel), 'highway' (G1's interchange connects here: the
-//        north roundabout's north arm at the highway band edge).
-// BLOCKS g.blocks: dressable rectangles of free cells, with the sides that face a street and a zone hint
-//        (suburb NW/NE, commercial S/SE, industrial SW, frontage strips beside the board, verges, waterfront).
+// PORTS  g.ports — v9 traffic: cars enter / leave ONLY at 'edge' (w: mountain road tunnel, s + e: causeways over the
+//        bay) and 'highway' (G1 connects to the north roundabout's north arm at the band edge). 'board' ports are the
+//        town's exit roads (`townEdge` = TOWN.roads edge id): pass through onto the town's streets, never spawn there.
+// BLOCKS g.blocks: dressable rectangles of free cells: street frontage sides, zone hint (suburb NW / NE, commercial
+//        S, industrial W / SW, frontage strips beside the board, verges, waterfront strips), `shore` (touches the
+//        bay), `density` 0..1 (thins out with noise away from the board: below ~0.35 dress as park / field / forest)
+//        and a `seed`.
+//
+// MAP (TOWN today; # board, = highway band, ^ ridge spur, + rail, ~ bay, X level crossing, B causeway, O roundabout,
+//      ◜ 2×2 curve, S S-bend, e cul-de-sac, ≡ zebra; letters = block zones: s suburb, c commercial, i industrial,
+//      f frontage, v verge, w waterfront, p park):
+//          0         1         2         3
+//          01234567890123456789012345678901
+//       0  ================================
+//       4  vvvvvvvvvvvvvvOOOvvvvvvvvvvvssss
+//       5  v◜◜───────────OOO─────────◜◜ssss
+//       6  v◜◜fffffffffffOOOfffffffff◜◜ssss
+//       7  v│ss^^^##################ff│ssss
+//       9  v┬─e^^^##################ff│ssss
+//      10  v│ss^^^##################ff┬─epp
+//      12  OOOp^^^##################ff│ssss
+//      13  OOO≡───##################ff│ssss
+//      14  OOOp^^^##################ff│ssss
+//      15  v│ii^^^##################ff│www~
+//      16  v│ii^^^##################SOOOw~~
+//      17  v┬─e^^^##################SOOO≡BB
+//      18  v│pp^^^##################wOOOw~~
+//      19  v│fffff##################wwew~~~
+//      20  v┬─────────┐ff+X+++www++ww~~~~~~
+//      21  v│pcccccccc│ffp≡++++++++~~~~~~~~
+//      22  v◜◜cccccccc│ffOOO+++++++~~~~~~~~
+//      23  v◜◜──≡──┬──┬─≡OOOe~~~~~~~~~~~~~~
+//      24  wwwwwwww│wwwwwOOOw~~~~~~~~~~~~~~
+//      25  wwwwwwwwewwwwww≡w~~~~~~~~~~~~~~~
+//      26  ~~~~~~~~~~w~~~~B~~~~~~~~~~~~~~~~
+//      (G0_DUMP=1 vitest run src/render/greater/roads/__tests__/debug-dump.test.ts --silent=false prints it live.)
 import { polyline } from '@headway/sim';
 import type { Polyline, TownMap, Vec2 } from '@headway/sim';
 import type { KenneyId } from '../assets/kenney/index';

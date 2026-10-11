@@ -106,7 +106,7 @@ float hwFoam = 0.0;
 	float w = 0.22 + 0.2 * edgeN;
 	hwFoam = 1.0 - smoothstep( w * 0.45, w, hwS );
 	for ( int k = 0; k < 2; k ++ ) {
-		float ph = fract( uTime / 6.5 + float( k ) * 0.5 + hwNoise( hwP * 0.07 + float( k ) * 4.0 ) * 0.4 );
+		float ph = fract( uTime / 5.5 + float( k ) * 0.5 + hwNoise( hwP * 0.07 + float( k ) * 4.0 ) * 0.4 );
 		float lineD = mix( 2.3, 0.25, ph );
 		float lw = 0.06 + 0.07 * ph;
 		float ln = 1.0 - smoothstep( lw * 0.4, lw, abs( hwS - lineD ) );
@@ -162,7 +162,7 @@ vec3 hwEmit = vec3( 0.0 );
 if ( uDusk > 0.001 ) {
 	float far = smoothstep( 1.0, 24.0, hwShore + ( hwN1 - 0.5 ) * 3.0 );
 	vec3 sky = mix( uDuskNear, uDuskFar, far );
-	hwEmit += sky * ( 0.34 + 0.07 * hwN2 ) * uDusk * ( 1.0 - 0.7 * hwFoam );
+	hwEmit += sky * ( 0.28 + 0.06 * hwN2 ) * uDusk * ( 1.0 - 0.7 * hwFoam );
 	hwEmit += uFoam * hwFoam * 0.16 * uDusk;
 	hwEmit += uGlow * uDusk * 0.1 * ( 1.0 - smoothstep( 0.0, 6.0, hwShore ) );
 	vec2 v = uView, vp = vec2( -uView.y, uView.x );

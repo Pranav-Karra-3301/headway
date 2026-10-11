@@ -1,23 +1,27 @@
 // Owner: T4. Evidence digest for designers (spec §8.3), at most 6,000 characters.
 // Training evidence only: validation results are reduced to the verdict ("Rejected: validation worse").
 import { SCENARIOS, TOWN } from '@headway/sim';
-import type { Policy, Proposal, RouteId, RunResult, ScenarioDef, SplitScore, StopId, Zone, ZoneSelector } from '@headway/sim';
+import type { Action, DecisionKind, Policy, Proposal, RouteId, Rule, RunResult, ScenarioDef, SplitScore, StopId, Zone, ZoneSelector } from '@headway/sim';
 import { aggregateResults, findingLabel, groupFindings } from './aggregate';
 
 export const DIGEST_MAX_CHARS = 6000;
 const PROMOTION_GAIN_PCT = 1;
 const VERDICT_MARKERS = ['Promoted to ', 'Rejected: ', 'Not promoted: '];
 
-interface Limits { findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number; sharedStops: boolean; probes: number }
+interface Limits {
+  findings: number; stops: number; proposals: number; summaryChars: number; errorChars: number; ideaChars: number;
+  sharedStops: boolean; probes: number; ruleJson: number;
+}
 const LIMITS: Limits[] = [
-  { findings: 8, stops: 8, proposals: 12, summaryChars: 130, errorChars: 140, sharedStops: true, probes: 8 },
-  { findings: 6, stops: 6, proposals: 9, summaryChars: 100, errorChars: 100, sharedStops: true, probes: 8 },
-  { findings: 4, stops: 4, proposals: 6, summaryChars: 70, errorChars: 70, sharedStops: true, probes: 8 },
-  { findings: 3, stops: 0, proposals: 2, summaryChars: 60, errorChars: 60, sharedStops: false, probes: 6 },
+  { findings: 8, stops: 8, proposals: 12, summaryChars: 130, errorChars: 140, ideaChars: 160, sharedStops: true, probes: 8, ruleJson: 3 },
+  { findings: 6, stops: 5, proposals: 12, summaryChars: 90, errorChars: 100, ideaChars: 120, sharedStops: true, probes: 8, ruleJson: 3 },
+  { findings: 5, stops: 0, proposals: 12, summaryChars: 70, errorChars: 70, ideaChars: 100, sharedStops: false, probes: 8, ruleJson: 3 },
+  { findings: 4, stops: 0, proposals: 9, summaryChars: 60, errorChars: 60, ideaChars: 80, sharedStops: false, probes: 8, ruleJson: 2 },
+  { findings: 3, stops: 0, proposals: 6, summaryChars: 50, errorChars: 50, ideaChars: 60, sharedStops: false, probes: 6, ruleJson: 1 },
 ];
 
 /** A measured one-step variant of the champion (see `runProbes` in evaluate.ts). */
-export interface DigestProbe { label: string; deltaPct: number }
+export interface DigestProbe { label: string; deltaPct: number; rule?: Rule }
 
 const hours = (s: number) => (s / 3600).toFixed(1);
 const mins = (s: number) => (s / 60).toFixed(1);
@@ -219,30 +223,71 @@ function routesSection(policy: Policy, results: RunResult[], lim: Limits): strin
   ];
 }
 
-function probesSection(probes: DigestProbe[] | undefined, n: number): string[] {
+function probesSection(probes: DigestProbe[] | undefined, n: number, ruleJson: number): string[] {
   if (!probes?.length) return [];
-  const best = [...probes].sort((a, b) => a.deltaPct - b.deltaPct).slice(0, n);
+  const sorted = [...probes].sort((a, b) => a.deltaPct - b.deltaPct);
+  const best = sorted.slice(0, n);
+  const rules = sorted.filter((p) => p.rule && p.deltaPct < 0).slice(0, ruleJson);
   return [
-    `## Probes (training ΔJ vs champion; negative = better; ${best.length} best of ${probes.length} one-step variants)`,
+    `## Probes (training ΔJ vs champion; negative = better; ${best.length} best of ${probes.length} one-change experiments)`,
     ...best.map((p) => `- ${p.label} → ${signedPct(p.deltaPct)}`),
-    ...(best[0]!.deltaPct > -PROMOTION_GAIN_PCT ? [`No one-step probe reaches the −${PROMOTION_GAIN_PCT.toFixed(1)}% promotion gate.`] : []),
+    ...(best[0]!.deltaPct > -PROMOTION_GAIN_PCT ? [`No one-change probe reaches the −${PROMOTION_GAIN_PCT.toFixed(1)}% promotion gate.`] : []),
+    ...(rules.length ? ['Best new-rule probes as rule JSON (adopt exactly or refine):', ...rules.map((p) => `${signedPct(p.deltaPct)} ${JSON.stringify(p.rule)}`)] : []),
   ];
+}
+
+// ---------- ideas: a proposal's exact change vs the current champion ----------
+
+const KIND_SHORT: Record<DecisionKind, string> = { bus_at_stop: 'stop', bus_at_terminal: 'terminal', train_at_station: 'train' };
+
+function actionText(a: Action): string {
+  switch (a.type) {
+    case 'continue': return 'continue';
+    case 'dispatch': return 'dispatch';
+    case 'hold': return 'seconds' in a ? `hold ${a.seconds}s` : 'hold to headway';
+    case 'reassign': return `reassign→${a.to}`;
+    case 'setTrainDeparture': return `dwell ${a.dwellS}s`;
+  }
+}
+
+/** What `p` changes relative to `champion`, compactly ("+terminal reassign→busiest if route_queue<5; alloc 1/2/3"). */
+export function ideaOf(p: Policy, champion: Policy): string {
+  const body = (r: Rule) => JSON.stringify({ on: r.on, priority: r.priority, when: r.when, do: r.do });
+  const champ = new Map(champion.rules.map((r) => [r.id, body(r)]));
+  const ids = new Set(p.rules.map((r) => r.id));
+  const parts: string[] = [];
+  for (const r of p.rules) {
+    const prev = champ.get(r.id);
+    if (prev === body(r)) continue;
+    parts.push(`${prev ? '~' : '+'}${KIND_SHORT[r.on]} ${actionText(r.do)} if ${r.when.map((c) => `${c.f}${c.op}${c.v}`).join('&') || 'always'}`);
+  }
+  for (const r of champion.rules) if (!ids.has(r.id)) parts.push(`-rule ${r.id}`);
+  const a = p.params.allocation, b = champion.params.allocation;
+  if (a.r1 !== b.r1 || a.r2 !== b.r2 || a.r3 !== b.r3) parts.push(`alloc ${a.r1}/${a.r2}/${a.r3}`);
+  if (p.params.maxHoldS !== champion.params.maxHoldS) parts.push(`maxHoldS ${p.params.maxHoldS}`);
+  if (p.params.trainDefaultDwellS !== champion.params.trainDefaultDwellS) parts.push(`trainDefaultDwellS ${p.params.trainDefaultDwellS}`);
+  if (JSON.stringify(p.params.targetHeadwayS ?? {}) !== JSON.stringify(champion.params.targetHeadwayS ?? {})) parts.push(`targetHeadwayS ${JSON.stringify(p.params.targetHeadwayS ?? {})}`);
+  for (const k of Object.keys(KIND_SHORT) as DecisionKind[]) {
+    if (JSON.stringify(p.defaults[k]) !== JSON.stringify(champion.defaults[k])) parts.push(`default ${KIND_SHORT[k]} ${actionText(p.defaults[k])}`);
+  }
+  return parts.join('; ') || 'same as the champion';
 }
 
 const roundNo = (p: Proposal) => Number(/\d+/.exec(p.roundId)?.[0] ?? 0);
 
-function historySection(history: Proposal[], lim: Limits): string[] {
+function historySection(history: Proposal[], champion: Policy, lim: Limits): string[] {
   const sorted = [...history].sort((x, y) => roundNo(x) - roundNo(y) || x.id.localeCompare(y.id));
   const recent = sorted.slice(-lim.proposals);
   if (!recent.length) return ['## Recent proposals', '(none yet: this is the first round)'];
-  const lastTwo = [...new Set(sorted.map((p) => p.roundId))].slice(-2);
+  const lastRound = sorted.at(-1)!.roundId;
   return [
-    `## Recent proposals (last ${new Set(recent.map((p) => p.roundId)).size} rounds, oldest first; validation details are withheld)`,
+    `## Recent proposals (last ${new Set(recent.map((p) => p.roundId)).size} rounds, oldest first; idea = exact change vs the current champion; validation details are withheld)`,
     ...recent.map((p) => {
       const delta = p.deltaTrainPct === null ? '' : ` ΔJ_train ${signedPct(p.deltaTrainPct)}`;
       const verdict = clip(proposalVerdict(p).replace(/ \(ΔJ [^)]*\)/, ''), lim.errorChars);
-      const chars = lastTwo.includes(p.roundId) ? lim.summaryChars : Math.min(lim.summaryChars, 80);
-      return `- ${p.id} [${p.emphasis}]${delta}${verdict ? ` · ${verdict}` : ''} · "${clip(p.summary, chars)}"`;
+      const summary = p.roundId === lastRound || !p.policy ? ` · "${clip(p.summary, lim.summaryChars)}"` : '';
+      const idea = p.policy ? ` · idea: ${clip(ideaOf(p.policy, champion), lim.ideaChars)}` : '';
+      return `- ${p.id} [${p.emphasis}]${delta}${verdict ? ` · ${verdict}` : ''}${summary}${idea}`;
     }),
   ];
 }
@@ -256,11 +301,11 @@ export function buildDigest(a: {
     text = [
       scoresSection(policy, results, a.baseline, a.reference),
       routesSection(policy, results, lim),
-      probesSection(a.probes, lim.probes),
+      probesSection(a.probes, lim.probes, lim.ruleJson),
       findingsSection(results, lim.findings),
       stopsSection(results, lim.stops),
       ruleFiresSection(policy, results),
-      historySection(a.history, lim),
+      historySection(a.history, policy, lim),
     ].filter((s) => s.length).map((s) => s.join('\n')).join('\n\n');
     if (text.length <= DIGEST_MAX_CHARS) return text;
   }

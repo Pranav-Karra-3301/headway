@@ -29,11 +29,13 @@ export interface CloudSpec {
 export const driftDir = (nx: number, nz: number) => ({ x: -nz, z: nx });
 
 // [band, phase in span, depth beyond the edge, height, size, speed]
+// The first of each band rests where the 0.45× beauty shot sees it (upper right over the north ridges, mid left peeking
+// over the near west ridge); the others float higher, off-frame, for pans and peeks.
 const DEFS: Array<['north' | 'west', number, number, number, number, number]> = [
-  ['north', 0.5, 40, 30, 11, 0.3],
-  ['north', 0.78, 36, 25, 8, 0.38],
-  ['west', 0.3, 42, 31, 12, 0.26],
-  ['west', 0.62, 35, 24, 7.5, 0.34],
+  ['north', 0.64, 22, 22, 10, 0.3],
+  ['north', 0.3, 34, 28, 7.5, 0.36],
+  ['west', 0.33, 14, 20, 10, 0.26],
+  ['west', 0.76, 32, 27, 7, 0.33],
 ];
 
 export function cloudSpecs(layout: WorldLayout): CloudSpec[] {

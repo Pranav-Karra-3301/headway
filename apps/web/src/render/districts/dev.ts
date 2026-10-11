@@ -1,4 +1,4 @@
-// District preview: /districts-dev.html?d=campus (default: all). Roads/rail as flat strips + district items + paths/areas.
+// District preview: /districts-dev.html?d=campus (default: all; &view=30&cx=0&cz=0 for close-ups). Roads/rail as flat strips + district items + paths/areas.
 import * as THREE from 'three';
 import { TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
@@ -15,8 +15,11 @@ if (!TOWN.roads) {
 } else {
   const ds = DISTRICTS.filter((d) => !only || d.id === only);
   const focus = only && ds[0] && 'center' in ds[0].region ? ds[0].region : null;
-  const center = focus ? new THREE.Vector3(focus.center.x, 0, focus.center.z) : new THREE.Vector3();
-  const { scene, loop } = devScene(focus ? Math.max(24, focus.radius * 2.4) : 64, center);
+  // close-ups of the whole town: &view=<ortho height in u>&cx=<x>&cz=<z>
+  const qs = new URLSearchParams(location.search), num = (k: string) => (qs.has(k) ? Number(qs.get(k)) : NaN);
+  const center = Number.isFinite(num('cx')) ? new THREE.Vector3(num('cx'), 0, num('cz') || 0)
+    : focus ? new THREE.Vector3(focus.center.x, 0, focus.center.z) : new THREE.Vector3();
+  const { scene, loop } = devScene(num('view') > 0 ? num('view') : focus ? Math.max(24, focus.radius * 2.4) : 64, center);
   const b = TOWN.bounds;
   const board = new THREE.Mesh(new THREE.BoxGeometry(b.maxX - b.minX + 4, 0.6, b.maxZ - b.minZ + 4), new THREE.MeshStandardMaterial({ color: '#A8D8B9', roughness: 0.9 }));
   board.position.set((b.minX + b.maxX) / 2, -0.3, (b.minZ + b.maxZ) / 2); board.receiveShadow = true; scene.add(board);

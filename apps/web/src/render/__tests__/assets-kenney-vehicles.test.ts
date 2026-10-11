@@ -139,26 +139,50 @@ describe('K2 builders before models load (toy fallback)', () => {
 });
 
 describe('K2 builders with Kenney templates', () => {
-  const part = (role: string, paint: boolean, geo: THREE.BufferGeometry): KenneyTemplate['parts'][number] => {
-    const info: KenneyPartInfo = { source: role, role, idx: 0, shade: 0.03, paint, side: THREE.FrontSide };
+  const part = (role: string, paint: boolean, geo: THREE.BufferGeometry, shade = 0.03): KenneyTemplate['parts'][number] => {
+    const info: KenneyPartInfo = { source: role, role, idx: 0, shade, paint, side: THREE.FrontSide };
     return { geometry: geo, info, tris: (geo.index?.count ?? 0) / 3 };
   };
   const install = (id: KenneyId) => {
     const [w, h, l] = scaled(id);
     const body = new THREE.BoxGeometry(w, h * 0.6, l).translate(0, h * 0.3, 0);
     const top = new THREE.BoxGeometry(w * 0.8, h * 0.4, l * 0.5).translate(0, h * 0.8, 0);
-    const parts = [part('knRed', true, body), part('knDark', false, top)];
-    const box = new THREE.Box3(new THREE.Vector3(-w / 2, 0, -l / 2), new THREE.Vector3(w / 2, h, l / 2));
-    const t: KenneyTemplate = { id, parts, box, size: box.getSize(new THREE.Vector3()), tris: 24 };
+    const glass = new THREE.BoxGeometry(w * 0.7, h * 0.2, l * 0.3).translate(0, h * 0.7, 0);
+    const box = new THREE.BoxGeometry(w * 0.5, h * 0.2, l * 0.2).translate(0, h * 0.5, 0);
+    const parts = [part('knRed', true, body), part('knDark', false, top), part('knWhite', false, glass, -0.03), part('knGreen', false, box, -0.06)];
+    const bb = new THREE.Box3(new THREE.Vector3(-w / 2, 0, -l / 2), new THREE.Vector3(w / 2, h, l / 2));
+    const t: KenneyTemplate = { id, parts, box: bb, size: bb.getSize(new THREE.Vector3()), tris: 48 };
     _setKenneyTemplate(id, t);
   };
   beforeAll(() => { for (const id of VEHICLE_KENNEY_IDS) install(id); });
   const r = vehicleRegistry();
-  const paintOf = (o: THREE.Object3D) => {
+  const partOf = (o: THREE.Object3D, source: string) => {
     let out: KenneyPartInfo | undefined;
-    o.traverse((c) => { const info = c.userData.kenney as KenneyPartInfo | undefined; if (info?.source === 'knRed') out = info; });
+    o.traverse((c) => { const info = c.userData.kenney as KenneyPartInfo | undefined; if (info?.source === source) out = info; });
     return out!;
   };
+  const paintOf = (o: THREE.Object3D) => partOf(o, 'knRed');
+  const build = (kind: string, params = {}, seed = 3) => r.build(createBasicKit(r.roles, 0, seed), { kind, x: 0, z: 0, params });
+
+  it('car windows take the palette glass role (boats keep theirs); delivery box takes the paint; cargo ship toned', () => {
+    expect(partOf(build('kn.car.sedan'), 'knWhite')).toMatchObject({ role: 'glass', idx: 0 });
+    expect(partOf(build('kn.car.taxi'), 'knWhite').role).toBe('glass');
+    expect(partOf(build('kn.boat.speed'), 'knWhite').role).toBe('knWhite');
+    expect(partOf(build('kn.car.delivery', { paint: 5 }), 'knGreen')).toMatchObject({ role: 'car', idx: 5 });
+    expect(partOf(build('kn.car.garbage'), 'knGreen').role).toBe('knGreen');
+    const ship = build('kn.boat.cargoShip');
+    expect(partOf(ship, 'knGreen')).toMatchObject({ role: 'car', idx: 3 });
+    expect(paintOf(ship)).toMatchObject({ role: 'car', idx: 0 });
+  });
+
+  it('wooden rowing boats keep their colour, also inside kn.boat.random', () => {
+    expect(paintOf(build('kn.boat.row', { paint: 2 })).role).toBe('knRed');
+    const random = vehicleSpec('kn.boat.random')!;
+    const row = random.ids.indexOf('watercraft-pack/boat-row-small');
+    expect(row).toBeGreaterThanOrEqual(0);
+    expect(paintOf(build('kn.boat.random', { model: row, paint: 2 })).role).toBe('knRed');
+    expect(paintOf(build('kn.boat.random', { model: 0, paint: 2 })).role).toBe('car');
+  });
 
   it('uses the Kenney model, repaints everyday cars with the palette `car` role, keeps identity colours', () => {
     const sedan = r.build(createBasicKit(r.roles, 0, 3), { kind: 'kn.car.sedan', x: 0, z: 0, params: { paint: 4 } });

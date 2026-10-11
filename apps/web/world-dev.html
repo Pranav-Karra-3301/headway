@@ -1,4 +1,21 @@
-<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><title>Headway — world preview</title>
-<style>html,body{margin:0;height:100%;overflow:hidden;background:#DDEFE5;font-family:"Avenir Next Rounded Std",system-ui,sans-serif}#msg{position:fixed;left:12px;top:10px;font-size:13px;color:#1F2A44}</style>
-</head><body><div id="msg"></div><script type="module" src="/src/render/world/dev.ts"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · world preview (TownRenderer + world)</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #E4F1E8; color: #1F2A44;
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      body.dusk { background: #2A2C4E; color: #FFF4E2; }
+      #c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+      #msg { position: fixed; left: 12px; top: 10px; font-size: 13px; opacity: .72; pointer-events: none; white-space: pre; }
+      body.clean #msg { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="msg">loading…</div>
+    <script type="module" src="/src/render/world/dev.ts"></script>
+  </body>
+</html>
