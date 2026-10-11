@@ -441,3 +441,33 @@ T2.2 composes: base `SCENERY` (Task M) only where no district provides items (di
   - Roads are plain strips: streetscape (S1) adds sidewalks/curbs/crosswalks; keep the dashed centre line subtle.
 - **Play screens (15:45):** goal card, dock (bus chips, hold/reassign picker with deadhead path, pending-intent badges) and results (You / AI / Baseline, verdict, race chart, "what made the difference", interventions timeline, leaderboard) are excellent. Integration fixes: "What made the difference" shows raw ids (`stop_apts_south`) — use map display names everywhere user-facing; the leaderboard must never ship fixture names (show "Be the first on this crowd" when empty); results numbers must come from the real engine runs.
 - **HUD (15:40):** default camera should frame the town larger; show at most 2–3 toasts at once.
+
+---
+
+## v4 world + camera (user: "detailed city, good views, best default camera; ocean on one end, mountains on the others, tunnels — plan it properly")
+
+**Read first:** `docs/research/iso-art-direction.md` (art + camera bible distilled from the user's references; may still be in progress — read it when present and re-check before you finish).
+
+**World framing (camera looks from +x/+z):** mountains at the back (north, west), water at the front (south, east), so nothing tall ever hides gameplay. Seam: `apps/web/src/render/world/layout.ts` → `worldLayout(TOWN)` gives the diorama `extent` (34 u of mountains beyond the north/west board edges, 30 u of water beyond south/east, a 4 u beach strip), every road `exit` (side, point, direction, `tunnel` on mountain sides / `bridge` on water sides) and a `railTunnel` span on the west half far from stations. `world/index.ts` composes `createBaseLayer`, `createTerrainLayer`, `createWaterLayer`, `createSkyLayer`. Preview: `/world-dev.html?elev=35&az=45&view=100&light=day|dusk`.
+
+- **Mountains ("Nittany Ridge", a nod to Mount Nittany):** layered low-poly ridges 8–22 u tall rising from foothills at the board edge, pine forests on the slopes (instanced), rock outcrops, a ridge line that reads well against the sky; stone tunnel portals with lamps where roads exit north/west; a foothill spur over the `railTunnel` span with portals at both ends so the train visibly enters and leaves a tunnel.
+- **Water ("Nittany Lake", reads like a bay):** stylized water shader (deep→shallow gradient, gentle animated waves, soft foam line at the shore, sparkle glints; dusk reflections of warm lights), a sandy beach strip along the south/east board edges, a small marina with bobbing boats at the south-east corner, a lighthouse on a little point, causeway bridges where roads exit south/east, headlands where mountains meet water at the NE/SW corners.
+- **Sky + base:** vertical gradient sky (day mint→cream, dusk indigo→peach), 2–3 layers of distant ridges behind the mountains with aerial perspective, a few slow low-poly clouds; the whole diorama sits on a base with cut edges showing soil/rock layers (and blue water layers under the lake) — a "slice of a world" model.
+- Never place terrain over stops, platforms, queue lines or the playable roads; the town board stays flat and readable.
+
+**Camera ("most information by default"):**
+- Orthographic. Study elevations 30°, 35.26°, 45° (and azimuth 45° vs 35°/55°) on the real town blockout; measure the fraction of stops, queue slots, platform edges and route segments hidden behind buildings/terrain (raycast from camera through each sample point against building bounding boxes) plus the projected screen area used by the transit network; recommend the most readable view.
+- Default framing fits the transit network (rail loop bounding box + stops) into the **HUD-safe rectangle** (excluding top bar, legend, bottom card/dock, and the right inspector when open) with 4 % padding; recomputed on resize; zoom range [0.8×, 4×] of fit.
+- Presets with smooth spring transitions: Overview (default), Stadium, Downtown hub, Campus, Central Station; double-click / "focus" on a selected vehicle or stop; optional Q/E rotate in 90° steps.
+- **X-ray occlusion:** buildings and terrain between the camera and the selected entity, any queue marker with ≥ 1 waiting, or a moving vehicle fade to ~30 % with a dithered fade so gameplay never hides.
+- Composition rules for district art: tall buildings on the far side of streets from the camera, low buildings on the camera side of stops; stations, stadium and clock tower as focal points; roads and rail as leading lines; quiet scenery around busy stops.
+
+### Tracks
+| Track | Owns | Delivers |
+|---|---|---|
+| C1 camera study | `src/render/camera/study/**`, `apps/web/camera-study.html` | the measured comparison above (table + screenshot grid), PUBLISH "camera-study", a recommendation in the final message |
+| E1 terrain | `src/render/world/terrain/**` | mountains, forests, rocks, tunnel portals (roads + rail), headlands; PUBLISH "world-terrain" |
+| E2 water | `src/render/world/water/**` | lake, shore, beach, marina, boats, lighthouse, causeway bridges; PUBLISH "world-water" |
+| E3 sky + base | `src/render/world/sky/**`, `src/render/world/base/**` | sky gradient, distant ridges, clouds, diorama base with cut edges; PUBLISH "world-sky" |
+| C2 camera rig (after C1) | `src/render/camera/**` except `study/` | `CameraRig` (elevation/azimuth from C1's recommendation, safe-area fit, presets, focus, rotate, x-ray occlusion helper the composer can call); exposes `fitToSafeArea(rect)`; tests for the fit math |
+| E4 world integration (after E1–E3) | `src/render/world/index.ts`, `src/render/world/dev.ts`, `apps/web/world-dev.html` | seamless board↔terrain↔water transitions, exits aligned with roads, rail tunnel aligned with the loop, day + dusk; PUBLISH "world-v1-day" and "world-v1-dusk" |
