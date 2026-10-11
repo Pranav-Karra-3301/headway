@@ -13,6 +13,8 @@ import './hud.css';
 /** How long each kind stays up (real ms). */
 export const TOAST_MS: Record<Toast['kind'], number> = { alert: 6000, missed: 4000, walkaway: 4000, transfer: 3200, info: 4000 };
 const EXIT_MS = 160;
+/** Never more than this many toasts on screen (the rest wait their turn, alerts first). */
+export const MAX_VISIBLE = 2;
 
 const ICONS: Record<Toast['kind'], ReactNode> = {
   alert: <AlertIcon />, transfer: <TransferIcon />, missed: <MissedIcon />, walkaway: <WalkIcon />, info: <InfoIcon />,
@@ -31,7 +33,7 @@ export interface ToastViewProps {
 
 export function ToastView({ toasts, clockStart, offset, exiting, onDismiss, onHold, style }: ToastViewProps) {
   // Alerts first (they carry game state), then events; newest first within each group.
-  const ordered = [...toasts].reverse().sort((a, b) => Number(b.kind === 'alert') - Number(a.kind === 'alert'));
+  const ordered = [...toasts].reverse().sort((a, b) => Number(b.kind === 'alert') - Number(a.kind === 'alert')).slice(0, MAX_VISIBLE);
   return (
     <div className="hud-root hud-toasts" data-offset={!!offset} style={style} role="status" aria-live="polite">
       {ordered.map((t, i) => (

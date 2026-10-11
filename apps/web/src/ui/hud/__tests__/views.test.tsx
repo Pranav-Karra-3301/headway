@@ -31,23 +31,21 @@ describe('MetricsView', () => {
     t: 660, clock: '21:41', phase: 'running' as const, meanWaitS: 192, completionPct: 64.4, missedConnections: 12,
     waitingNow: 143, ridingNow: 88, jSoFar: 50000, p95WaitS: 545,
   };
-  it('shows mean wait, p95 wait, completion and missed connections (spec §10)', () => {
+  it('shows only the essentials: mean wait, completion and missed connections (p95 lives in Results)', () => {
     const s = html(<MetricsView hud={hud} />);
     expect(s).toContain('Mean wait');
     expect(s).toContain('3:12');
-    expect(s).toContain('P95 wait');
-    expect(s).toContain('9:05');
+    expect(s).not.toContain('P95');
     expect(s).toContain('64%');
     expect(s).toContain('Missed');
     expect(s).toContain('>12<');
     expect(s).toContain('data-sev="warn"');
-    expect(s).toContain('data-sev="bad"');
     expect(s).not.toContain('vs AI');
   });
   it('shows the Play pace chip: green when ahead, red when behind, neutral when even', () => {
     const ahead = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 6.24, vsBaselinePaxH: 9.1, ahead: true, tone: 'ahead', t: 660 }} paceClock="21:41" />);
     expect(ahead).toContain('You vs AI · 21:41');
-    expect(ahead).toContain('baseline');
+    expect(ahead).not.toContain('baseline');
     expect(ahead).toContain('+6.2');
     expect(ahead).toContain('pax-h');
     expect(ahead).toContain('data-tone="ahead"');
@@ -57,10 +55,6 @@ describe('MetricsView', () => {
     const even = html(<MetricsView hud={hud} pace={{ vsAiPaxH: 0.01, vsBaselinePaxH: null, ahead: false, tone: 'even', t: 660 }} paceClock={null} />);
     expect(even).toContain('even');
     expect(even).not.toContain('pax-h');
-  });
-  it('shows a dash for p95 when the feed does not carry it', () => {
-    const { p95WaitS: _drop, ...rest } = hud;
-    expect(html(<MetricsView hud={rest} />)).toContain('—');
   });
   it('shows placeholders before the first HUD tick', () => {
     expect(html(<MetricsView hud={null} />)).toContain('—');
@@ -152,5 +146,19 @@ describe('ToastView', () => {
     expect(s).toContain('data-kind="missed"');
     expect(s).toContain('21:38');
     expect(s).toContain('21:41');
+  });
+  it('shows at most 2 toasts, alerts first', () => {
+    const s = html(
+      <ToastView clockStart="21:30" onDismiss={noop} onHold={noop} toasts={[
+        { id: 1, kind: 'alert', text: 'Stadium closing in 2:00', simT: 480 },
+        { id: 2, kind: 'missed', text: 'Missed connection at Central', simT: 700 },
+        { id: 3, kind: 'transfer', text: 'Transfer made', simT: 710 },
+        { id: 4, kind: 'walkaway', text: 'Rider walked away', simT: 720 },
+      ]} />,
+    );
+    expect(s.match(/class="hud-toast /g)?.length).toBe(2);
+    expect(s).toContain('Stadium closing in 2:00');
+    expect(s).toContain('Rider walked away');
+    expect(s).not.toContain('Transfer made');
   });
 });

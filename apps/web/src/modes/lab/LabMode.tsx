@@ -11,14 +11,14 @@ import { diffPolicies } from './diff';
 import { reduceFeed } from './feed';
 import { useLab } from './labStore';
 import type { LabLocal } from './labStore';
-import { chartData, roundForGeneration } from './model';
+import { chartData } from './model';
 import type { ChartStep } from './model';
 import { DiffView, ErrorsView } from './components/DiffView';
 import { EvolveButton } from './components/EvolveButton';
-import { GenerationCard } from './components/GenerationCard';
+import { ChampionCard } from './components/ChampionCard';
 import { JChart } from './components/JChart';
 import { LiveRound } from './components/LiveRound';
-import { RoundCard } from './components/RoundCard';
+import { RoundTimeline } from './components/RoundTimeline';
 import { SealedCard } from './components/SealedCard';
 
 const byNumber = <T extends { number: number }>(xs: T[]) => [...xs].sort((a, b) => a.number - b.number);
@@ -30,7 +30,11 @@ function replay(policy: Policy, id: string) {
 function pickStep(s: ChartStep) {
   if (s.running && useApp.getState().lab.evolveEvents.length) { useLab.setState({ liveOpen: true }); return; }
   useApp.getState().setLab({ selectedGenerationId: s.genId });
-  useLab.setState({ focusRoundId: s.promoted ? null : s.roundId, focusProposalId: null, liveOpen: false });
+  useLab.setState({ focusRoundId: s.roundId, focusProposalId: null, liveOpen: false });
+}
+
+function toggleRound(r: Round) {
+  useLab.setState((s) => ({ focusRoundId: s.focusRoundId === r.id ? null : r.id, focusProposalId: null }));
 }
 
 function focusProposal(p: Proposal) {
@@ -61,8 +65,7 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
     live: liveActive && feed.round !== null && !liveRoundKnown ? { round: feed.round, scored: feed.scored } : null,
   }), [gens, rounds, local.reference, local.baseline, liveActive, feed.round, feed.scored, liveRoundKnown]);
 
-  const focusRound: Round | null = (local.focusRoundId ? rounds.find((r) => r.id === local.focusRoundId) : undefined)
-    ?? (selected ? roundForGeneration(selected, rounds) : null);
+  const openRound: Round | null = local.focusRoundId ? rounds.find((r) => r.id === local.focusRoundId) ?? null : null;
   const selectedStep = (local.focusRoundId ? chart.steps.find((s) => s.roundId === local.focusRoundId) : undefined)
     ?? chart.steps.find((s) => s.genId === selected?.id && s.promoted) ?? null;
 
@@ -73,12 +76,8 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
     return m;
   }, [rounds, feed.lanes]);
 
-  const producer: Proposal | null = selected?.fromProposal
-    ? rounds.flatMap((r) => r.proposals).find((p) => p.id === selected.fromProposal) ?? null : null;
-  const producerRound = selected ? roundForGeneration(selected, rounds) : null;
-
-  const fp = focusRound?.proposals.find((p) => p.id === local.focusProposalId) ?? null;
-  const fpBase: Generation | null = fp && focusRound ? gens.find((g) => g.id === focusRound.championBefore) ?? null : null;
+  const fp = openRound?.proposals.find((p) => p.id === local.focusProposalId) ?? null;
+  const fpBase: Generation | null = fp && openRound ? gens.find((g) => g.id === openRound.championBefore) ?? null : null;
   const showLive = local.liveOpen && liveActive;
 
   return (
@@ -88,8 +87,7 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
           <div className="lab-head__title">
             <h2 className="lab-title">Lab</h2>
             <p className="lab-lede">
-              Each round, three DeepSeek designers on Luminal rewrite the town’s dispatch policy. A change survives only if it
-              measurably helps on training seeds and holds up on validation seeds.
+              Each round, three AI designers on Luminal propose rule changes; the simulator keeps only what measurably helps.
             </p>
           </div>
           <div className="lab-head__right">
@@ -112,57 +110,36 @@ export function LabView({ lab, local }: { lab: LabState; local: LabLocal }) {
               : <p><span className="lab-spin lab-spin--ink" aria-hidden="true" /> Loading the lab…</p>}
           </div>
         ) : (
-          <div className="lab-grid">
-            <div className="lab-col lab-col--main">
-              <section className="lab-card lab-chartcard" style={{ ['--n' as string]: 0 }}>
-                <header className="lab-card__head">
-                  <h3 className="lab-h3">Objective J by round<span className="lab-h3__sub">vs the g0 baseline · lower is better</span></h3>
-                  <span className="lab-chip lab-chip--quiet">{gens.length} generations · {rounds.length} rounds</span>
-                </header>
-                <JChart data={chart} selectedStep={selectedStep?.step ?? null} onPick={pickStep}
-                  emphasisOf={(id) => emphasis.get(id) ?? null} />
-              </section>
+          <div className="lab-stack">
+            {champion && (
+              <ChampionCard gen={champion} g0={g0} refPct={chart.ref} onReplay={() => replay(champion.policy, champion.id)} />
+            )}
 
-              {showLive ? (
-                <LiveRound feed={feed} events={lab.evolveEvents} evolving={lab.evolving} onClose={() => useLab.setState({ liveOpen: false })} />
-              ) : focusRound ? (
-                <RoundCard round={focusRound} generations={gens} focusProposalId={local.focusProposalId}
-                  onFocus={focusProposal} onReplay={(p) => p.policy && replay(p.policy, p.id)} />
-              ) : selected && selected.number > 0 ? (
-                <section className="lab-card lab-note">
-                  <h3 className="lab-h3">Round not published</h3>
-                  <p>{selected.id} was promoted from {selected.fromProposal ?? 'a proposal'}, but its round record is not published, so the other proposals are not available.</p>
-                </section>
-              ) : (
-                <section className="lab-card lab-note">
-                  <h3 className="lab-h3">Where it starts</h3>
-                  <p>
-                    g0 is the hand-written baseline: two buses per route and terminal holds that keep headways even. Every
-                    round, three designers each propose up to three focused rule changes to the current champion; the town
-                    is simulated on 8 training runs, and the best survivor must not be worse on 4 validation runs.
-                  </p>
-                  <p className="lab-muted">Pick a generation or a round on the timeline to see its proposals.</p>
-                </section>
-              )}
+            <section className="lab-card lab-chartcard">
+              <header className="lab-card__head">
+                <h3 className="lab-h3">Objective J by round<span className="lab-h3__sub">vs the g0 baseline · lower is better</span></h3>
+              </header>
+              <JChart data={chart} selectedStep={selectedStep?.step ?? null} onPick={pickStep}
+                emphasisOf={(id) => emphasis.get(id) ?? null} />
+            </section>
 
-              <SealedCard rows={local.sealed} championId={champion?.id ?? null} />
-            </div>
+            {showLive && (
+              <LiveRound feed={feed} events={lab.evolveEvents} evolving={lab.evolving} onClose={() => useLab.setState({ liveOpen: false })} />
+            )}
 
-            <div className="lab-col lab-col--side">
-              {selected && (
-                <GenerationCard gen={selected} parent={parent} g0={g0} isChampion={selected === champion}
-                  proposal={producer} roundLabel={producerRound ? `Round ${producerRound.number}` : null}
-                  onReplay={() => replay(selected.policy, selected.id)} />
-              )}
-              {fp ? (
-                !fp.valid || !fp.policy
-                  ? <ErrorsView title={`${fp.id} · validation errors`} errors={fp.errors} />
-                  : <DiffView title={`${fp.id} vs ${fpBase?.id ?? 'champion'}`} diff={fpBase ? diffPolicies(fpBase.policy, fp.policy) : null} policy={fp.policy} />
-              ) : selected ? (
-                <DiffView title={parent ? `Rule diff ${parent.id} → ${selected.id}` : `Rules in ${selected.id}`}
-                  diff={parent ? diffPolicies(parent.policy, selected.policy) : null} policy={selected.policy} />
-              ) : null}
-            </div>
+            <RoundTimeline rounds={rounds} generations={gens} openRoundId={local.focusRoundId} focusProposalId={local.focusProposalId}
+              onToggle={toggleRound} onFocus={focusProposal} onReplay={(p) => p.policy && replay(p.policy, p.id)} />
+
+            {fp ? (
+              !fp.valid || !fp.policy
+                ? <ErrorsView title={`${fp.id} · validation errors`} errors={fp.errors} />
+                : <DiffView title={`Rule diff ${fpBase?.id ?? 'champion'} → ${fp.id}`} diff={fpBase ? diffPolicies(fpBase.policy, fp.policy) : null} policy={fp.policy} />
+            ) : selected ? (
+              <DiffView title={parent ? `Rule diff ${parent.id} → ${selected.id}` : `Rules in ${selected.id}`}
+                diff={parent ? diffPolicies(parent.policy, selected.policy) : null} policy={selected.policy} />
+            ) : null}
+
+            <SealedCard rows={local.sealed} championId={champion?.id ?? null} />
           </div>
         )}
       </div>

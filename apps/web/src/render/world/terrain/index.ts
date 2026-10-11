@@ -1,8 +1,8 @@
 // Owner: E1. Terrain layer: Nittany Ridge around the north + west of the board (layered ridges, pine forests,
 // rocky summits and headlands where it meets Nittany Lake), stone tunnel portals with lanterns where roads leave
 // the board on the mountain sides, and the rail tunnel: the whole off-board run of the line through the ridge is
-// underground, with skew portals on the board edge (facing the town and camera) so the train visibly enters and
-// leaves. (An on-board `layout.railTunnel` span instead becomes a loaf-shaped spur hill, cut open at road crossings.)
+// underground (layout.railTunnel = RAIL_SPANS.tunnel), with lamp-lit portals set square to the track just off the
+// board edge, so the train visibly enters and leaves. (An on-board `layout.railTunnel` span instead becomes a loaf-shaped spur hill, cut open at road crossings.)
 // Draw calls: ≤ 5 — mountains (terrain + road portals, one mesh), rail tunnel (rail portals + any on-board spur and
 // its trees, one mesh with its own KitMaterial so the composer can x-ray-fade it: `material.fade.value`), pines,
 // broadleaf and rocks (InstancedMeshes; trees sway). Everything is vertex-coloured KitMaterial; palettes repaint in

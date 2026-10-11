@@ -32,30 +32,39 @@ const render = () => text(renderToString(<LabView lab={lab} local={local} />));
 describe('LabView (server render with fixtures)', () => {
   beforeEach(() => setup());
 
-  it('renders the chart, timeline, champion card, round proposals, diff and sealed panel', () => {
+  it('renders explainer, champion summary, chart, collapsed round timeline, diff and sealed panel in order', () => {
     const t = render();
-    expect(t).toContain('Objective J by round');
-    for (const id of ['g0', 'g1', 'g2', 'g3', 'g4']) expect(t).toContain(id);
-    expect(t).toContain('Champion');
+    const order = ['three AI designers on Luminal', 'Champion', 'Objective J by round', 'Rounds', 'Rule diff g3 → g4', 'Sealed test'];
+    let at = -1;
+    for (const s of order) { const i = t.indexOf(s, at + 1); expect(i, s).toBeGreaterThan(at); at = i; }
+    expect(t).toContain('Unseen validation');
+    expect(t).toContain('Hand-written ref');
     expect(t).toContain('Replay on stadium exit');
     expect(t).toContain('Evolve next generation');
     expect(t).toContain('never shown to agents');
     expect(t).toContain('sample data');
+    for (const r of ROUNDS) expect(t).toContain(`Round ${r.number}`);
     const champRound = ROUNDS.find((r) => r.championAfter === 'g4')!;
-    expect(t).toContain(`Round ${champRound.number}`);
-    for (const p of champRound.proposals) expect(t).toContain(p.emphasis);
-    expect(t).toContain('Rule diff g3 → g4');
+    const runnerUp = champRound.proposals.find((p) => p.valid && p.summary && p.id !== GENERATIONS[4]!.fromProposal)!;
+    expect(t).not.toContain(runnerUp.summary.slice(0, 30));
   });
 
-  it('shows the hand-written baseline note and its rules for g0', () => {
+  it('expands a round to show its three proposals', () => {
+    const champRound = ROUNDS.find((r) => r.championAfter === 'g4')!;
+    setup({ focusRoundId: champRound.id });
+    const t = render();
+    for (const p of champRound.proposals) expect(t).toContain(p.emphasis);
+    expect(t).toContain('Promoted');
+  });
+
+  it('shows the rules of g0 when the baseline is picked', () => {
     setup({ selected: 'g0' });
     const t = render();
-    expect(t).toContain('Where it starts');
     expect(t).toContain('Rules in g0');
     expect(t).toContain('even-headway');
   });
 
-  it('shows a rejected round with its reasons when picked on the timeline', () => {
+  it('shows a rejected round when picked on the timeline', () => {
     const rejected = ROUNDS.find((r) => r.championAfter === r.championBefore)!;
     setup({ selected: rejected.championBefore, focusRoundId: rejected.id });
     const t = render();
@@ -72,11 +81,11 @@ describe('LabView (server render with fixtures)', () => {
     expect(t).toContain(bad.errors[0]!.slice(0, 20));
   });
 
-  it('explains a generation whose round was not published', () => {
+  it('still diffs a generation whose round was not published', () => {
     setup({ selected: 'g2' });
     lab = { ...lab, rounds: [] };
     const t = render();
-    expect(t).toContain('Round not published');
+    expect(t).toContain('No rounds are published yet');
     expect(t).toContain('Rule diff g1 → g2');
   });
 

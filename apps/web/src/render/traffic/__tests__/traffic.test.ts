@@ -1,9 +1,9 @@
 // Owner: T2.3. Pure traffic helpers (no WebGL): lane graph, stepping, spacing, road-graph containment, exits,
 // level crossings, buses, the stadium surge and determinism.
 import { describe, expect, it } from 'vitest';
-import { TOWN, pointAt, projectOnPolyline } from '@headway/sim';
+import { TOWN, pointAt, polyline, projectOnPolyline } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
-import { JUNCTION_TRIM, LANE_OFFSET, ROAD_HALF_WIDTH, buildLaneGraph, type LaneGraph } from '../lanes';
+import { APPROACH_TUNNEL, JUNCTION_TRIM, LANE_OFFSET, ROAD_HALF_WIDTH, buildLaneGraph, type LaneGraph } from '../lanes';
 import { MIN_SPACING, createTrafficModel, mapBuses, type BusPose, type TrafficCar, type TrafficModel } from '../model';
 import { mulberry32 } from '../rng';
 
@@ -20,11 +20,14 @@ function pathGap(a: TrafficCar, b: TrafficCar): number | null {
   return null;
 }
 
+/** Distance to the nearest road as driven (board streets + the tunnel / causeway approaches of the exits). */
 function nearestRoad(p: Vec2): number {
   let best = Infinity;
-  for (const e of TOWN.roads.edges) best = Math.min(best, projectOnPolyline(e.path, p).d);
+  for (const r of graph.roads) best = Math.min(best, projectOnPolyline(r, p).d);
   return best;
 }
+const B = TOWN.bounds;
+const onBoard = (p: Vec2) => p.x >= B.minX - 0.01 && p.x <= B.maxX + 0.01 && p.z >= B.minZ - 0.01 && p.z <= B.maxZ + 0.01;
 
 function run(model: TrafficModel, seconds: number, dt: number, env: (t: number) => { buses?: BusPose[]; trainDist?: number | null } = () => ({}),
   each?: (t: number) => void, t0 = 0): number {
@@ -69,7 +72,9 @@ describe('buildLaneGraph', () => {
       const from = graph.nodes.get(lane.from)!, to = graph.nodes.get(lane.to)!;
       const p0 = lane.poly.points[0]!, p1 = lane.poly.points[lane.poly.points.length - 1]!;
       if (from.junction) expect(dist(p0, from.p)).toBeGreaterThan(JUNCTION_TRIM - 0.05);
+      else if (from.exit) expect(dist(p0, from.p)).toBeGreaterThan(APPROACH_TUNNEL - 0.5); // off board, out of sight
       else expect(dist(p0, from.p)).toBeLessThan(LANE_OFFSET + 0.3);
+      if (to.exit) expect(dist(p1, to.p)).toBeGreaterThan(APPROACH_TUNNEL - 0.5);
       if (to.junction) expect(dist(p1, to.p)).toBeGreaterThan(JUNCTION_TRIM - 0.05);
     }
     expect(graph.entries.map((l) => l.from).sort()).toEqual(['x_east', 'x_north', 'x_south', 'x_west']);
@@ -216,6 +221,7 @@ describe('traffic model', () => {
       for (const [id, c] of seen) if (!now.has(id) && c.lane.exit && !c.conn && c.s > c.lane.len - 1.5) left++;
       for (const [id, c] of now) if (!seen.has(id)) {
         expect(c.lane.entry && !c.conn && c.s < 1.5).toBe(true);
+        expect(onBoard(c)).toBe(false); // in a tunnel or at the far end of a causeway, never at the board edge
         entered++;
       }
       seen.clear();
@@ -249,6 +255,30 @@ describe('traffic model', () => {
       }
     });
     expect(behind).toBeGreaterThan(0);
+  });
+
+  it('never shadows a bus: a car stuck behind one turns off at the next junction', () => {
+    // A bus crawling east along the whole of Main St (and round again); time how long any one car stays behind it.
+    const pts = ['main_w', 'main_1', 'main_2', 'main_3', 'main_4'].flatMap((id, i) => {
+      const p = TOWN.roads.edges.find((e) => e.id === id)!.path.points;
+      return i ? p.slice(1) : p;
+    });
+    const main = polyline(pts, false);
+    const busAt = (t: number): BusPose => {
+      const p = pointAt(main, (t * 0.3) % main.length);
+      return { id: 'b1', x: p.x, z: p.z, dx: Math.cos(p.heading), dz: -Math.sin(p.heading), halfLen: 1.65, stopped: false };
+    };
+    const m = createTrafficModel(graph, { seed: 5, carCount: 24 });
+    const tail = new Map<number, number>();
+    let worst = 0;
+    run(m, 1500, 0.25, (t) => ({ buses: [busAt(t)] }), () => {
+      for (const c of m.cars) {
+        const v = c.busTail > 0 ? (tail.get(c.id) ?? 0) + 0.25 : 0;
+        tail.set(c.id, v);
+        worst = Math.max(worst, v);
+      }
+    });
+    expect(worst).toBeLessThan(30); // ~44 s without the turn-off
   });
 
   it('stops before a level crossing while the train is on it', () => {

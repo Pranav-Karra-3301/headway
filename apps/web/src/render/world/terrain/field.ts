@@ -216,6 +216,25 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     }
     close(to);
   }
+  // Band (off-board) tunnels: slide each end's portal into the ridge until the back corners of a facade set square to
+  // the track stand off the board, so the hill rises right behind it (and a short open forecourt runs to the edge).
+  const offB = (x: number, z: number) => x < B.minX || z < B.minZ;
+  function bandInset(d0: number, dir: 1 | -1): number {
+    const w = RAIL_PORTAL.half + 0.15;
+    for (let k = 0; k <= 5; k += 0.05) {
+      const p = pointAt(loop, d0 + dir * k), t = tangent(loop, d0 + dir * k);
+      const fx = -dir * t.x, fz = -dir * t.z; // out of the tunnel
+      const bx = p.x - fx * 0.35, bz = p.z - fz * 0.35;
+      if (offB(bx - fz * w, bz + fx * w) && offB(bx + fz * w, bz - fx * w)) return k;
+    }
+    return 5;
+  }
+  for (let i = 0; i < spans.length; i++) {
+    const s = spans[i]!;
+    if (!s.band) continue;
+    const a = s.from + bandInset(s.from, 1), b = s.to - bandInset(s.to, -1);
+    if (b - a >= SPUR.minLen) spans[i] = makeSpan(a, b);
+  }
 
   function makeSpan(from: number, to: number): Span {
     const pts: Vec2[] = [];
@@ -241,18 +260,11 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     return { from, to, poly, side, win, edgeDist: Math.max(0, Math.min(tx, tz)), band };
   }
 
-  /** Rail portal at one end of a span (0 = from, 1 = to): faces out along the track, except where a band tunnel
-   *  ends on the board edge — there the facade lines up with the edge and faces the town (a skew portal), so it
-   *  stands wholly off the board with the hill right behind it. */
+  /** Rail portal at one end of a span (0 = from, 1 = to): square to the track, facing out along it. */
   function railFace(s: Span, end: 0 | 1): { p: Vec2; face: Vec2 } {
     const d = end === 0 ? 0 : s.poly.length, sign = end === 0 ? -1 : 1;
     const p = pointAt(s.poly, d), t = tangent(s.poly, d);
-    const face = { x: t.x * sign, z: t.z * sign };
-    if (s.band) {
-      if (Math.abs(p.x - B.minX) < 0.05 && face.x > 0.3) return { p: { x: B.minX, z: p.z }, face: { x: 1, z: 0 } };
-      if (Math.abs(p.z - B.minZ) < 0.05 && face.z > 0.3) return { p: { x: p.x, z: B.minZ }, face: { x: 0, z: 1 } };
-    }
-    return { p: { x: p.x, z: p.z }, face };
+    return { p: { x: p.x, z: p.z }, face: { x: t.x * sign, z: t.z * sign } };
   }
   const spurSpans = spans.filter((s) => !s.band), bandSpans = spans.filter((s) => s.band);
   // spur bounding box (quick reject)
@@ -333,6 +345,19 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     }
     return m;
   }
+  /** 0 on the open forecourt in front of a band rail portal (the ridge kept off the track up to the board edge). */
+  const railMouths = moundSites.slice(exits.length);
+  function forecourt(x: number, z: number): number {
+    let k = 1;
+    for (const e of railMouths) {
+      const rx = x - e.p.x, rz = z - e.p.z;
+      const o = -(rx * e.dir.x + rz * e.dir.z);
+      if (o < 0 || o > 7) continue;
+      const a = Math.abs(-rx * e.dir.z + rz * e.dir.x);
+      k = Math.min(k, Math.max(smooth(RAIL_PORTAL.half + 0.3, RAIL_PORTAL.half + 2.6, a), smooth(4.5, 7, o)));
+    }
+    return k;
+  }
   function roadPortalCut(x: number, z: number): boolean {
     for (const e of exits) {
       const rx = x - e.p.x, rz = z - e.p.z;
@@ -392,6 +417,7 @@ export function createTerrainField(map: TownMap, layout: WorldLayout): TerrainFi
     h = sunion(h, mound(x, z), 1.2);
     h = sunion(h, spur(x, z).h, 1.5);
     h = sunion(h, cover(x, z), 1.5);
+    if (railMouths.length) h *= forecourt(x, z);
     const L = coast(x, z);
     const land = Math.pow(smooth(0, 9, L), 0.7);
     // Where E2's beach strips run on past the board corners, stay a hair above its sand (BEACH_Y = -0.04) so the

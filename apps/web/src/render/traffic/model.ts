@@ -5,8 +5,10 @@
 //  - a car only enters a junction with a reservation that conflicts with no other car in it, no bus in the box,
 //    and room to clear the box on the far side ("don't block the box");
 //  - cars stop before a level crossing while the train is near it.
-// Cars enter at board-edge exits and leave there; after the advertised stadium closing time extra cars pull out
+// Cars enter and leave at the world exits (lanes run on into the tunnels / out along the causeways, so they appear and
+// vanish out of sight); after the advertised stadium closing time extra cars pull out
 // near the stadium and head for the exits. A car stuck for STUCK_S shrinks away (liveness).
+// No car shadows a bus: after BUS_TAIL_S right behind one it drops back and turns off at the next junction.
 import { pointAt, projectOnPolyline } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
 import type { Connector, Crossing, Lane, LaneGraph } from './lanes';
@@ -42,6 +44,11 @@ const SPAWN_GAP_S = 2;
 const SURGE_SPAWN_GAP_S = 5;
 const STADIUM_R = 15;
 const CLEAR_CAR = 3.2;
+/** A car within BUS_TAIL_GAP (centre distance along its path) of a bus ahead is tailing it; after BUS_TAIL_S it
+ *  drops back (up to BUS_DROP extra gap) and turns off at the next junction, away from the bus's lane. */
+const BUS_TAIL_S = 8;
+const BUS_TAIL_GAP = 7;
+const BUS_DROP = 3;
 
 export interface CarVariantSpec { length: number; weight: number }
 /** Kit cars (render/kit/cars.ts CAR_SIZE): hatchback, van, pickup. */
@@ -101,6 +108,8 @@ export interface TrafficCar {
   dying: number;
   /** Sim time it started waiting first in line at a junction (FIFO priority), or null. */
   waitSince: number | null;
+  /** Seconds spent right behind a bus (0 when none is close ahead). */
+  busTail: number;
 }
 
 export interface BusOnLane { id: string; s: number; halfLen: number; stopped: boolean }
@@ -300,13 +309,22 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
     c.reserved = null;
   }
 
+  const busOn = (l: Lane) => (buses.lanes.get(l.id)?.length ?? 0) > 0;
+  /** Centre distance to the nearest bus ahead seen by the last freeAhead call. */
+  let busAhead = Infinity;
+
   /** How far the car's centre may advance this step. */
   function freeAhead(c: TrafficCar): number {
     let free = Infinity;
+    busAhead = Infinity;
+    const busGap = GAP_BUS + BUS_DROP * Math.min(1, Math.max(0, (c.busTail - BUS_TAIL_S) / 4));
     const consider = (g: number, sp: number) => { if (g > 1e-9) free = Math.min(free, g - sp); };
     const lanePiece = (l: Lane, off: number, current: boolean) => {
       for (const o of onPiece(l, false)) if (o !== c && (!current || o.s > c.s)) consider(off + o.s, spacing(c, o));
-      for (const b of buses.lanes.get(l.id) ?? []) if (!current || b.s > c.s) consider(off + b.s, b.halfLen + c.halfLen + GAP_BUS);
+      for (const b of buses.lanes.get(l.id) ?? []) if (!current || b.s > c.s) {
+        if (off + b.s > 1e-9) busAhead = Math.min(busAhead, off + b.s);
+        consider(off + b.s, b.halfLen + c.halfLen + busGap);
+      }
       for (const x of crossingsByLane.get(l.id) ?? []) {
         if (!crossingClosed(x)) continue;
         const g = off + x.s - CROSS_STOP - c.halfLen;
@@ -321,6 +339,11 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
       lanePiece(l, -c.s, true);
       const rest = l.len - c.s;
       for (const k of graph.out.get(l.id) ?? []) connPiece(k, rest, false);
+      // Tailing a bus for too long: turn off at this junction, away from the lane the bus took.
+      if (c.next && c.busTail > BUS_TAIL_S && c.reserved !== c.next && graph.nodes.get(l.to)!.junction && busOn(c.next.to)) {
+        const alt = (graph.out.get(l.id) ?? []).filter((o) => o !== c.next && !busOn(o.to));
+        if (alt.length) c.next = alt[Math.floor(rand() * alt.length)]!;
+      }
       if (c.next) {
         lanePiece(c.next.to, rest + c.next.len, false);
         if (graph.nodes.get(l.to)!.junction && c.reserved !== c.next) {
@@ -388,6 +411,7 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
       id: nextId++, variant, color: Math.floor(rand() * colors), halfLen: variants[variant]!.length / 2,
       vMax: CRUISE * (0.85 + rand() * 0.3), lane, conn: null, s, next: null, prev: null, reserved: null,
       v: 0, x: 0, z: 0, heading: 0, scale: grown ? 1 : 0, surge, age: grown ? GROW_S : 0, stuck: 0, dying: 0, waitSince: null,
+      busTail: 0,
     };
     c.v = grown ? c.vMax * 0.7 : c.vMax * 0.5;
     c.next = plan(c, lane);
@@ -499,6 +523,7 @@ export function createTrafficModel(graph: LaneGraph, opts: TrafficModelOptions):
           continue;
         }
         const free = Math.max(0, freeAhead(c));
+        c.busTail = busAhead < BUS_TAIL_GAP ? c.busTail + dt : 0;
         let vTarget = c.vMax;
         if (c.conn) vTarget = Math.min(vTarget, TURN_SPEED[c.conn.turn]);
         else if (c.next) vTarget = Math.min(vTarget, Math.sqrt(TURN_SPEED[c.next.turn] ** 2 + 2 * 0.25 * Math.max(0, c.lane.len - c.s)));

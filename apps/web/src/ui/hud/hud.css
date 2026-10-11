@@ -635,3 +635,24 @@
     transition-property: opacity, background-color, color !important;
   }
 }
+
+/* ---------- mode purpose line (TopBar): under the tab island; inline in Lab, where the bar is empty ---------- */
+.hw-island--nav { position: relative; }
+.hw-purpose {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 22px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper, #fffbf2) 82%, transparent);
+  color: var(--ink-2, rgb(31 42 68 / 0.74));
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: hw-purpose-in 220ms ease-out both;
+}
+.hw-app[data-mode="lab"] .hw-purpose { position: static; padding: 0 6px 0 0; background: none; }
+@keyframes hw-purpose-in { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .hw-purpose { animation: none; } }

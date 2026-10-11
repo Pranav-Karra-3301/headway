@@ -1,4 +1,4 @@
-// Owner: T3b. Top-bar metrics (spec §10: mean wait, p95 wait, completion %, missed connections) + Play's live
+// Owner: T3b. Top-bar metrics, decluttered to the essentials (mean wait, completion %, missed connections; p95 lives in Results/Lab) + Play's live
 // "You vs AI" pace chip (fed by store.play.pace from modes/play/game.ts, T3c), which floats at top-centre under the
 // clock so the bar never overflows on 1280–1440 px screens.
 // Reads the 4 Hz HUD feed only; numbers spring between ticks (Ticker), never re-render per frame.
@@ -38,8 +38,6 @@ export function MetricsView({ hud, pace, paceClock, style }: MetricsViewProps) {
       <div className="hud-surface hud-stats">
         <Stat label="Mean wait" short="Wait" value={hud?.meanWaitS ?? null} format={mmss} sev={hud ? severityOf(hud.meanWaitS) : undefined}
           title="Mean wait so far" />
-        <Stat label="P95 wait" short="P95" value={hud?.p95WaitS ?? null} format={mmss} sev={hud?.p95WaitS != null ? severityOf(hud.p95WaitS) : undefined}
-          title="95% of waits so far were shorter than this" />
         <Stat label="Completed" short="Done" value={hud?.completionPct ?? null} format={pct} title="Riders who reached their destination" />
         <Stat label="Missed" short="Missed" value={hud?.missedConnections ?? null} format={round} title="Missed connections" />
       </div>
@@ -51,9 +49,6 @@ export function MetricsView({ hud, pace, paceClock, style }: MetricsViewProps) {
             {pace.tone === 'even' ? 'even' : <Ticker value={pace.vsAiPaxH} format={(v) => signed(v)} />}
           </span>
           {pace.tone !== 'even' && <span className="hud-pace-unit">pax-h</span>}
-          {pace.vsBaselinePaxH != null && (
-            <span className="hud-pace-base">baseline <b>{signed(pace.vsBaselinePaxH)}</b></span>
-          )}
         </div>
       )}
     </div>

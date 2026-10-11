@@ -8,10 +8,17 @@ import { InfoIcon, MoonIcon, SunIcon } from './icons';
 import { Segmented } from './Segmented';
 import { Slot } from './Slot';
 
+/** One tiny purpose line per mode, shown under the tabs. */
+export const PURPOSE: Record<Mode, string> = {
+  watch: 'The AI runs the town',
+  play: 'Beat the AI on the same crowd',
+  lab: 'How the AI improved',
+};
+
 const MODES: Array<{ value: Mode; label: string; title: string }> = [
-  { value: 'watch', label: 'Watch', title: 'Watch the AI dispatcher run the town' },
-  { value: 'play', label: 'Play', title: 'Dispatch the stadium crowd yourself' },
-  { value: 'lab', label: 'Lab', title: 'How the AI designers evolved the policy' },
+  { value: 'watch', label: 'Watch', title: `Watch: ${PURPOSE.watch}` },
+  { value: 'play', label: 'Play', title: `Play: ${PURPOSE.play}` },
+  { value: 'lab', label: 'Lab', title: `Lab: ${PURPOSE.lab}` },
 ];
 
 export function Wordmark() {
@@ -22,6 +29,11 @@ export function Wordmark() {
       <span className="hw-wordmark__dots" aria-hidden="true"><i /><i /><i /></span>
     </button>
   );
+}
+
+function Purpose() {
+  const mode = useApp((s) => s.mode);
+  return <span key={mode} className="hw-purpose" aria-live="polite">{PURPOSE[mode]}</span>;
 }
 
 export function ModeTabs() {
@@ -59,9 +71,10 @@ export function TopBar() {
   return (
     <header className="hw-topbar">
       <div className="hw-topbar__left">
-        <nav className="hw-card hw-island" aria-label="Headway">
+        <nav className="hw-card hw-island hw-island--nav" aria-label="Headway">
           <Wordmark />
           <ModeTabs />
+          <Purpose />
         </nav>
       </div>
       <div className="hw-topbar__center">

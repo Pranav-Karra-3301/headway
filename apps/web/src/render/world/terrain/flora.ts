@@ -105,6 +105,7 @@ export function scatterFlora(field: TerrainField, seed = 11): Flora {
   const railPortals = field.portals.filter((p) => p.kind === 'rail');
   const nearRoadPortal = (x: number, z: number) => field.portals.some((p) => {
     const rx = x - p.x, rz = z - p.z, o = -(rx * p.face.x + rz * p.face.z), a = Math.abs(rx * p.face.z - rz * p.face.x);
+    if (p.kind === 'rail' && (Math.hypot(rx, rz) < 6 || (o > -7 && o < 4 && a < p.half + 2.6))) return true; // clear mouth
     return o > -1 && o < 3.4 && a < p.half + 1.6;
   });
   const hazeAt = (d: number) => smooth(10, 34, d) * 0.42;

@@ -35,6 +35,39 @@ export function walkAt(from: Vec2, to: Vec2, t0: number, t1: number, t: number):
   return { x: from.x + (to.x - from.x) * k, z: from.z + (to.z - from.z) * k };
 }
 
+/** Most figures drawn per stop / platform: longer queues compress to the head of the line (the HUD marker shows
+ *  the full count), so crowds stay readable and never spill onto roads. Each drawn figure is one sim rider. */
+export const QUEUE_VISIBLE = 24;
+
+/** Whether a waiting rider at queue slot `slot` (0 = head) is drawn. */
+export function queueVisible(slot: number | undefined): boolean {
+  return (slot ?? 0) < QUEUE_VISIBLE;
+}
+
+/** Deterministic per-person value in [-1, 1). */
+export function personJitter(id: number): number {
+  let h = Math.imul(id ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return ((h >>> 0) / 0x100000000) * 2 - 1;
+}
+
+/**
+ * `walkAt` plus a per-person sideways offset (up to `width` either side) so a crowd leaving one door walks as a
+ * band, not single file. The offset ramps in/out over the first/last `ramp` units, so walks still start at the
+ * door and end exactly at the stop.
+ */
+export function crowdWalkAt(from: Vec2, to: Vec2, t0: number, t1: number, t: number, id: number, width = 0.55, ramp = 1.2): Vec2 {
+  const p = walkAt(from, to, t0, t1, t);
+  const dx = to.x - from.x, dz = to.z - from.z;
+  const L = Math.sqrt(dx * dx + dz * dz);
+  if (!(t1 > t0) || L < 1e-6 || t <= t0 || t >= t1) return p;
+  const k = (t - t0) / (t1 - t0);
+  const w = Math.max(0, Math.min(1, (k * L) / ramp, ((1 - k) * L) / ramp));
+  const off = personJitter(id) * width * w;
+  // left of travel = (dz, -dx) / L
+  return { x: p.x + (dz / L) * off, z: p.z - (dx / L) * off };
+}
+
 export interface QueueSlotOptions {
   /** Distance between people along the line. */
   spacing?: number;

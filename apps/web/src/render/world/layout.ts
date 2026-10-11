@@ -1,6 +1,6 @@
 // World-framing seam (coordinator): where mountains, water, tunnels and bridges go around the town board.
 // Camera looks from +x/+z, so mountains sit at the back (north, west) and water at the front (south, east).
-import { pointAt } from '@headway/sim';
+import { pointAt, RAIL_SPANS, TOWN } from '@headway/sim';
 import type { TownMap, Vec2 } from '@headway/sim';
 
 export type Side = 'north' | 'south' | 'east' | 'west';
@@ -50,7 +50,12 @@ export function worldLayout(map: TownMap): WorldLayout {
     if (gap >= 15 && (!best || gap > best.gap)) best = { d, gap };
   }
   const half = 9;
-  const railTunnel = best
+  // TOWN (and its play instances): the sim's exact ridge-tunnel span (the whole off-board run through the NW ridge).
+  const [t0, t1] = RAIL_SPANS.tunnel;
+  const sameLoop = Math.abs(L - TOWN.rail.loop.length) < 1e-6 && t1 > t0;
+  const railTunnel = sameLoop
+    ? { fromDist: t0, toDist: t1, center: (({ x, z }) => ({ x, z }))(pointAt(map.rail.loop, (t0 + t1) / 2)) }
+    : best
     ? { fromDist: (best.d - half + L) % L, toDist: (best.d + half) % L, center: (({ x, z }) => ({ x, z }))(pointAt(map.rail.loop, best.d)) }
     : null;
   return {

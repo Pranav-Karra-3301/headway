@@ -64,8 +64,7 @@ export function GoalCard() {
         </div>
 
         <p className="pl-fair">
-          <TrainIcon /> You run the baseline rules (g0) plus your own calls, on the exact crowd the AI is scored on, and you see
-          only what it sees. Space pauses; 1–4 set the speed.
+          <TrainIcon /> Click a bus (map or chip), then an action. Finish when you are done. Keys are optional.
         </p>
 
         <div className="pl-goal__actions">

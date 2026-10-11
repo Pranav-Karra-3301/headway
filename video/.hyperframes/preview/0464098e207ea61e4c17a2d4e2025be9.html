@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><script data-hf-gsap-fallback>
+(function(){
+  var cdnBase="https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/";
+  var loaded={};
+  function loadFallback(file){
+    if(loaded[file])return loaded[file];
+    return loaded[file]=new Promise(function(ok,fail){
+      var s=document.createElement("script");
+      s.src=cdnBase+file;s.hfGsapFallback=true;s.onload=ok;s.onerror=fail;
+      document.head.appendChild(s);
+    });
+  }
+  document.addEventListener("error",function(e){
+    var t=e.target;
+    if(!t||t.tagName!=="SCRIPT"||!t.src||t.hfGsapFallback)return;
+    var m=t.src.match(/gsap[^/]*\/dist\/(.+\.js)/);
+    if(m)loadFallback(m[1]).catch(function(){
+      reportError(new Error("GSAP could not load from "+t.src+" or "+cdnBase+m[1]+", so this preview's animations will not play."));
+    });
+  },true);
+})();
+</script>
+<meta name="hyperframes-studio-preview"><script>(function(){var seen=window.__hfPreviewErrors=[];
+addEventListener("error",function(e){seen.push(e.message||String(e))});})();</script>
+<base href="/api/projects/video/preview/"><style data-hyperframes-text-rendering="true">html,body,*{text-rendering:geometricPrecision}</style><script data-hf-after-fonts-fallback="">document.addEventListener("DOMContentLoaded", function () {
+  if (window.__hfAfterFontsClaimed) return;
+  var T = "text/hf-after-fonts";
+  var all = [].slice.call(document.querySelectorAll('script[type="text/hf-after-fonts"], script[type="text/hf-after-fonts+module"]'));
+  if (!all.length) return;
+  console.warn("[hyperframes] the runtime has no web-font gate; composition scripts run without waiting for fonts");
+  var late = function (el) { return el.type !== T || el.matches('[defer][src], [defer][data-hf-inlined-src]'); };
+  var queue = all.filter(function (el) { return !late(el); }).concat(all.filter(late));
+  (function next() {
+    var el = queue.shift();
+    if (!el) return;
+    var s = document.createElement("script");
+    for (var i = 0; i < el.attributes.length; i++) s.setAttribute(el.attributes[i].name, el.attributes[i].value);
+    if (el.type === T) s.removeAttribute("type"); else s.type = "module";
+    s.async = el.hasAttribute("async");
+    s.text = el.text;
+    var waits = s.type !== "module" && s.hasAttribute("src") && !s.async && !s.noModule;
+    if (waits) { s.addEventListener("load", next); s.addEventListener("error", next); }
+    el.replaceWith(s);
+    if (!waits) next();
+  })();
+});
+//# sourceURL=hyperframes://after-fonts-fallback</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Headway — explainer</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("assets/fonts/GumballRounded.ttf") format("truetype"); font-weight: 400; }
+      @font-face { font-family: "General Sans"; src: url("assets/fonts/GeneralSans-Regular.otf") format("opentype"); font-weight: 400; }
+      @font-face { font-family: "General Sans"; src: url("assets/fonts/GeneralSans-Medium.otf") format("opentype"); font-weight: 500; }
+      @font-face { font-family: "General Sans"; src: url("assets/fonts/GeneralSans-Semibold.otf") format("opentype"); font-weight: 600; }
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #1F2A44; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: "General Sans", sans-serif; color: #1F2A44; }
+
+      .scene { position: absolute; inset: 0; overflow: hidden; }
+      .inner { position: absolute; inset: 0; overflow: hidden; }
+      .kb { position: absolute; left: 0; top: -60px; width: 1920px; height: 1200px; }
+      .kb.world { top: -54px; height: 1188px; }
+      .kb img, .layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+      /* caption card */
+      .card {
+        position: absolute; left: 96px; top: 80px; max-width: 1180px;
+        padding: 26px 40px 32px; border-radius: 32px;
+        background: rgba(221, 239, 229, 0.96);
+        box-shadow: 0 24px 60px rgba(31, 42, 68, 0.24);
+        opacity: 0;
+      }
+      .chip {
+        display: inline-block; margin-bottom: 14px; padding: 8px 16px 7px; border-radius: 999px;
+        background: #2E5BDA; color: #FFFFFF; font-weight: 600; font-size: 22px; letter-spacing: 0.16em;
+      }
+      .ttl { font-family: "Gumball Rounded", sans-serif; font-size: 66px; line-height: 1.1; color: #1F2A44; }
+
+      /* S1 hook */
+      .scrim-c { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(31, 42, 68, 0.62) 0%, rgba(31, 42, 68, 0.35) 60%, rgba(31, 42, 68, 0.15) 100%); }
+      .center-stack { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+      .brand { display: flex; align-items: center; gap: 18px; font-family: "Gumball Rounded", sans-serif; font-size: 44px; color: #DDEFE5; letter-spacing: 0.04em; }
+      .dots { display: flex; gap: 9px; }
+      .dots i { display: block; width: 14px; height: 14px; border-radius: 50%; }
+      .hook-l { display: block; font-family: "Gumball Rounded", sans-serif; font-size: 124px; line-height: 1.08; color: #F4FAF6; text-shadow: 0 6px 40px rgba(31, 42, 68, 0.45); }
+
+      /* S6 results */
+      .mint { position: absolute; inset: 0; background: #DDEFE5; }
+      .res { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      .res-h { font-family: "Gumball Rounded", sans-serif; font-size: 72px; color: #1F2A44; margin-bottom: 40px; }
+      .cols { display: flex; gap: 140px; }
+      .col { width: 640px; display: flex; flex-direction: column; align-items: center; opacity: 0; }
+      .num { font-family: "Gumball Rounded", sans-serif; font-size: 230px; line-height: 1; color: #2E5BDA; font-variant-numeric: tabular-nums; }
+      .lbl { margin-top: 18px; font-weight: 500; font-size: 38px; color: #1F2A44; }
+      .ref { margin-top: 64px; padding: 16px 34px; border-radius: 999px; border: 2px solid rgba(31, 42, 68, 0.25); font-weight: 500; font-size: 34px; color: #1F2A44; opacity: 0; }
+
+      /* S7 built pills */
+      .pills { display: flex; gap: 14px; margin-top: 20px; }
+      .pill { padding: 12px 22px; border-radius: 999px; background: #1F2A44; color: #DDEFE5; font-weight: 500; font-size: 30px; opacity: 0; }
+
+      /* S8 end */
+      .scrim-e { position: absolute; inset: 0; background: rgba(31, 42, 68, 0.55); }
+      .end-mark { font-family: "Gumball Rounded", sans-serif; font-size: 176px; line-height: 1; color: #DDEFE5; }
+      .end-url { margin-top: 36px; padding: 18px 40px; border-radius: 999px; background: #2E5BDA; color: #FFFFFF; font-weight: 600; font-size: 52px; }
+      .end-sub { margin-top: 30px; font-weight: 500; font-size: 30px; letter-spacing: 0.14em; color: rgba(221, 239, 229, 0.85); }
+      .fade { opacity: 0; }
+    </style>
+  
+<script data-hyperframes-preview-runtime="1" src="/api/runtime.js"></script>
+<meta name="hyperframes-project-signature" content="f8660ff0f8c1e2e466769a77">
+</head>
+  <body>
+    <div data-hf-id="hf-rrpb" id="root" data-composition-id="main" data-start="0" data-duration="74" data-width="1920" data-height="1080">
+
+      <!-- S1 hook -->
+      <section data-hf-id="hf-w7u8" id="s1" class="scene clip" data-start="0" data-duration="5.7" data-track-index="0">
+        <div data-hf-id="hf-mv1a" id="s1-in" class="inner">
+          <div data-hf-id="hf-ge26" id="s1-kb" class="kb" data-layout-allow-overflow=""><img data-hf-id="hf-h4wx" src="assets/img/town-3d-dusk.png" alt=""></div>
+          <div data-hf-id="hf-8s9m" class="scrim-c"></div>
+          <div data-hf-id="hf-gobo" class="center-stack">
+            <div data-hf-id="hf-x00e" id="s1-brand" class="brand fade">HEADWAY<span data-hf-id="hf-r6mh" class="dots"><i data-hf-id="hf-sigy" style="background:#2BB3A0"></i><i data-hf-id="hf-qxaj" style="background:#F2994A"></i><i data-hf-id="hf-xvc5" style="background:#8E6CE6"></i></span></div>
+            <div data-hf-id="hf-2jqp" id="s1-title" class="fade" style="margin-top: 26px">
+              <span data-hf-id="hf-anii" class="hook-l">A town whose</span>
+              <span data-hf-id="hf-ce89" class="hook-l">dispatcher learns</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S2 the town: day to dusk -->
+      <section data-hf-id="hf-2ns0" id="s2" class="scene clip" data-start="5" data-duration="15.1" data-track-index="1">
+        <div data-hf-id="hf-79rj" id="s2-in" class="inner">
+          <div data-hf-id="hf-b8ev" id="s2-kb" class="kb world" data-layout-allow-overflow="">
+            <img loading="lazy" data-hf-preview-lazy data-hf-id="hf-nzha" src="assets/img/world-day.png" alt="">
+            <img loading="lazy" data-hf-preview-lazy data-hf-id="hf-2enl" id="s2-dusk" class="layer" src="assets/img/world-dusk.png" alt="" style="opacity: 0">
+          </div>
+          <div data-hf-id="hf-3vw0" id="c2a" class="card"><div data-hf-id="hf-noqz" class="chip">THE TOWN</div><div data-hf-id="hf-m7ha" class="ttl">Campus, downtown, apartments, a stadium</div></div>
+          <div data-hf-id="hf-erdn" id="c2b" class="card"><div data-hf-id="hf-lp4b" class="chip">THE TOWN</div><div data-hf-id="hf-566o" class="ttl">3 bus routes. One regional train.</div></div>
+        </div>
+      </section>
+
+      <!-- S3 watch -->
+      <section data-hf-id="hf-s8sp" id="s3" class="scene clip" data-start="19.4" data-duration="8.5" data-track-index="2">
+        <div data-hf-id="hf-3q3o" id="s3-in" class="inner">
+          <div data-hf-id="hf-m770" id="s3-kb" class="kb" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-3loy" src="assets/img/integrated-watch.png" alt=""></div>
+          <div data-hf-id="hf-1lsf" id="c3a" class="card"><div data-hf-id="hf-ujvx" class="chip">WATCH</div><div data-hf-id="hf-16yn" class="ttl">An AI dispatcher runs the town</div></div>
+          <div data-hf-id="hf-sxwk" id="c3b" class="card"><div data-hf-id="hf-mbc1" class="chip">WATCH</div><div data-hf-id="hf-p195" class="ttl">Click any bus to read its rule</div></div>
+        </div>
+      </section>
+
+      <!-- S4 play -->
+      <section data-hf-id="hf-4yub" id="s4" class="scene clip" data-start="27.2" data-duration="10.3" data-track-index="3">
+        <div data-hf-id="hf-ohsd" id="s4-in" class="inner">
+          <div data-hf-id="hf-vrc5" id="s4-kb" class="kb" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-81h9" src="assets/img/integrated-play.png" alt=""></div>
+          <div data-hf-id="hf-v94h" id="s4-res" class="inner" style="opacity: 0">
+            <div data-hf-id="hf-yimt" id="s4-kb2" class="kb" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-7wqw" src="assets/img/play-results-v1.png" alt=""></div>
+          </div>
+          <div data-hf-id="hf-p266" id="c4a" class="card"><div data-hf-id="hf-b63k" class="chip">PLAY</div><div data-hf-id="hf-u7c3" class="ttl">Dispatch the same stadium crowd</div></div>
+          <div data-hf-id="hf-l425" id="c4b" class="card"><div data-hf-id="hf-3tlk" class="chip">PLAY</div><div data-hf-id="hf-6t09" class="ttl">Same crowd: you vs AI vs baseline</div></div>
+          <div data-hf-id="hf-kcec" id="c4c" class="card"><div data-hf-id="hf-2moh" class="chip">PLAY</div><div data-hf-id="hf-7w9p" class="ttl">Doing nothing scores the baseline</div></div>
+        </div>
+      </section>
+
+      <!-- S5 lab -->
+      <section data-hf-id="hf-1l2k" id="s5" class="scene clip" data-start="36.8" data-duration="13.7" data-track-index="4">
+        <div data-hf-id="hf-xz22" id="s5-in" class="inner">
+          <div data-hf-id="hf-1k76" id="s5-kb" class="kb" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-lkcm" src="assets/img/integrated-lab.png" alt=""></div>
+          <div data-hf-id="hf-46hp" id="c5a" class="card"><div data-hf-id="hf-psit" class="chip">LAB</div><div data-hf-id="hf-11g5" class="ttl">Three DeepSeek designers propose rule changes</div></div>
+          <div data-hf-id="hf-84lq" id="c5b" class="card"><div data-hf-id="hf-nchl" class="chip">LAB</div><div data-hf-id="hf-zbef" class="ttl">Kept only if unseen runs agree</div></div>
+          <div data-hf-id="hf-c2pr" id="c5c" class="card"><div data-hf-id="hf-ojeo" class="chip">LAB</div><div data-hf-id="hf-lg0m" class="ttl">Never retrained. The rulebook evolves.</div></div>
+        </div>
+      </section>
+
+      <!-- S6 results -->
+      <section data-hf-id="hf-920w" id="s6" class="scene clip" data-start="49.8" data-duration="11.5" data-track-index="5">
+        <div data-hf-id="hf-pz63" id="s6-in" class="inner">
+          <div data-hf-id="hf-6mn4" class="mint"></div>
+          <div data-hf-id="hf-j5iq" class="res">
+            <div data-hf-id="hf-359f" id="r-h" class="res-h fade">Total passenger time</div>
+            <div data-hf-id="hf-6ra9" class="cols">
+              <div data-hf-id="hf-02an" id="col1" class="col"><div data-hf-id="hf-dt70" id="n1" class="num">0.0%</div><div data-hf-id="hf-ay9y" class="lbl">training runs</div></div>
+              <div data-hf-id="hf-rees" id="col2" class="col"><div data-hf-id="hf-7gmb" id="n2" class="num">0.0%</div><div data-hf-id="hf-au8t" class="lbl">unseen validation</div></div>
+            </div>
+            <div data-hf-id="hf-fl8o" id="r-ref" class="ref">Hand-written reference: −5.1% / −4.6%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S7 built -->
+      <section data-hf-id="hf-w8mo" id="s7" class="scene clip" data-start="60.6" data-duration="7.3" data-track-index="6">
+        <div data-hf-id="hf-stlc" id="s7-in" class="inner">
+          <div data-hf-id="hf-lsmo" id="s7-kb" class="kb" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-a3x7" src="assets/img/town-fx-dusk-close.png" alt=""></div>
+          <div data-hf-id="hf-byjy" id="c7" class="card">
+            <div data-hf-id="hf-abah" class="ttl">Built in one day</div>
+            <div data-hf-id="hf-c9cw" class="pills">
+              <div data-hf-id="hf-3ds2" id="p1" class="pill">TypeScript sim</div>
+              <div data-hf-id="hf-fcwg" id="p2" class="pill">Three.js</div>
+              <div data-hf-id="hf-qh6r" id="p3" class="pill">Cloudflare</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S8 end card -->
+      <section data-hf-id="hf-phe1" id="s8" class="scene clip" data-start="67.2" data-duration="6.8" data-track-index="7">
+        <div data-hf-id="hf-fe61" id="s8-in" class="inner">
+          <div data-hf-id="hf-b4rl" id="s8-kb" class="kb world" data-layout-allow-overflow=""><img loading="lazy" data-hf-preview-lazy data-hf-id="hf-90w9" src="assets/img/world-dusk.png" alt=""></div>
+          <div data-hf-id="hf-p8w4" class="scrim-e"></div>
+          <div data-hf-id="hf-g9uk" class="center-stack">
+            <div data-hf-id="hf-rv3s" id="e1" class="end-mark fade">Headway</div>
+            <div data-hf-id="hf-g9ie" id="e2" class="end-url fade">headway.pranavkarra.me</div>
+            <div data-hf-id="hf-fahc" id="e3" class="end-sub fade">WATCH · PLAY · LAB</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- voiceover (Deepgram Aura 2, one voice) -->
+      <audio data-hf-id="hf-0oy3" id="vo1" src="assets/vo/l1.mp3" data-start="0.8" data-duration="3.02" data-track-index="10" data-volume="1" data-end="3.8200000000000003"></audio>
+      <audio data-hf-id="hf-p2eo" id="vo2" src="assets/vo/l2.mp3" data-start="5.4" data-duration="13.3" data-track-index="10" data-volume="1" data-end="18.700000000000003"></audio>
+      <audio data-hf-id="hf-uu2v" id="vo3" src="assets/vo/l3.mp3" data-start="19.8" data-duration="6.74" data-track-index="10" data-volume="1" data-end="26.54"></audio>
+      <audio data-hf-id="hf-0izy" id="vo4" src="assets/vo/l4.mp3" data-start="27.6" data-duration="8.38" data-track-index="10" data-volume="1" data-end="35.980000000000004"></audio>
+      <audio data-hf-id="hf-k31y" id="vo5" src="assets/vo/l5.mp3" data-start="37.2" data-duration="11.86" data-track-index="10" data-volume="1" data-end="49.06"></audio>
+      <audio data-hf-id="hf-w2bd" id="vo6" src="assets/vo/l6.mp3" data-start="50.2" data-duration="9.5" data-track-index="10" data-volume="1" data-end="59.7"></audio>
+      <audio data-hf-id="hf-gy8q" id="vo7" src="assets/vo/l7.mp3" data-start="61.0" data-duration="5.93" data-track-index="10" data-volume="1" data-end="66.93"></audio>
+      <audio data-hf-id="hf-q15r" id="vo8" src="assets/vo/l8.mp3" data-start="67.6" data-duration="2.86" data-track-index="10" data-volume="1" data-end="70.46"></audio>
+    </div>
+
+    
+  <script type="text/hf-after-fonts">const tl = gsap.timeline({ paused: true });
+[["#s2-in", 5], ["#s3-in", 19.4], ["#s4-in", 27.2], ["#s5-in", 36.8], ["#s6-in", 49.8], ["#s7-in", 60.6], ["#s8-in", 67.2]].forEach(([sel, t]) => {
+  tl.fromTo(sel, { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "sine.inOut" }, t);
+});
+tl.fromTo("#s1-in", { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "sine.out" }, 0);
+const cardIn = (sel, t) => tl.fromTo(sel, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, t);
+const cardOut = (sel, t) => tl.to(sel, { opacity: 0, y: -12, duration: 0.4, ease: "power2.in" }, t);
+tl.fromTo("#s1-kb", { scale: 1 }, { scale: 1.1, duration: 5.7, ease: "none" }, 0);
+tl.fromTo("#s1-brand", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" }, 0.4);
+tl.fromTo("#s1-title", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.9, ease: "power2.out" }, 0.8);
+tl.fromTo("#s2-kb", { scale: 1, x: 0, y: 0 }, { scale: 1.16, x: -40, y: 24, duration: 15.1, ease: "sine.inOut" }, 5);
+tl.fromTo("#s2-dusk", { opacity: 0 }, { opacity: 1, duration: 1.6, ease: "sine.inOut" }, 12.4);
+cardIn("#c2a", 5.6);
+cardOut("#c2a", 13.1);
+cardIn("#c2b", 13.6);
+tl.fromTo("#s3-kb", { scale: 1, y: 0 }, { scale: 1.06, y: 0, duration: 3.6, ease: "none" }, 19.4);
+tl.to("#s3-kb", { scale: 1.75, y: -510, duration: 3.6, ease: "power2.inOut" }, 23);
+tl.to("#s3-kb", { scale: 1.8, y: -530, duration: 1.3, ease: "none" }, 26.6);
+cardIn("#c3a", 20);
+cardOut("#c3a", 23.2);
+cardIn("#c3b", 23.6);
+tl.fromTo("#s4-kb", { scale: 1, y: 0 }, { scale: 1.45, y: -330, duration: 3.6, ease: "power1.inOut" }, 27.2);
+tl.fromTo("#s4-res", { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "sine.inOut" }, 30.5);
+tl.fromTo("#s4-kb2", { scale: 1, y: 0 }, { scale: 1.1, y: 30, duration: 7, ease: "none" }, 30.5);
+cardIn("#c4a", 27.8);
+cardOut("#c4a", 30.3);
+cardIn("#c4b", 30.8);
+cardOut("#c4b", 33.5);
+cardIn("#c4c", 33.9);
+tl.fromTo("#s5-kb", { scale: 1, x: 0, y: 0 }, { scale: 1.04, x: 0, y: 0, duration: 3.6, ease: "none" }, 36.8);
+tl.to("#s5-kb", { scale: 1.35, x: 336, y: 262, duration: 4, ease: "power2.inOut" }, 40.4);
+tl.to("#s5-kb", { scale: 1.4, x: 352, y: 272, duration: 6.1, ease: "none" }, 44.4);
+cardIn("#c5a", 37.4);
+cardOut("#c5a", 41.4);
+cardIn("#c5b", 41.8);
+cardOut("#c5b", 45.2);
+cardIn("#c5c", 45.6);
+tl.fromTo("#r-h", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 50.3);
+const n1 = document.getElementById("n1"), n2 = document.getElementById("n2");
+const fmt = (v) => (v >= 0.05 ? "\u2212" : "") + v.toFixed(1) + "%";
+const c1 = { v: 0 }, c2 = { v: 0 };
+tl.fromTo("#col1", { opacity: 0, y: 24, x: 390 }, { opacity: 1, y: 0, x: 390, duration: 0.6, ease: "power2.out" }, 51.2);
+tl.to("#col1", { x: 0, duration: 0.8, ease: "power2.inOut" }, 54.5);
+tl.fromTo(c1, { v: 0 }, { v: 6, duration: 1.5, ease: "power2.out", onUpdate: () => {
+  n1.textContent = fmt(c1.v);
+} }, 51.4);
+tl.fromTo("#col2", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 54.9);
+tl.fromTo(c2, { v: 0 }, { v: 5.3, immediateRender: false, duration: 1.5, ease: "power2.out", onUpdate: () => {
+  n2.textContent = fmt(c2.v);
+} }, 55.1);
+tl.fromTo("#r-ref", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 57.8);
+tl.fromTo("#s7-kb", { scale: 1.06, x: 30 }, { scale: 1.16, x: -30, duration: 7.3, ease: "none" }, 60.6);
+cardIn("#c7", 61);
+tl.fromTo("#p1", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 62.8);
+tl.fromTo("#p2", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 64.4);
+tl.fromTo("#p3", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 65.6);
+tl.fromTo("#s8-kb", { scale: 1.14 }, { scale: 1, duration: 6.8, ease: "sine.out" }, 67.2);
+tl.fromTo("#e1", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, 67.6);
+tl.fromTo("#e2", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.7, ease: "power2.out" }, 68.3);
+tl.fromTo("#e3", { opacity: 0 }, { opacity: 1, duration: 0.7, ease: "sine.out" }, 69);
+tl.to("#s8-in", { opacity: 0, duration: 0.8, ease: "sine.in" }, 73.2);
+window.__timelines["main"] = tl;</script></body>
+</html>

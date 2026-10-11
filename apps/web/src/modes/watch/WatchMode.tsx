@@ -33,9 +33,9 @@ function Ticker({ rec, clockStart, preview }: { rec: DecisionRecord | undefined;
   const phase = useApp((s) => s.hud?.phase);
   let body;
   if (phase === 'done') {
-    body = <span className="hw-watch__ticker-text">Run complete. The next crowd starts in a few seconds.</span>;
+    body = <span className="hw-watch__ticker-text">Run complete. Next crowd in a moment.</span>;
   } else if (!rec) {
-    body = <span className="hw-watch__ticker-text">Click a bus, the train or a stop to see what it is doing and why.</span>;
+    body = <span className="hw-watch__ticker-text">Click a bus, train or stop to see why.</span>;
   } else {
     body = (
       <>

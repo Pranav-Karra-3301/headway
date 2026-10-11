@@ -1,5 +1,5 @@
 // Owner: E1. Stone tunnel portals (toy-railway style): a chunky masonry facade with a round arch, alternating
-// voussoirs + keystone, a cornice, plinths, a dark mouth set back in the opening, and (road portals) two lanterns
+// voussoirs + keystone, a cornice, plinths, a dark mouth set back in the opening, and two lanterns
 // whose glass glows at dusk (palette role `lamp`). Local frame: +z = out of the tunnel, the cut plane at z = 0, the
 // facade occupies z ∈ [0, depth]; y = 0 is the ground. Parts carry palette/terrain roles for bakeGeometry.
 import * as THREE from 'three';
@@ -125,10 +125,10 @@ function portalGroup(dims: PortalDims, kind: 'road' | 'rail'): THREE.Group {
     // a string course between plinth and arch
     g.add(at(rbox(pier + 0.06, 0.12, 0.1, 0.03, 'trStone', 1), sx * (dims.open + pier / 2), dims.spring - 0.5, front + 0.03));
   }
+  for (const sx of [-1, 1]) {
+    g.add(at(lantern(), sx * (dims.open + pier * 0.5), dims.spring + (kind === 'road' ? 1.1 : 1.0), front + 0.26));
+  }
   if (kind === 'road') {
-    for (const sx of [-1, 1]) {
-      g.add(at(lantern(), sx * (dims.open + pier * 0.5), dims.spring + 1.1, front + 0.26));
-    }
     // a raised name plaque above the keystone (shape only)
     g.add(at(rbox(1.3, 0.38, 0.12, 0.06, 'trStone', 2), 0, dims.spring + dims.open + 0.62, front + 0.03));
     g.add(at(rbox(1.05, 0.2, 0.06, 0.04, 'trIron'), 0, dims.spring + dims.open + 0.62, front + 0.1));

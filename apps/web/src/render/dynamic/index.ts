@@ -11,7 +11,7 @@ import { addInstanceFade, KitMaterial } from '../materials';
 import { colorOf, PALETTES } from '../palettes';
 import type { DetailMode, PaletteId, Pick } from '../types';
 import { LANE_OFFSET, ROAD } from '../town/network';
-import { stopFrame, approach, lerpDist, PLATFORM_QUEUE, queueSlot, STOP_QUEUE, walkAt, type QueueSlotOptions } from './interp';
+import { stopFrame, approach, crowdWalkAt, lerpDist, PLATFORM_QUEUE, queueSlot, queueVisible, STOP_QUEUE, type QueueSlotOptions } from './interp';
 
 export interface DynamicFrame {
   prev: SimSnapshot;
@@ -295,7 +295,8 @@ export function createDynamicLayer(map: TownMap, opts: { palette: PaletteId; det
       for (const e of next.events as SimEvent[]) {
         if (e.kind !== 'board') continue;
         const st = people.get(e.personId);
-        if (!st) continue;
+        // only riders drawn last frame walk to the door (hidden queue overflow just boards)
+        if (!st || frameNo - st.seen > 2) continue;
         ghosts.push({ id: e.personId, x: st.x, z: st.z, tint: st.tint, vehicleId: e.vehicleId, start: timeS, place: e.at });
       }
       lastNext = next;
@@ -321,10 +322,11 @@ export function createDynamicLayer(map: TownMap, opts: { palette: PaletteId; det
       let target: Vec2 | null = null;
       let rate = 12, walking = false, fade = 0, scale = 1;
       if (pv.state === 'walking' && pv.from && pv.to) {
-        target = walkAt(pv.from, pv.to, pv.t0 ?? simT, pv.t1 ?? simT, simT);
+        target = crowdWalkAt(pv.from, pv.to, pv.t0 ?? simT, pv.t1 ?? simT, simT, pv.id);
         walking = simT < (pv.t1 ?? simT);
         rate = 14;
       } else if (pv.state === 'waiting' && pv.at) {
+        if (!queueVisible(pv.slot)) continue; // long queues compress; the marker shows the full count
         const pl = places.get(placeKey(pv.at));
         if (pl) target = queueSlot(pl.p, pl.dir, pv.slot ?? 0, pl.opts);
         rate = 5;

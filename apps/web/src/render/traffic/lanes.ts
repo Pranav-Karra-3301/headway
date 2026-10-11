@@ -5,9 +5,13 @@
 //   quadratic Béziers through the intersection of the two lane lines (eased corners), straight when collinear.
 // - Connectors at a junction that come too close to each other conflict (one reservation at a time).
 // - Board-edge nodes (degree 1 on the board boundary) are exits: cars enter on `entry` lanes and leave on `exit` lanes.
+//   Those lanes run on past the board edge (v9): APPROACH_TUNNEL u into the ridge behind a tunnel portal (north/west),
+//   or along the causeway deck to its far end at the diorama edge (south/east), so cars appear and vanish out of
+//   sight and drive in on the road instead of popping up at the board edge.
 // - Level crossings: where lanes cross the rail loop (cars stop while the train is there).
 import { pointAt, polyline } from '@headway/sim';
 import type { Polyline, TownMap, Vec2 } from '@headway/sim';
+import { worldLayout } from '../world/layout';
 
 /** Lane centre distance from the road centreline (road width 2.4 → two 1.2 u lanes). */
 export const LANE_OFFSET = 0.6;
@@ -17,6 +21,8 @@ export const ROAD_HALF_WIDTH = 1.2;
 /** Two movements whose paths come closer than this cannot share a junction. */
 const CONFLICT_DIST = 1.1;
 const CONNECTOR_SEGS = 10;
+/** How far exit lanes run on into the ridge behind a road tunnel portal (the portal mound covers ≥ 7 u). */
+export const APPROACH_TUNNEL = 6;
 
 export interface LaneNode { id: string; p: Vec2; degree: number; exit: boolean; junction: boolean }
 export interface Lane {
@@ -62,6 +68,8 @@ export interface LaneGraph {
   connectors: Connector[];
   entries: Lane[];
   crossings: Crossing[];
+  /** Road centrelines as driven, incl. the off-board approaches (tunnel / causeway) of the board exits. */
+  roads: Polyline[];
 }
 
 const EPS = 1e-6;
@@ -180,12 +188,30 @@ export function buildLaneGraph(map: TownMap): LaneGraph {
     nodes.set(n.id, { id: n.id, p: n.p, degree: deg, exit: deg === 1 && onEdge, junction: deg >= 3 });
   }
 
+  // Off-board approaches: into the ridge behind a tunnel portal, or out to the far end of a causeway.
+  const layout = worldLayout(map), E = layout.extent;
+  const approach = (edgeId: string, end: Vec2): Vec2 | null => {
+    const x = layout.exits.find((q) => q.edgeId === edgeId && Math.hypot(q.p.x - end.x, q.p.z - end.z) < 1e-6);
+    if (!x) return null;
+    const d = x.dir, ts: number[] = [];
+    if (d.x > 1e-6) ts.push((E.maxX - end.x) / d.x);
+    if (d.x < -1e-6) ts.push((E.minX - end.x) / d.x);
+    if (d.z > 1e-6) ts.push((E.maxZ - end.z) / d.z);
+    if (d.z < -1e-6) ts.push((E.minZ - end.z) / d.z);
+    const len = x.kind === 'tunnel' ? APPROACH_TUNNEL : Math.max(0, Math.min(...ts));
+    return len > 0.5 ? { x: end.x + d.x * len, z: end.z + d.z * len } : null;
+  };
+  const roads: Polyline[] = [];
   const lanes: Lane[] = [];
   for (const e of map.roads.edges) {
     if (e.path.points.length < 2 || e.path.length < 0.5) continue;
+    const ep = [...e.path.points];
+    if (nodes.get(e.a)!.exit) { const q = approach(e.id, ep[0]!); if (q) ep.unshift(q); }
+    if (nodes.get(e.b)!.exit) { const q = approach(e.id, ep[ep.length - 1]!); if (q) ep.push(q); }
+    roads.push(ep.length === e.path.points.length ? e.path : polyline(ep, false));
     for (const forward of [true, false]) {
       const from = forward ? e.a : e.b, to = forward ? e.b : e.a;
-      const centrePts = forward ? e.path.points : [...e.path.points].reverse();
+      const centrePts = forward ? ep : [...ep].reverse();
       const centre = polyline(centrePts, false);
       const off = polyline(offsetRight(centre.points, LANE_OFFSET), false);
       const maxTrim = Math.max(0, (centre.length - 0.6) / 2);
@@ -228,7 +254,7 @@ export function buildLaneGraph(map: TownMap): LaneGraph {
   }
 
   const crossings = lanes.flatMap((l) => crossingsOf(l, map.rail.loop));
-  const g: LaneGraph = { map, nodes, lanes, laneById, out, into, connectors, entries: lanes.filter((l) => l.entry), crossings };
+  const g: LaneGraph = { map, nodes, lanes, laneById, out, into, connectors, entries: lanes.filter((l) => l.entry), crossings, roads };
   graphs.set(map, g);
   return g;
 }

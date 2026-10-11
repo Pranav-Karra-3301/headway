@@ -132,7 +132,7 @@ function DockBody() {
   const summary = !obs ? 'Waiting for the town…'
     : selBus ? busLine(selBus, t)
     : selection?.kind === 'train' ? trainLine(obs)
-    : 'Pick a bus to dispatch, hold or reassign it, or time the train.';
+    : 'Click a bus or the train, then an action.';
 
   return (
     <div className="pl-dock hw-card" role="region" aria-label="Dispatcher controls">
@@ -169,7 +169,11 @@ function DockBody() {
       </div>
       <div className="pl-dock__summary">
         <span className="pl-dock__text">{summary}</span>
-        {paused && <span className="pl-paused">Paused <span className="pl-kbd pl-kbd--sm">Space</span></span>}
+        {paused && (
+          <button type="button" className="pl-paused" onClick={() => useApp.getState().setPaused(false)} title="Resume (Space)">
+            Paused · resume <span className="pl-kbd pl-kbd--sm">Space</span>
+          </button>
+        )}
       </div>
       <div className="pl-actions">
         <Action k="D" label="Dispatch" gate={legal.dispatch} onClick={() => act({ kind: 'dispatch' })} />
