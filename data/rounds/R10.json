@@ -1,0 +1,713 @@
+{
+  "id": "R10",
+  "number": 10,
+  "championBefore": "g1",
+  "championAfter": "g2",
+  "status": "done",
+  "proposals": [
+    {
+      "id": "r10-a",
+      "roundId": "R10",
+      "designer": 0,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "emphasis": "spacing",
+      "summary": "Add the strongest probe: reassign a terminal bus to the busiest route when queue_ratio_other >= 6.67, keeping the existing queue-relief dispatch.",
+      "rationale": "The champion leaves 1,088 riders behind on r3 and 206 waiting at Old Main, while r2/r1 terminals can sit with idle buses. The probe that reassigns a terminal bus to the busiest route when queue_ratio_other >= 6.67 is the only measured change above 1% (-2.6%), directly moving capacity toward the most-pressured route. Keeping queue-relief-dispatch preserves the existing fast dispatch behavior, and the high 6.67 ratio guard prevents pulling r2 buses off Central transfers except in extreme imbalance. Changes: Add terminal rule reassigning to busiest when queue_ratio_other >= 6.67 (priority 30); Keep queue-relief-dispatch and even-headway unchanged.",
+      "policy": {
+        "meta": {
+          "id": "r10-a",
+          "parent": "g1",
+          "generation": 2,
+          "author": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "emphasis": "spacing",
+          "summary": "Add the strongest probe: reassign a terminal bus to the busiest route when queue_ratio_other >= 6.67, keeping the existing queue-relief dispatch."
+        },
+        "params": {
+          "allocation": {
+            "r1": 2,
+            "r2": 2,
+            "r3": 2
+          },
+          "maxHoldS": 60,
+          "trainDefaultDwellS": 45
+        },
+        "rules": [
+          {
+            "id": "probe-term-reas-queuerat-6p67",
+            "on": "bus_at_terminal",
+            "priority": 30,
+            "when": [
+              {
+                "f": "queue_ratio_other",
+                "op": ">=",
+                "v": 6.67
+              }
+            ],
+            "do": {
+              "type": "reassign",
+              "to": "busiest"
+            },
+            "say": "Rebalancing: other route queue is {queue_ratio_other}x this one, moving to busiest"
+          },
+          {
+            "id": "queue-relief-dispatch",
+            "on": "bus_at_terminal",
+            "priority": 20,
+            "when": [
+              {
+                "f": "route_queue",
+                "op": ">=",
+                "v": 3
+              }
+            ],
+            "do": {
+              "type": "dispatch"
+            },
+            "say": "Queue relief: {route_queue} waiting, dispatching now"
+          },
+          {
+            "id": "even-headway",
+            "on": "bus_at_terminal",
+            "priority": 10,
+            "when": [
+              {
+                "f": "headway_ratio",
+                "op": "<",
+                "v": 1
+              }
+            ],
+            "do": {
+              "type": "hold",
+              "until": "target_headway"
+            },
+            "say": "Waiting {seconds}s at the terminal to keep a {target_headway_s}s headway"
+          }
+        ],
+        "defaults": {
+          "bus_at_stop": {
+            "type": "continue"
+          },
+          "bus_at_terminal": {
+            "type": "dispatch"
+          },
+          "train_at_station": {
+            "type": "setTrainDeparture",
+            "dwellS": 45
+          }
+        }
+      },
+      "valid": true,
+      "errors": [],
+      "train": {
+        "J": 9007216,
+        "runs": 8,
+        "metrics": {
+          "J": 9007216,
+          "spawned": 9171,
+          "completed": 8603,
+          "unfinished": 568,
+          "completionPct": 93.81,
+          "meanJourneyS": 767.09,
+          "meanWaitS": 284.43,
+          "p95WaitS": 731.55,
+          "maxWaitS": 1499,
+          "transfersMade": 1106,
+          "missedConnections": 224,
+          "leftBehind": 1969,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 29520.4,
+            "deadheadDistanceU": 1227.25,
+            "holdS": 0,
+            "trainDwellS": 9156
+          }
+        }
+      },
+      "val": null,
+      "deltaTrainPct": -2.6,
+      "findings": [
+        {
+          "kind": "overload",
+          "impactS": 137697,
+          "text": "198 people waiting for Route 3 were left behind at Old Main; the queue peaked at 189.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 198,
+          "peakQueue": 189
+        },
+        {
+          "kind": "overload",
+          "impactS": 124502,
+          "text": "206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 205.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 206,
+          "peakQueue": 205
+        },
+        {
+          "kind": "overload",
+          "impactS": 119509,
+          "text": "219 people waiting for Route 3 were left behind at Old Main; the queue peaked at 198.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 219,
+          "peakQueue": 198
+        },
+        {
+          "kind": "overload",
+          "impactS": 111290,
+          "text": "198 people waiting for Route 3 were left behind at Old Main; the queue peaked at 191.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 198,
+          "peakQueue": 191
+        },
+        {
+          "kind": "overload",
+          "impactS": 79766,
+          "text": "94 people waiting for Route 1 were left behind at Old Main; the queue peaked at 105.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r1",
+          "leftBehind": 94,
+          "peakQueue": 105
+        },
+        {
+          "kind": "overload",
+          "impactS": 59977,
+          "text": "69 people waiting for Route 2 were left behind at Central Station; the queue peaked at 69.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 69,
+          "peakQueue": 69
+        },
+        {
+          "kind": "overload",
+          "impactS": 51223,
+          "text": "91 people waiting for Route 2 were left behind at Downtown; the queue peaked at 77.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_downtown"
+          },
+          "routeId": "r2",
+          "leftBehind": 91,
+          "peakQueue": 77
+        },
+        {
+          "kind": "overload",
+          "impactS": 48649,
+          "text": "69 people waiting for Route 2 were left behind at Central Station; the queue peaked at 69.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 69,
+          "peakQueue": 69
+        }
+      ],
+      "narrative": "ΔJ −2.6% on training. Eased: 206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 206 (now 198 left behind). Eased: 97 riders reached Central Station from the train just after Route 2 left (now 9 riders). Worse: 91 people waiting for Route 2 were left behind at Downtown; the queue peaked at 77 (was 13 left behind). Worse: 69 people waiting for Route 2 were left behind at Central Station; the queue peaked at 69 (was 59 left behind). Not promoted: r10-b was promoted."
+    },
+    {
+      "id": "r10-b",
+      "roundId": "R10",
+      "designer": 1,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "emphasis": "allocation",
+      "summary": "Add the supported terminal reassign-to-busiest rule (queue_ratio_other >= 6.67) and move one bus from the least-pressured route r1 to the most-pressured r3.",
+      "rationale": "The strongest probe (-2.6%) reassigns a bus to the busiest route when another route's queue dwarfs this one, directly attacking the r3 Old Main/Stadium Station left-behinds (1,088) and the r2 Central transfer misses (494). The second probe (-1.4%) moves a bus r1->r3, matching the pressure ranking (r3 > r2 > r1) and the flagged unused capacity on r1; r1 keeps 1 bus so service stays intact. Both changes are allocation-focused and independently supported by the probes. Changes: Add bus_at_terminal rule reassign-to-busiest when queue_ratio_other >= 6.67; Change allocation from 2/2/2 to 1/2/3 (move one bus r1 -> r3).",
+      "policy": {
+        "meta": {
+          "id": "r10-b",
+          "parent": "g1",
+          "generation": 2,
+          "author": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "emphasis": "allocation",
+          "summary": "Add the supported terminal reassign-to-busiest rule (queue_ratio_other >= 6.67) and move one bus from the least-pressured route r1 to the most-pressured r3."
+        },
+        "params": {
+          "allocation": {
+            "r1": 1,
+            "r2": 2,
+            "r3": 3
+          },
+          "maxHoldS": 60,
+          "trainDefaultDwellS": 45
+        },
+        "rules": [
+          {
+            "id": "reassign-to-busiest",
+            "on": "bus_at_terminal",
+            "priority": 30,
+            "when": [
+              {
+                "f": "queue_ratio_other",
+                "op": ">=",
+                "v": 6.67
+              }
+            ],
+            "do": {
+              "type": "reassign",
+              "to": "busiest"
+            },
+            "say": "Reassigning to busiest route: queue_ratio_other is {queue_ratio_other}"
+          },
+          {
+            "id": "queue-relief-dispatch",
+            "on": "bus_at_terminal",
+            "priority": 20,
+            "when": [
+              {
+                "f": "route_queue",
+                "op": ">=",
+                "v": 3
+              }
+            ],
+            "do": {
+              "type": "dispatch"
+            },
+            "say": "Queue relief: {route_queue} waiting, dispatching now"
+          },
+          {
+            "id": "even-headway",
+            "on": "bus_at_terminal",
+            "priority": 10,
+            "when": [
+              {
+                "f": "headway_ratio",
+                "op": "<",
+                "v": 1
+              }
+            ],
+            "do": {
+              "type": "hold",
+              "until": "target_headway"
+            },
+            "say": "Waiting {seconds}s at the terminal to keep a {target_headway_s}s headway"
+          }
+        ],
+        "defaults": {
+          "bus_at_stop": {
+            "type": "continue"
+          },
+          "bus_at_terminal": {
+            "type": "dispatch"
+          },
+          "train_at_station": {
+            "type": "setTrainDeparture",
+            "dwellS": 45
+          }
+        }
+      },
+      "valid": true,
+      "errors": [],
+      "train": {
+        "J": 8978721,
+        "runs": 8,
+        "metrics": {
+          "J": 8978721,
+          "spawned": 9171,
+          "completed": 8604,
+          "unfinished": 567,
+          "completionPct": 93.82,
+          "meanJourneyS": 762.09,
+          "meanWaitS": 277.08,
+          "p95WaitS": 738.77,
+          "maxWaitS": 1835,
+          "transfersMade": 1062,
+          "missedConnections": 285,
+          "leftBehind": 1955,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 29390.65,
+            "deadheadDistanceU": 1192.78,
+            "holdS": 0,
+            "trainDwellS": 9156
+          }
+        }
+      },
+      "val": {
+        "J": 3909738,
+        "runs": 4,
+        "metrics": {
+          "J": 3909738,
+          "spawned": 4148,
+          "completed": 3944,
+          "unfinished": 204,
+          "completionPct": 95.08,
+          "meanJourneyS": 774.2,
+          "meanWaitS": 270.91,
+          "p95WaitS": 743.95,
+          "maxWaitS": 1155,
+          "transfersMade": 508,
+          "missedConnections": 211,
+          "leftBehind": 809,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 14708.56,
+            "deadheadDistanceU": 622.87,
+            "holdS": 0,
+            "trainDwellS": 4661
+          }
+        }
+      },
+      "deltaTrainPct": -2.91,
+      "findings": [
+        {
+          "kind": "overload",
+          "impactS": 170019,
+          "text": "228 people waiting for Route 3 were left behind at Old Main; the queue peaked at 197.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 228,
+          "peakQueue": 197
+        },
+        {
+          "kind": "overload",
+          "impactS": 158460,
+          "text": "225 people waiting for Route 3 were left behind at Old Main; the queue peaked at 201.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 225,
+          "peakQueue": 201
+        },
+        {
+          "kind": "overload",
+          "impactS": 119476,
+          "text": "212 people waiting for Route 3 were left behind at Old Main; the queue peaked at 189.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 212,
+          "peakQueue": 189
+        },
+        {
+          "kind": "overload",
+          "impactS": 99471,
+          "text": "206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 172.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 206,
+          "peakQueue": 172
+        },
+        {
+          "kind": "overload",
+          "impactS": 63612,
+          "text": "88 people waiting for Route 2 were left behind at Central Station; the queue peaked at 87.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 88,
+          "peakQueue": 87
+        },
+        {
+          "kind": "overload",
+          "impactS": 59522,
+          "text": "66 people waiting for Route 2 were left behind at Central Station; the queue peaked at 65.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 66,
+          "peakQueue": 65
+        },
+        {
+          "kind": "missed_transfer",
+          "impactS": 51106,
+          "text": "46 riders reached Central Station from the train just after Route 2 left.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "from": "train",
+          "to": "r2",
+          "count": 46,
+          "window": [
+            1515,
+            1515
+          ]
+        },
+        {
+          "kind": "overload",
+          "impactS": 42048,
+          "text": "67 people waiting for Route 2 were left behind at Central Station; the queue peaked at 67.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 67,
+          "peakQueue": 67
+        }
+      ],
+      "narrative": "ΔJ −2.9% on training. Eased: 206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 206 (−6291 pax-min over the training runs). Eased: 72 people were left behind at Stadium Station; the queue peaked at 76 (now 45 left behind). Worse: 88 people waiting for Route 2 were left behind at Central Station; the queue peaked at 87 (was 59 left behind). Worse: 91 people waiting for Route 2 were left behind at Downtown; the queue peaked at 79 (was 13 left behind). Promoted to g2."
+    },
+    {
+      "id": "r10-c",
+      "roundId": "R10",
+      "designer": 2,
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "emphasis": "transfers",
+      "summary": "Add a guarded terminal reassign rule that sends a bus to the busiest route only when an r3/r1-style queue imbalance is extreme, keeping it from pulling r2 off Central transfers.",
+      "rationale": "The strongest probe (reassign to busiest when queue_ratio_other >= 6.67, -2.6%) attacks the dominant finding: 206 riders left behind for r3 at Old Main and 72 at Stadium Station, plus r2 Central queues. Untuned, that rule can strip r2 buses from Central, so I guard it to fire only at extreme imbalance and only outside the event window, and combine it with a modest bus shift from the least-pressured route r1 to the most-pressured r3 (probe -1.4%). Together these add capacity where riders are actually stranded without touching the transfer-critical r2 allocation. Changes: +terminal rule reassign-to-busiest when queue_ratio_other>=6.67 & route_queue<20 & event_in_s<0, priority 30; move 1 bus r1->r3 (allocation 1/2/3).",
+      "policy": {
+        "meta": {
+          "id": "r10-c",
+          "parent": "g1",
+          "generation": 2,
+          "author": "deepseek-ai/DeepSeek-V4.1-Flash",
+          "emphasis": "transfers",
+          "summary": "Add a guarded terminal reassign rule that sends a bus to the busiest route only when an r3/r1-style queue imbalance is extreme, keeping it from pulling r2 off Central transfers."
+        },
+        "params": {
+          "allocation": {
+            "r1": 1,
+            "r2": 2,
+            "r3": 3
+          },
+          "maxHoldS": 60,
+          "trainDefaultDwellS": 45
+        },
+        "rules": [
+          {
+            "id": "reassign-extreme-imbalance",
+            "on": "bus_at_terminal",
+            "priority": 30,
+            "when": [
+              {
+                "f": "queue_ratio_other",
+                "op": ">=",
+                "v": 6.67
+              },
+              {
+                "f": "route_queue",
+                "op": "<",
+                "v": 20
+              },
+              {
+                "f": "event_in_s",
+                "op": "<",
+                "v": 0
+              }
+            ],
+            "do": {
+              "type": "reassign",
+              "to": "busiest"
+            },
+            "say": "Extreme imbalance ({queue_ratio_other}x): reassigning to {to}"
+          },
+          {
+            "id": "queue-relief-dispatch",
+            "on": "bus_at_terminal",
+            "priority": 20,
+            "when": [
+              {
+                "f": "route_queue",
+                "op": ">=",
+                "v": 3
+              }
+            ],
+            "do": {
+              "type": "dispatch"
+            },
+            "say": "Queue relief: {route_queue} waiting, dispatching now"
+          },
+          {
+            "id": "even-headway",
+            "on": "bus_at_terminal",
+            "priority": 10,
+            "when": [
+              {
+                "f": "headway_ratio",
+                "op": "<",
+                "v": 1
+              }
+            ],
+            "do": {
+              "type": "hold",
+              "until": "target_headway"
+            },
+            "say": "Waiting {seconds}s at the terminal to keep a {target_headway_s}s headway"
+          }
+        ],
+        "defaults": {
+          "bus_at_stop": {
+            "type": "continue"
+          },
+          "bus_at_terminal": {
+            "type": "dispatch"
+          },
+          "train_at_station": {
+            "type": "setTrainDeparture",
+            "dwellS": 45
+          }
+        }
+      },
+      "valid": true,
+      "errors": [],
+      "train": {
+        "J": 9072112,
+        "runs": 8,
+        "metrics": {
+          "J": 9072112,
+          "spawned": 9171,
+          "completed": 8601,
+          "unfinished": 570,
+          "completionPct": 93.78,
+          "meanJourneyS": 773.37,
+          "meanWaitS": 295.96,
+          "p95WaitS": 808.42,
+          "maxWaitS": 1835,
+          "transfersMade": 1090,
+          "missedConnections": 272,
+          "leftBehind": 2020,
+          "walkaways": 0,
+          "effort": {
+            "busDistanceU": 29367.12,
+            "deadheadDistanceU": 1038.18,
+            "holdS": 0,
+            "trainDwellS": 9156
+          }
+        }
+      },
+      "val": null,
+      "deltaTrainPct": -1.9,
+      "findings": [
+        {
+          "kind": "overload",
+          "impactS": 170019,
+          "text": "228 people waiting for Route 3 were left behind at Old Main; the queue peaked at 197.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 228,
+          "peakQueue": 197
+        },
+        {
+          "kind": "overload",
+          "impactS": 119476,
+          "text": "212 people waiting for Route 3 were left behind at Old Main; the queue peaked at 189.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 212,
+          "peakQueue": 189
+        },
+        {
+          "kind": "overload",
+          "impactS": 119403,
+          "text": "225 people waiting for Route 3 were left behind at Old Main; the queue peaked at 201.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 225,
+          "peakQueue": 201
+        },
+        {
+          "kind": "overload",
+          "impactS": 99471,
+          "text": "206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 172.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r3",
+          "leftBehind": 206,
+          "peakQueue": 172
+        },
+        {
+          "kind": "overload",
+          "impactS": 63612,
+          "text": "88 people waiting for Route 2 were left behind at Central Station; the queue peaked at 87.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "routeId": "r2",
+          "leftBehind": 88,
+          "peakQueue": 87
+        },
+        {
+          "kind": "missed_transfer",
+          "impactS": 51106,
+          "text": "46 riders reached Central Station from the train just after Route 2 left.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_central_stn"
+          },
+          "from": "train",
+          "to": "r2",
+          "count": 46,
+          "window": [
+            1515,
+            1515
+          ]
+        },
+        {
+          "kind": "overload",
+          "impactS": 47232,
+          "text": "68 people waiting for Route 1 were left behind at Old Main; the queue peaked at 97.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_old_main"
+          },
+          "routeId": "r1",
+          "leftBehind": 68,
+          "peakQueue": 97
+        },
+        {
+          "kind": "overload",
+          "impactS": 46226,
+          "text": "90 people waiting for Route 2 were left behind at Downtown; the queue peaked at 86.",
+          "at": {
+            "kind": "stop",
+            "id": "stop_downtown"
+          },
+          "routeId": "r2",
+          "leftBehind": 90,
+          "peakQueue": 86
+        }
+      ],
+      "narrative": "ΔJ −1.9% on training. Eased: 206 people waiting for Route 3 were left behind at Old Main; the queue peaked at 206 (−6942 pax-min over the training runs). Eased: 72 people were left behind at Stadium Station; the queue peaked at 76 (now 45 left behind). Worse: 90 people waiting for Route 2 were left behind at Downtown; the queue peaked at 86 (was 13 left behind). Worse: 88 people waiting for Route 2 were left behind at Central Station; the queue peaked at 87 (was 59 left behind). Not promoted: r10-b was promoted."
+    }
+  ],
+  "startedAt": "2026-10-11T22:43:16.125Z",
+  "finishedAt": "2026-10-11T22:43:29.759Z"
+}

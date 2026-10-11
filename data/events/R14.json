@@ -1,0 +1,481 @@
+[
+  {
+    "type": "round_start",
+    "round": 14,
+    "champion": "g2"
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: remove rule reassign-to-busiest → ΔJ +1.6%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: remove rule queue-relief-dispatch → ΔJ +11.2%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: remove rule even-headway → ΔJ +5.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: move 1 bus r2→r1 (1/2/3 → 2/1/3) → ΔJ +0.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: move 1 bus r2→r3 (1/2/3 → 1/1/4) → ΔJ +2.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: move 1 bus r3→r1 (1/2/3 → 2/2/2) → ΔJ +0.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: move 1 bus r3→r2 (1/2/3 → 1/3/2) → ΔJ +4.9%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: default bus_at_stop → hold until target headway → ΔJ +8.8%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: default bus_at_terminal → hold until target headway → ΔJ 0.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: default train_at_station → dwell 30 s → ΔJ +1.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule even-headway skipped while route_queue >= 20 → ΔJ 0.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule even-headway skipped while route_queue >= 40 → ΔJ 0.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule even-headway skipped while route_queue >= 80 → ΔJ 0.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule reassign-to-busiest: queue_ratio_other >= 6.67 → 3.34 → ΔJ +5.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule reassign-to-busiest: queue_ratio_other >= 6.67 → 10 → ΔJ +1.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule queue-relief-dispatch: route_queue >= 3 → 1.5 → ΔJ +0.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule queue-relief-dispatch: route_queue >= 3 → 4.5 → ΔJ −1.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule even-headway: headway_ratio < 1 → 0.5 → ΔJ +3.9%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: rule even-headway: headway_ratio < 1 → 1.5 → ΔJ 0.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when route_queue >= 2 → ΔJ +28.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold 30 s when downstream_queue >= 1 → ΔJ +21.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on train_at_station: dwell 75 s when onboard >= 1 → ΔJ +1.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: dispatch when route_queue >= 2 → ΔJ +1.8%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold until target headway when downstream_queue >= 1 → ΔJ +6.8%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on train_at_station: dwell 30 s when onboard >= 1 → ΔJ +0.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold until target headway when route_queue >= 2 → ΔJ +9.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold 30 s when downstream_queue >= 10 → ΔJ +10.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold 30 s when route_queue >= 2 → ΔJ +47.8%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold until target headway when downstream_queue >= 10 → ΔJ +1.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when route_queue >= 14 → ΔJ +22.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold 30 s when load_factor >= 0.03 → ΔJ +16.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: dispatch when route_queue >= 14 → ΔJ +0.9%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold until target headway when load_factor >= 0.03 → ΔJ +4.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold until target headway when route_queue >= 14 → ΔJ +3.1%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold 30 s when load_factor >= 0.1 → ΔJ +15.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold 30 s when route_queue >= 14 → ΔJ +38.8%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_stop: hold until target headway when load_factor >= 0.1 → ΔJ +3.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when max_other_route_queue >= 4 → ΔJ +27.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: dispatch when max_other_route_queue >= 4 → ΔJ +1.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold until target headway when max_other_route_queue >= 4 → ΔJ +8.4%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold 30 s when max_other_route_queue >= 4 → ΔJ +50.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when max_other_route_queue >= 32 → ΔJ +17.6%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: dispatch when max_other_route_queue >= 32 → ΔJ −0.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold until target headway when max_other_route_queue >= 32 → ΔJ +3.5%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold 30 s when max_other_route_queue >= 32 → ΔJ +31.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when queue_ratio_other >= 1 → ΔJ +12.0%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: dispatch when queue_ratio_other >= 1 → ΔJ +3.2%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold until target headway when queue_ratio_other >= 1 → ΔJ +6.3%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: hold 30 s when queue_ratio_other >= 1 → ΔJ +20.7%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "probe: new rule on bus_at_terminal: reassign to busiest when queue_ratio_other >= 4 → ΔJ +5.6%",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "received",
+    "summary": "Add a guarded terminal dispatch rule for the stadium-exit surge (max_other_route_queue >= 32) and tighten queue-relief-dispatch to route_queue >= 4.5, keeping the champion's reassign and allocation."
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "received",
+    "summary": "Add a stop-level hold at stadium_stn for r3 buses to wait for incoming trains, and tighten terminal queue-relief dispatch to route_queue >= 4.5."
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "received",
+    "summary": "Add a new terminal rule that holds a bus until its target headway when this route's queue is very small, so same-route buses stay evenly spaced without delaying crowded queues."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-a",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-a",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r14-a",
+    "deltaTrainPct": -0.36,
+    "narrative": "ΔJ −0.4% on training. Eased: 91 people waiting for Route 2 were left behind at Downtown; the queue peaked at 79 (now 85 left behind). Eased: 37 riders reached Downtown from Route 3 just after Route 2 left (now 27 riders). Worse: 230 people waiting for Route 3 were left behind at Old Main; the queue peaked at 225 (was 228 left behind). Worse: 46 riders reached Central Station from the train just after Route 2 left (+583 pax-min over the training runs)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-b",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-b",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r14-b",
+    "deltaTrainPct": -1.48,
+    "narrative": "ΔJ −1.5% on training. Eased: 88 people waiting for Route 2 were left behind at Central Station; the queue peaked at 87 (−405 pax-min over the training runs). Eased: 37 riders reached Downtown from Route 3 just after Route 2 left (now 29 riders). Worse: 230 people waiting for Route 3 were left behind at Old Main; the queue peaked at 225 (was 228 left behind). Worse: 49 people waiting for Route 1 were left behind at Old Main; the queue peaked at 83 (+135 pax-min over the training runs)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-c",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-c",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r14-c",
+    "deltaTrainPct": 6.29,
+    "narrative": "ΔJ +6.3% on training. Eased: 37 riders reached Downtown from Route 3 just after Route 2 left (now 35 riders). Eased: 91 people waiting for Route 2 were left behind at Downtown; the queue peaked at 79 (−212 pax-min over the training runs). Worse: 95 people waiting for Route 1 were left behind at Old Main; the queue peaked at 124 (was 49 left behind). Worse: 111 people waiting for Route 2 were left behind at Central Station; the queue peaked at 108 (was 88 left behind)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-b",
+    "split": "val",
+    "done": 0,
+    "total": 4
+  },
+  {
+    "type": "eval",
+    "proposalId": "r14-b",
+    "split": "val",
+    "done": 4,
+    "total": 4
+  },
+  {
+    "type": "decision",
+    "promoted": null,
+    "reason": "No promotion: r14-b was worse on validation; g2 stays champion."
+  }
+]
