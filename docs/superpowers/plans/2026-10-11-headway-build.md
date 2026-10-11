@@ -439,3 +439,5 @@ T2.2 composes: base `SCENERY` (Task M) only where no district provides items (di
   - Slightly more contrast/saturation in the grade at full-board zoom (colours wash out when small).
   - The kit's stadium is the weakest piece (inner ring reads as water, a pole stands in the field): superseded by A4's `lm.stadium` — make sure the composer uses A4's.
   - Roads are plain strips: streetscape (S1) adds sidewalks/curbs/crosswalks; keep the dashed centre line subtle.
+- **Play screens (15:45):** goal card, dock (bus chips, hold/reassign picker with deadhead path, pending-intent badges) and results (You / AI / Baseline, verdict, race chart, "what made the difference", interventions timeline, leaderboard) are excellent. Integration fixes: "What made the difference" shows raw ids (`stop_apts_south`) — use map display names everywhere user-facing; the leaderboard must never ship fixture names (show "Be the first on this crowd" when empty); results numbers must come from the real engine runs.
+- **HUD (15:40):** default camera should frame the town larger; show at most 2–3 toasts at once.
