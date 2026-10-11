@@ -343,13 +343,13 @@ export function highwayPlan(map: TownMap): HighwayPlan {
   const slipSpanS: [number, number] = [xn - D0 - 1, xn + M1 + 1];
   const hill = { minX: xPortal - 16, maxX: xPortal + 7.5, minZ: z0 - 6, maxZ: z1 + 10, bandMaxZ: z1 - 0.4 };
   let k = 0;
-  for (let x = hill.maxX + 2; x < xe - 1; x += 2.6) {
+  for (let x = hill.maxX + 1.5; x < xe - 1; x += 1.9) {
     k++;
     const r = hash01(k, 7), r2 = hash01(k, 11), r3 = hash01(k, 13);
     if (x > slipSpanN[0] && x < slipSpanN[1]) continue;
-    if (r < 0.22) continue;
-    const zt = zN + (r2 - 0.5) * 1.6;
-    P(r3 < 0.55 ? 'pine' : 'tree', x + (r - 0.5) * 1.2, zt, r2 * Math.PI * 2, 0.85 + r3 * 0.3, Math.floor(r * 97));
+    if (r < 0.18) continue;
+    const zt = zN + (k % 2 ? -0.75 : 0.65) + (r2 - 0.5) * 0.7;
+    P(r3 < 0.6 ? 'pine' : 'tree', x + (r - 0.5) * 1.0, zt, r2 * Math.PI * 2, 0.8 + r3 * 0.35, Math.floor(r * 97));
   }
   k = 0;
   for (let x = hill.maxX + 3; x < xe - 1; x += 3.4) {

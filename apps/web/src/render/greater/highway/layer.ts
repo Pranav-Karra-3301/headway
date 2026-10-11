@@ -470,6 +470,7 @@ function buildHill(X: Acc, plan: HighwayPlan): void {
       // two triangles, each coloured by its slope + height (low-poly facets)
       for (const [p, q, r] of [[a, b, c], [a, c, d]] as Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]>) {
         const hy = (p.y + q.y + r.y) / 3;
+        if (p.y < 0.02 && q.y < 0.02 && r.y < 0.02) continue; // flat foot: the band / world ground shows through
         const n = new THREE.Vector3().subVectors(q, p).cross(new THREE.Vector3().subVectors(r, p)).normalize();
         const jitter = hash01(Math.round(p.x * 7), Math.round(p.z * 7));
         const key: ColorKey = n.y < 0.42 ? 'hillRock' : hy > 3.4 + jitter * 0.9 ? 'hillForest' : hy > 1.2 + jitter ? 'hillMeadow' : 'hillGrass';

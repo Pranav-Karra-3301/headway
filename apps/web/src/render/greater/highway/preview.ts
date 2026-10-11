@@ -2,7 +2,8 @@
 // look (Stage: lights, sky, post chain). Query flags:
 //   view=<u visible vertically>  tx, tz=<look-at>  palette=a|b|c  light=day|dusk  post=0|1
 //   town=1 (static town on the board)  roads=0 (hide G0's roads layer)  lanes=1 (lane graph; overpass lanes at height)
-//   cars=1 (a few debug cars driving the lane graph)  gallery=1 (Kenney piece gallery, see ./gallery.ts)
+//   cars=1 (a few debug cars driving the lane graph)  land=0 (hide the preview-only ground beyond the grid)
+//   gallery=1 (Kenney piece gallery, see ./gallery.ts)
 import * as THREE from 'three';
 import { TOWN } from '@headway/sim';
 import { Stage } from '../../post/stage';
@@ -43,6 +44,16 @@ async function main(): Promise<void> {
     } catch (e) {
       console.warn('[greater-highway] static town unavailable', e);
     }
+  }
+  if (q.get('land') !== '0') {
+    // preview-only stand-in for the world ground beyond the grid (E1 / E3 own the real terrain and base)
+    const b = grid.bounds;
+    const geo = new THREE.PlaneGeometry(b.maxX - b.minX + 80, b.maxZ - b.minZ + 80);
+    geo.rotateX(-Math.PI / 2);
+    const ground = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#9ccfae', roughness: 1 }));
+    ground.position.set((b.minX + b.maxX) / 2, -0.08, (b.minZ + b.maxZ) / 2);
+    ground.receiveShadow = true;
+    stage.scene.add(ground);
   }
   if (!town) {
     const b = TOWN.bounds;
