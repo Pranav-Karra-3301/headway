@@ -44,7 +44,7 @@ export function buildStationCentral(k: Kit, _params: AssetParams): THREE.Object3
   const g = group('stationCentral');
   const lit = () => k.rand() < 0.45;
   // ---- central hall ----
-  const hw = 3.2, hd = 2.6, hh = 2.6, hz = -0.85;
+  const hw = 3.2, hd = 2.6, hh = 2.6, hz = -0.75;
   const hall = group('hall');
   hall.add(at(rbox(k, hw, hh, hd, 0.1, 'wall', 0), 0, hh / 2, 0));
   hall.add(k.detail(at(box(k, hw + 0.04, 0.22, hd + 0.04, 'lmStone'), 0, 0.11, 0)));
@@ -65,12 +65,11 @@ export function buildStationCentral(k: Kit, _params: AssetParams): THREE.Object3
   }
   // cupola on the ridge
   const cup = group('cupola');
-  cup.add(at(box(k, 0.42, 0.34, 0.42, 'wall', 2), 0, 0.17, 0));
-  for (const r of [0, Math.PI / 2]) { const l = box(k, 0.44, 0.18, 0.02, 'window', 1); l.rotation.y = r; cup.add(k.detail(at(l, 0, 0.19, 0))); }
-  cup.add(at(pyramid(k, 0.56, 0.56, 0.34, 'roof', 1), 0, 0.34, 0));
-  cup.add(k.detail(at(cyl(k, 0.012, 0.012, 0.3, 'post', 0, 4), 0, 0.82, 0)));
-  cup.add(k.detail(at(box(k, 0.2, 0.12, 0.015, 'lmBanner', 0), 0.1, 0.9, 0)));
-  hall.add(at(cup, 0, hh + 0.82, 0));
+  cup.add(at(box(k, 0.42, 0.32, 0.42, 'wall', 2), 0, 0.16, 0));
+  for (const r of [0, Math.PI / 2]) { const l = box(k, 0.44, 0.16, 0.02, 'window', 1); l.rotation.y = r; cup.add(k.detail(at(l, 0, 0.18, 0))); }
+  cup.add(at(pyramid(k, 0.56, 0.56, 0.3, 'roof', 1), 0, 0.32, 0));
+  cup.add(k.detail(at(sphere(k, 0.05, 'safety', 0, 8), 0, 0.65, 0)));
+  hall.add(at(cup, 0, hh + 0.8, 0));
   g.add(at(hall, 0, 0, hz));
 
   // ---- wings ----
@@ -91,27 +90,37 @@ export function buildStationCentral(k: Kit, _params: AssetParams): THREE.Object3
     g.add(at(wing, s * (hw / 2 + ww / 2), 0, hz));
   }
 
-  // ---- platform canopy, apron, benches, lamps ----
-  const cz0 = 0.22, cz1 = 2.17, cy = 1.86, cw = 8.7;
-  g.add(at(box(k, 8.9, 0.05, cz1 - cz0 + 0.06, 'platform'), 0, 0.025, (cz0 + cz1) / 2));
+  // ---- platform canopy (lighter, shallower), apron, benches, lamps ----
+  const cz0 = 0.32, cz1 = 1.72, cy = 1.8, cw = 8.6;
+  g.add(at(box(k, 8.9, 0.05, 2.2 - cz0 + 0.04, 'platform'), 0, 0.025, (cz0 + 2.2) / 2));
+  g.add(k.detail(at(box(k, 8.9, 0.012, 0.08, 'curb'), 0, 0.056, 2.1)));
   const canopy = group('canopy');
-  const slab = rbox(k, cw, 0.1, cz1 - cz0, 0.04, 'canopy');
-  slab.rotation.x = 0.05;
+  const slab = rbox(k, cw, 0.08, cz1 - cz0, 0.03, 'canopy');
+  slab.rotation.x = 0.06;
   canopy.add(at(slab, 0, cy, (cz0 + cz1) / 2));
-  canopy.add(k.detail(at(box(k, cw, 0.1, 0.03, 'stripe'), 0, cy - 0.1, cz1 - 0.02)));
+  canopy.add(k.detail(at(box(k, cw, 0.09, 0.03, 'stripe'), 0, cy - 0.11, cz1 - 0.01)));
   for (const x of [-3.9, -1.3, 1.3, 3.9]) {
-    canopy.add(at(cyl(k, 0.05, 0.06, cy - 0.04, 'post', 0, 8), x, (cy - 0.04) / 2 + 0.04, cz1 - 0.3));
-    const br = box(k, 0.05, 0.05, 0.5, 'post'); br.rotation.x = -0.6;
-    canopy.add(k.detail(at(br, x, cy - 0.2, cz1 - 0.48)));
-    canopy.add(k.detail(at(sphere(k, 0.09, 'lamp', 0, 8), x * 0.67, cy - 0.26, (cz0 + cz1) / 2 + 0.1)));
-    canopy.add(k.detail(at(cyl(k, 0.008, 0.008, 0.18, 'post', 0, 4), x * 0.67, cy - 0.12, (cz0 + cz1) / 2 + 0.1)));
+    canopy.add(at(cyl(k, 0.045, 0.055, cy - 0.06, 'post', 0, 8), x, (cy - 0.06) / 2 + 0.05, cz1 - 0.22));
+    const br = box(k, 0.04, 0.04, 0.42, 'post'); br.rotation.x = -0.7;
+    canopy.add(k.detail(at(br, x, cy - 0.2, cz1 - 0.4)));
+    canopy.add(k.detail(at(sphere(k, 0.085, 'lamp', 0, 8), x * 0.67, cy - 0.27, (cz0 + cz1) / 2 + 0.05)));
+    canopy.add(k.detail(at(cyl(k, 0.008, 0.008, 0.18, 'post', 0, 4), x * 0.67, cy - 0.13, (cz0 + cz1) / 2 + 0.05)));
   }
-  canopy.add(k.detail(at(box(k, 1.4, 0.26, 0.04, 'paper'), 0, cy - 0.28, cz1 - 0.06)));
-  canopy.add(k.detail(at(box(k, 1.1, 0.07, 0.02, 'accent'), 0, cy - 0.28, cz1 - 0.035)));
+  canopy.add(k.detail(at(box(k, 1.4, 0.24, 0.04, 'paper'), 0, cy - 0.27, cz1 - 0.04)));
+  canopy.add(k.detail(at(box(k, 1.1, 0.07, 0.02, 'accent'), 0, cy - 0.27, cz1 - 0.015)));
   g.add(canopy);
+  // upper hall windows above the canopy line, on the platform side
+  for (const u of [-0.9, 0, 0.9]) hall.add(onFace(archWindow(k, 0.3, 0.42, lit()), 'front', hw, hd, u, 2.2));
   for (const x of [-3.0, 3.0]) g.add(at(bench(k, 0.95), x, 0.05, 0.62));
-  g.add(k.detail(at(box(k, 0.22, 0.42, 0.22, 'post'), -1.9, 0.26, 0.48)));
-  g.add(k.detail(at(box(k, 0.24, 0.03, 0.24, 'trim'), -1.9, 0.49, 0.48)));
+  g.add(k.detail(at(box(k, 0.22, 0.42, 0.22, 'post'), -1.9, 0.26, 0.5)));
+  g.add(k.detail(at(box(k, 0.24, 0.03, 0.24, 'trim'), -1.9, 0.49, 0.5)));
+  // luggage trolley on the apron
+  const trolley = group('trolley');
+  trolley.add(at(box(k, 0.5, 0.05, 0.3, 'bench'), 0, 0.2, 0));
+  for (const x of [-0.17, 0.17]) trolley.add(at(cyl(k, 0.06, 0.06, 0.34, 'post', 0, 8), x, 0.08, 0).rotateX(Math.PI / 2));
+  trolley.add(at(box(k, 0.3, 0.16, 0.2, 'door'), -0.05, 0.31, 0));
+  trolley.add(at(box(k, 0.18, 0.12, 0.16, 'lmBanner', 0), 0.15, 0.29, 0.02));
+  g.add(k.detail(at(trolley, 2.1, 0.05, 1.95)));
   return g;
 }
 
@@ -140,10 +149,11 @@ export function buildStationHalt(k: Kit, _params: AssetParams): THREE.Object3D {
   g.add(at(wall, sx, 0, -0.98));
   for (const x of [-W / 2 + 0.25, -0.6]) g.add(at(cyl(k, 0.05, 0.06, wallH, 'post', 0, 8), x, wallH / 2, 0.95));
   // gable roof: the front slab is the platform canopy (+z)
-  const roof = gableX(k, W, D, wallH, rise, 'canopy', 0, 'wall', 1, 0.0, ['canopy', 'roofBack']);
+  const roof = gableX(k, W, D, wallH, rise, 'roof', 1, 'wall', 1, 0.06, ['canopy', 'roofBack']);
   g.add(roof);
   for (const x of [-W / 2 + 0.25, -0.6, W / 2 - 0.1]) g.add(k.detail(at(box(k, 0.06, 0.06, D, 'post'), x, wallH - 0.03, 0)));
-  g.add(k.detail(at(box(k, W - 0.1, 0.08, 0.03, 'stripe'), 0, wallH - 0.1, D / 2 - 0.02)));
+  g.add(at(box(k, W + 0.1, 0.12, 0.04, 'canopy'), 0, wallH - 0.02, D / 2 + 0.03));
+  g.add(k.detail(at(box(k, W + 0.1, 0.04, 0.045, 'stripe'), 0, wallH - 0.1, D / 2 + 0.035)));
   // benches, lamps, name board, bin
   for (const x of [-2.15, -1.05]) g.add(at(bench(k, 0.8), x, 0.05, -0.68));
   for (const x of [-2.2, 0.25]) {
@@ -153,5 +163,15 @@ export function buildStationHalt(k: Kit, _params: AssetParams): THREE.Object3D {
   g.add(at(box(k, 1.3, 0.26, 0.05, 'paper'), -1.6, wallH - 0.28, 1.06));
   g.add(k.detail(at(box(k, 1.04, 0.07, 0.02, 'accent'), -1.6, wallH - 0.28, 1.09)));
   g.add(k.detail(at(cyl(k, 0.1, 0.09, 0.36, 'post', 0, 8), -0.2, 0.23, 0.85)));
+  // hanging platform clock, timetable board, office chimney and a planter by the door
+  const clock = clockFace(k, 0.17, true);
+  g.add(at(clock, 0.0, wallH - 0.3, 1.0));
+  g.add(k.detail(at(cyl(k, 0.01, 0.01, 0.12, 'post', 0, 4), 0.0, wallH - 0.08, 1.0)));
+  g.add(k.detail(at(box(k, 0.5, 0.36, 0.03, 'panel'), -0.3, 1.05, -0.9)));
+  g.add(k.detail(at(box(k, 0.56, 0.42, 0.02, 'post'), -0.3, 1.05, -0.915)));
+  g.add(at(box(k, 0.26, 0.5, 0.26, 'brick'), ox + 0.45, wallH + rise * 0.55, oz - 0.35));
+  g.add(k.detail(at(box(k, 0.32, 0.05, 0.32, 'trim'), ox + 0.45, wallH + rise * 0.55 + 0.27, oz - 0.35)));
+  g.add(k.detail(at(box(k, 0.46, 0.22, 0.22, 'brick'), ox - 0.6, 0.16, oz + od / 2 + 0.16)));
+  g.add(k.detail(at(sphere(k, 0.17, 'leaf', 1, 10), ox - 0.6, 0.36, oz + od / 2 + 0.16)));
   return g;
 }

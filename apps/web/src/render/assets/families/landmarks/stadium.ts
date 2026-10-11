@@ -6,10 +6,19 @@
 import * as THREE from 'three';
 import type { AssetParams } from '../../types';
 import { loftGeometry, perimeterAt, perimeterLength, rrAt, type Bowl } from './loft';
-import { at, box, cyl, disc, group, type Kit, mesh, rbox, rodX, roundedPlate } from './parts';
+import { at, box, cyl, disc, group, type Kit, mesh, prism, rbox, rodX, roundedPlate } from './parts';
 
 /** Bowl outline: outer facade 10 × 7.5, corner radius 2.4; end stands shallower than the side stands. */
 export const STADIUM_BOWL: Bowl = { a: 5.0, b: 3.75, r: 2.4, fx: 0.75, fz: 1.0, fr: 0.9, rMin: 0.5, seg: 8 };
+
+const TOWER_X = 4.74, TOWER_Z = 3.5, HEAD_Y = 3.4, HEAD_PITCH = 0.3;
+/** Floodlight lamp heads in stadium-local coordinates (unscaled, rot 0): centre, yaw (local +z → aim) and
+ *  downward pitch, all aimed at the pitch centre — for FX light cones at dusk. */
+export const STADIUM_FLOODLIGHTS: ReadonlyArray<{ x: number; y: number; z: number; yaw: number; pitch: number }> =
+  [[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz]) => {
+    const x = sx! * TOWER_X, z = sz! * TOWER_Z;
+    return { x, y: HEAD_Y, z, yaw: Math.atan2(-x, -z), pitch: HEAD_PITCH };
+  });
 
 const RIM_Y = 1.68;
 const FIELD_D = 2.0;
@@ -63,22 +72,42 @@ function pitch(k: Kit, root: THREE.Group): void {
   for (const s of [-1, 1]) for (const x of [-0.9, 0.9]) root.add(k.detail(at(box(k, 0.9, 0.08, 0.1, 'bench'), x, 0.08, s * (W + 0.12))));
 }
 
+/** Radial aisle stairs: light strips laid over the step nosings of the upper and lower seating (detail). */
+function aisles(k: Kit, root: THREE.Group): void {
+  const runs: Array<[number, number, number, number]> = [[0.2, 1.53, 0.98, 1.21], [1.18, 1.05, 1.93, 0.51]];
+  const n = 16;
+  for (let i = 0; i < n; i++) {
+    const u = (i + 0.25) / n;
+    for (const [d0, y0, d1, y1] of runs) {
+      const a = perimeterAt(rrAt(STADIUM_BOWL, d0), u), b = perimeterAt(rrAt(STADIUM_BOWL, d1), u);
+      const ax = a.x, az = a.z, bx = b.x, bz = b.z;
+      if (Math.abs(az) > 2.6 && Math.abs(ax) < 2.0 && az < 0 && d0 < 1) continue; // under the press box
+      const len = Math.hypot(bx - ax, bz - az, y1 - y0);
+      const strip = box(k, 0.09, 0.03, len, 'stadium');
+      strip.rotation.order = 'YXZ';
+      strip.rotation.y = Math.atan2(bx - ax, bz - az);
+      strip.rotation.x = Math.atan2(y0 - y1, Math.hypot(bx - ax, bz - az));
+      root.add(k.detail(at(strip, (ax + bx) / 2, (y0 + y1) / 2 + 0.02, (az + bz) / 2)));
+    }
+  }
+}
+
 function lightTower(k: Kit, x: number, z: number): THREE.Group {
   const t = group('lightTower');
   t.add(at(cyl(k, 0.2, 0.24, 0.12, 'curb', 0, 10), 0, 0.06, 0));
-  t.add(at(cyl(k, 0.05, 0.09, 3.18, 'mast', 0, 8), 0, 0.12 + 1.59, 0));
-  for (const y of [1.0, 1.9, 2.7]) t.add(k.detail(at(cyl(k, 0.1 - y * 0.012, 0.1 - y * 0.012, 0.05, 'mast', 0, 8), 0, y, 0)));
+  t.add(at(cyl(k, 0.045, 0.085, 3.2, 'rail', 0, 8), 0, 0.12 + 1.6, 0));
+  for (const y of [1.2, 2.4]) t.add(k.detail(at(cyl(k, 0.1 - y * 0.014, 0.1 - y * 0.014, 0.05, 'rail', 0, 6), 0, y, 0)));
   const head = group('lampHead');
-  head.add(at(box(k, 1.0, 0.5, 0.1, 'mast'), 0, 0, -0.02));
-  head.add(at(box(k, 0.9, 0.4, 0.04, 'lamp'), 0, 0, 0.05));
-  head.add(k.detail(at(box(k, 0.9, 0.025, 0.03, 'mast'), 0, 0, 0.08)));
-  for (const u of [-0.15, 0.15]) head.add(k.detail(at(box(k, 0.025, 0.4, 0.03, 'mast'), u, 0, 0.08)));
-  head.add(k.detail(at(box(k, 1.04, 0.04, 0.18, 'mast'), 0, 0.27, 0.03)));
-  head.add(k.detail(at(box(k, 0.86, 0.03, 0.2, 'mast'), 0, -0.32, -0.04)));
+  // open rack: frame bars + a 3 x 2 grid of lamps (role `lamp`, glows at dusk) visible from both sides
+  for (const v of [-0.205, 0, 0.205]) head.add(at(box(k, 0.9, 0.035, 0.07, 'rail'), 0, v, 0));
+  for (const u of [-0.435, 0.435]) head.add(at(box(k, 0.035, 0.445, 0.07, 'rail'), u, 0, 0));
+  for (const u of [-0.28, 0, 0.28]) for (const v of [-0.1, 0.1]) head.add(at(box(k, 0.24, 0.15, 0.08, 'lamp'), u, v, 0.01));
+  head.add(k.detail(at(box(k, 0.94, 0.03, 0.16, 'rail'), 0, 0.24, 0.02)));
+  head.add(k.detail(at(box(k, 0.76, 0.03, 0.18, 'rail'), 0, -0.27, -0.03)));
   head.rotation.order = 'YXZ';
   head.rotation.y = Math.atan2(-x, -z);
-  head.rotation.x = 0.32;
-  t.add(at(head, 0, 3.34, 0));
+  head.rotation.x = HEAD_PITCH;
+  t.add(at(head, 0, HEAD_Y, 0));
   return at(t, x, 0, z);
 }
 
@@ -107,39 +136,42 @@ function pressBox(k: Kit): THREE.Group {
   return p;
 }
 
-/** Gate pavilion facing +z, its back embedded in the facade. `main` adds the sign, crest and flags. */
+/** Gate pavilion facing +z, its back embedded in the facade: limestone body, brick pilasters, arched entrance
+ *  with a red canopy. The main gate is taller than the rim and adds a pediment, a sign and two flags. */
 function gate(k: Kit, main: boolean, rnd: () => number): THREE.Group {
   const g = group('gate');
-  const w = main ? 2.1 : 1.5, h = main ? 1.95 : 1.8, d = 0.72;
-  g.add(at(rbox(k, w, h, d, 0.07, 'brick'), 0, h / 2, 0.08));
-  const ow = main ? 0.9 : 0.66, rect = main ? 0.62 : 0.5, front = 0.08 + d / 2;
-  // arched opening with a stone surround
-  g.add(k.detail(at(box(k, ow + 0.16, rect, 0.03, 'lmStone'), 0, rect / 2, front + 0.005)));
-  g.add(k.detail(at(disc(k, ow / 2 + 0.08, 0.03, 'lmStone', 0, 10), 0, rect, front + 0.005)));
+  const w = main ? 2.2 : 1.5, h = main ? 1.9 : 1.42, d = 0.7, zc = 0.07;
+  const front = zc + d / 2;
+  g.add(at(box(k, w - 0.04, h, d, 'lmStone'), 0, h / 2, zc));
+  for (const s of [-1, 1]) g.add(at(box(k, 0.24, h + 0.02, d + 0.06, 'brick'), s * (w / 2 - 0.12), h / 2, zc));
+  g.add(k.detail(at(box(k, w + 0.08, 0.08, d + 0.08, 'brick'), 0, h - 0.04, zc)));
+  const ow = main ? 0.92 : 0.66, rect = main ? 0.6 : 0.46;
+  // arched opening with a brick surround
+  g.add(at(box(k, ow + 0.16, rect, 0.03, 'brick'), 0, rect / 2, front + 0.005));
+  g.add(at(disc(k, ow / 2 + 0.08, 0.03, 'brick', 0, 8), 0, rect, front + 0.005));
   g.add(at(box(k, ow, rect, 0.04, 'window'), 0, rect / 2, front + 0.02));
-  g.add(at(disc(k, ow / 2, 0.04, 'window', 0, 10), 0, rect, front + 0.02));
-  // canopy over the entrance
-  g.add(at(box(k, ow + 0.6, 0.06, 0.36, 'canopy'), 0, rect + ow / 2 + 0.16, front + 0.2));
-  g.add(k.detail(at(box(k, ow + 0.6, 0.08, 0.02, 'stripe'), 0, rect + ow / 2 + 0.1, front + 0.38)));
-  // turnstiles
-  for (const u of [-ow / 3, 0, ow / 3]) g.add(k.detail(at(cyl(k, 0.035, 0.035, 0.32, 'rail', 0, 6), u, 0.16, front + 0.12)));
-  // lanterns
-  for (const u of [-1, 1]) g.add(k.detail(at(box(k, 0.1, 0.16, 0.1, 'lamp'), u * (ow / 2 + 0.24), rect + 0.12, front + 0.05)));
+  g.add(at(disc(k, ow / 2, 0.04, 'window', 0, 8), 0, rect, front + 0.02));
+  // canopy over the entrance + turnstiles + lanterns
+  const cy = rect + ow / 2 + 0.17;
+  g.add(at(box(k, ow + 0.56, 0.06, 0.34, 'canopy'), 0, cy, front + 0.18));
+  g.add(k.detail(at(box(k, ow + 0.56, 0.07, 0.02, 'stripe'), 0, cy - 0.06, front + 0.35)));
+  for (const u of [-ow / 3, 0, ow / 3]) g.add(k.detail(at(cyl(k, 0.035, 0.035, 0.3, 'rail', 0, 4), u, 0.15, front + 0.12)));
+  for (const u of [-1, 1]) g.add(k.detail(at(box(k, 0.09, 0.15, 0.09, 'lamp'), u * (ow / 2 + 0.2), rect + 0.1, front + 0.05)));
   if (main) {
-    g.add(at(box(k, 1.5, 0.3, 0.05, 'paper'), 0, h - 0.25, front + 0.02));
-    g.add(k.detail(at(box(k, 1.24, 0.08, 0.02, 'accent'), 0, h - 0.25, front + 0.055)));
-    g.add(at(rbox(k, 1.1, 0.24, 0.5, 0.05, 'brick'), 0, h + 0.1, 0.08));
-    g.add(k.detail(at(box(k, w + 0.06, 0.06, d + 0.06, 'lmStone'), 0, h - 0.02, 0.08)));
+    g.add(at(box(k, 1.36, 0.28, 0.05, 'paper'), 0, h - 0.34, front + 0.02));
+    g.add(k.detail(at(box(k, 1.1, 0.07, 0.02, 'accent'), 0, h - 0.34, front + 0.055)));
+    g.add(at(prism(k, w * 0.62, 0.32, 0.36, 'z', 'lmStone'), 0, h, zc + 0.12));
+    g.add(k.detail(at(disc(k, 0.09, 0.03, 'lmBanner', 0, 10), 0, h + 0.12, zc + 0.31)));
     const o = Math.floor(rnd() * 3);
     for (const s of [-1, 1]) {
       const f = group('flag');
       f.add(at(cyl(k, 0.018, 0.018, 0.72, 'post', 0, 5), 0, 0.36, 0));
       f.add(at(box(k, 0.34, 0.2, 0.02, 'lmBanner', (o + (s > 0 ? 1 : 0)) % 3), 0.18, 0.6, 0));
-      g.add(k.detail(at(f, s * (w / 2 - 0.12), h, 0.08)));
+      g.add(k.detail(at(f, s * (w / 2 - 0.12), h, zc)));
     }
   } else {
-    g.add(k.detail(at(box(k, w + 0.06, 0.06, d + 0.06, 'lmStone'), 0, h - 0.02, 0.08)));
-    g.add(at(box(k, 0.9, 0.2, 0.04, 'paper'), 0, h - 0.24, front + 0.02));
+    g.add(at(box(k, 0.84, 0.2, 0.04, 'paper'), 0, h - 0.24, front + 0.02));
+    g.add(k.detail(at(box(k, 0.64, 0.05, 0.02, 'accent'), 0, h - 0.24, front + 0.045)));
   }
   return g;
 }
@@ -157,6 +189,7 @@ export function buildStadium(k: Kit, _params: AssetParams): THREE.Object3D {
   root.add(loft(k, TIER_LOW, 'seats', 0, 'tier'));
   root.add(loft(k, FIELD_WALL, 'lmEndzone'));
   pitch(k, root);
+  aisles(k, root);
 
   // ---- gates (front + both ends) ----
   const gates: Array<[number, number, number]> = [[0, STADIUM_BOWL.b, 0], [STADIUM_BOWL.a, 0, Math.PI / 2], [-STADIUM_BOWL.a, 0, -Math.PI / 2]];
@@ -168,6 +201,13 @@ export function buildStadium(k: Kit, _params: AssetParams): THREE.Object3D {
   const nArch = 28, start = 0.5 / nArch, offset = rnd() < 0.5 ? 0 : 1;
   for (let i = 0; i < nArch; i++) {
     const p = perimeterAt(outer, start + i / nArch);
+    // pilaster between this arch and the next (facade rhythm)
+    const q = perimeterAt(outer, start + (i + 0.5) / nArch);
+    if (!nearGate(q.x, q.z, 1.3)) {
+      const pl = box(k, 0.13, 1.34, 0.05, 'lmStone');
+      pl.rotation.y = yawOf(q.nx, q.nz);
+      root.add(k.detail(at(pl, q.x + q.nx * 0.015, 0.67, q.z + q.nz * 0.015)));
+    }
     if (nearGate(p.x, p.z, 1.45)) continue;
     const a = group('arch');
     a.add(at(box(k, 0.3, 0.3, 0.03, 'window'), 0, 0.27, 0.01));
@@ -188,10 +228,10 @@ export function buildStadium(k: Kit, _params: AssetParams): THREE.Object3D {
     const p = perimeterAt(rim, (i + 0.5) / nFlag);
     if (p.z < -2.6 && Math.abs(p.x) < 2.1) continue; // press box
     if (p.x < -3.5 && Math.abs(p.z) < 1.4) continue; // scoreboard
+    if (nearGate(p.x, p.z, 1.6)) continue;
     const f = group('flag');
     f.add(at(cyl(k, 0.016, 0.016, 0.56, 'post', 0, 5), 0, 0.28, 0));
     f.add(at(box(k, 0.26, 0.16, 0.02, 'lmBanner', (i + offset) % 3), 0.13, 0.47, 0));
-    f.rotation.y = yawOf(p.nx, p.nz) + Math.PI / 2;
     root.add(k.detail(at(f, p.x, RIM_Y, p.z)));
   }
   void perimeterLength;
@@ -201,6 +241,6 @@ export function buildStadium(k: Kit, _params: AssetParams): THREE.Object3D {
   root.add(at(scoreboard(k), -STADIUM_BOWL.a + 0.12, 0, 0));
 
   // ---- light towers in the four corner gaps ----
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) root.add(lightTower(k, sx * 4.74, sz * 3.5));
+  for (const f of STADIUM_FLOODLIGHTS) root.add(lightTower(k, f.x, f.z));
   return root;
 }

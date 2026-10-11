@@ -23,7 +23,7 @@ const iso = (u: number, v: number) => ({ x: (u + v) * S, z: (v - u) * S });
 
 const items: PlacedAsset[] = [];
 const labels: Array<{ text: string; u: number; v: number }> = [];
-const flats: Array<{ kind: 'lawn' | 'path'; u: number; v: number; w: number; d: number; rot?: number }> = [];
+const flats: Array<{ kind: 'lawn' | 'path' | 'plaza'; u: number; v: number; w: number; d: number }> = [];
 let view = 19;
 
 if (scene === 'trees') {
@@ -46,35 +46,54 @@ if (scene === 'trees') {
   for (let i = 0; i < 9; i++) items.push({ kind: 'veg.planter', ...iso(i * 1.65 - 6.3, 2.8) });
   view = 15;
 } else {
-  // park vignette: lawn, a diagonal path with a poplar avenue, hedged borders, beds, planters, groves
-  view = Number(q.get('zoom') ?? 24);
-  flats.push({ kind: 'lawn', u: 0, v: 0, w: 26, d: 17 });
-  flats.push({ kind: 'path', u: 0, v: 0.2, w: 26, d: 1.6 });
-  flats.push({ kind: 'path', u: 2.4, v: 0, w: 1.4, d: 17 });
+  // park vignette: lawn, crossing paths with a planter plaza, poplar avenue, hedged edges, themed corners
+  view = 16;
+  flats.push({ kind: 'lawn', u: 0, v: 0, w: 27, d: 16.5 });
+  flats.push({ kind: 'path', u: -1.5, v: 0, w: 24, d: 1.6 });
+  flats.push({ kind: 'path', u: 3, v: 0, w: 1.4, d: 16.5 });
+  flats.push({ kind: 'plaza', u: 3, v: 0, w: 4.8, d: 4.8 });
   const put = (kind: string, u: number, v: number, extra: Partial<PlacedAsset> = {}) => items.push({ kind, ...iso(u, v), ...extra });
-  for (let i = 0; i < 6; i++) put('veg.poplar', -11 + i * 2.2, -1.4);
-  for (let i = 0; i < 6; i++) put('veg.poplar', -11 + i * 2.2, 1.8);
-  put('veg.hedge', -6.5, -6.6, { params: { length: 9 } });
-  put('veg.hedge', 8.5, 6.8, { params: { length: 8 } });
-  [[-10, -4.6], [-7.2, -3.9], [-4.4, -4.8], [5.6, -6.2], [8.8, -5.0], [11.2, -6.6]].forEach(([u, v], i) => put(i % 3 === 1 ? 'veg.maple' : 'veg.oak', u!, v!));
-  [[6.2, 4.4], [9.6, 4.0], [12.0, 3.4]].forEach(([u, v]) => put('veg.cherry', u!, v!));
-  [[-10.8, 4.4], [-9.6, 5.8], [-11.8, 6.4], [-8.2, 6.9]].forEach(([u, v], i) => put(i === 1 ? 'veg.birch' : 'veg.pine', u!, v!));
-  [[-5.6, 4.6], [-4.2, 5.5], [-6.9, 5.6]].forEach(([u, v]) => put('veg.birch', u!, v!));
-  put('veg.flowerbed', -1.6, -3.6); put('veg.flowerbed', 6.4, -2.4); put('veg.flowerbed', -1.4, 4.4);
-  [[0.9, -1.4], [3.9, -1.4], [0.9, 1.8], [3.9, 1.8]].forEach(([u, v]) => put('veg.planter', u!, v!));
-  [[1.6, -5.9], [3.4, -6.3], [-2.2, 6.6], [12.2, -2.6], [11.3, -1.9], [-12.4, -6.2], [6.6, 7.0]].forEach(([u, v]) => put('veg.bush', u!, v!));
+  const ALONG_U = Math.PI / 4, ALONG_V = -Math.PI / 4;
+  for (const v of [-1.7, 1.7]) for (let i = 0; i < 4; i++) put('veg.poplar', -11.2 + i * 2.6, v);
+  put('veg.bush', -7.3, -1.9); put('veg.bush', -4.7, 1.9);
+  // top-left: hedged lawn with a flowerbed
+  put('veg.hedge', -7.2, -7.2, { rot: ALONG_U, params: { length: 9 } });
+  put('veg.bush', -12.3, -7.0); put('veg.bush', -2.1, -7.1);
+  put('veg.flowerbed', -7.4, -5.1, { rot: ALONG_U });
+  put('veg.oak', -11.0, -4.5); put('veg.maple', -3.6, -4.4);
+  // top-right: oak + maple grove
+  [[5.6, -6.0, 'veg.oak'], [7.8, -6.8, 'veg.maple'], [10.0, -5.8, 'veg.oak'], [12.0, -6.9, 'veg.oak'], [8.6, -4.0, 'veg.maple'], [11.4, -3.6, 'veg.oak']]
+    .forEach(([u, v, k]) => put(k as string, u as number, v as number));
+  put('veg.flowerbed', 6.0, -2.7, { rot: ALONG_U });
+  put('veg.bush', 13.0, -2.4); put('veg.bush', 6.8, -4.4);
+  // bottom-right: blossom garden behind a hedge
+  [[6.0, 4.0], [8.4, 3.2], [10.8, 4.2], [7.4, 6.2], [9.9, 6.3], [12.4, 6.0]].forEach(([u, v]) => put('veg.cherry', u!, v!));
+  put('veg.hedge', 9.0, 7.9, { rot: ALONG_U, params: { length: 8 } });
+  put('veg.hedge', 13.2, 4.6, { rot: ALONG_V, params: { length: 4.5 } });
+  // bottom-left: birch + pine woodland
+  [[-11.4, 3.9], [-10.0, 5.7], [-12.0, 6.9], [-8.3, 7.0]].forEach(([u, v]) => put('veg.pine', u!, v!));
+  [[-6.4, 3.7], [-4.6, 4.9], [-6.9, 5.8], [-3.0, 6.6], [-8.2, 4.5]].forEach(([u, v]) => put('veg.birch', u!, v!));
+  put('veg.bush', -2.4, 3.3); put('veg.bush', -9.0, 2.9); put('veg.bush', -4.9, 7.4);
+  // plaza planters + beds
+  [[1.25, -1.75], [4.75, -1.75], [1.25, 1.75], [4.75, 1.75]].forEach(([u, v]) => put('veg.planter', u!, v!));
+  put('veg.flowerbed', -0.4, 2.4, { rot: ALONG_U }); put('veg.flowerbed', 6.4, 2.2, { rot: ALONG_U });
 }
-
-const center = new THREE.Vector3(0, 0.8, 0);
+view = Number(q.get('zoom') ?? view);
+const cu = Number(q.get('cu') ?? 0), cv = Number(q.get('cv') ?? 0);
+const cc = iso(cu, cv);
+const center = new THREE.Vector3(cc.x, 0.8, cc.z);
 const { scene: s3, camera, loop } = devScene(view, center);
 s3.background = new THREE.Color(P.bg);
 const mat = (c: string) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 });
 const board = new THREE.Mesh(new RoundedBoxGeometry(40, 1, 40, 2, 0.4), mat(P.board));
 board.position.y = -0.5; board.receiveShadow = true; s3.add(board);
 for (const f of flats) {
-  const m = new THREE.Mesh(new RoundedBoxGeometry(f.w, 0.06, f.d, 2, f.kind === 'lawn' ? 0.03 : 0.03), mat(f.kind === 'lawn' ? P.lawn : P.road));
   const c = iso(f.u, f.v);
-  m.position.set(c.x, f.kind === 'lawn' ? 0.0 : 0.02, c.z); m.rotation.y = Math.PI / 4; m.receiveShadow = true; s3.add(m);
+  const m = f.kind === 'plaza'
+    ? new THREE.Mesh(new THREE.CylinderGeometry(f.w / 2, f.w / 2, 0.08, 48), mat(P.road))
+    : new THREE.Mesh(new RoundedBoxGeometry(f.w, 0.06, f.d, 2, 0.03), mat(f.kind === 'lawn' ? P.lawn : P.road));
+  m.position.set(c.x, f.kind === 'lawn' ? 0.0 : f.kind === 'path' ? 0.02 : 0.03, c.z);
+  m.rotation.y = Math.PI / 4; m.receiveShadow = true; s3.add(m);
 }
 for (const it of items) s3.add(registry.build(kit, it));
 

@@ -7,7 +7,7 @@ import type { RoleColors } from '../../types';
 export const ROLES: RoleColors = {
   /** Red-brick facades, warm to deep. */
   dtBrick: [
-    ['#C8644E', '#D47A5E', '#B85A48', '#DC9270'],
+    ['#CF6A52', '#D97E62', '#C2604D', '#E09476'],
     ['#A9503A', '#93452F', '#B8664A', '#C27C5C'],
     ['#A8483A', '#8F3C30', '#B45A44', '#9A4A3A'],
   ],
@@ -21,11 +21,11 @@ export const ROLES: RoleColors = {
   dtStone: [['#F2E8D2', '#E2D3B6'], ['#E6DCC6', '#D6C9AE'], ['#EFE8D8', '#DDD3BF']],
   /** Window frames, columns, piping. */
   dtTrim: ['#FFF9EE', '#F5EFE3', '#FFFFFF'],
-  /** Painted storefront frames: teal, navy, oxblood, green, charcoal. */
+  /** Painted storefront frames: teal, blue, red, green, cream. */
   dtFront: [
-    ['#2F8C80', '#35558A', '#A9483D', '#3F7F5B', '#2B3348'],
-    ['#2F7F7A', '#22407A', '#8C2F39', '#4F6F4F', '#2B2A28'],
-    ['#0B2A5B', '#1E3A6E', '#7A2E2A', '#2E5B45', '#25272B'],
+    ['#3FA796', '#4F7FC4', '#C8573F', '#5FA36F', '#F3EAD7'],
+    ['#2F7F7A', '#22407A', '#8C2F39', '#4F6F4F', '#E9DFCB'],
+    ['#0B2A5B', '#1E3A6E', '#7A2E2A', '#2E5B45', '#F5F2EA'],
   ],
   /** Awning canvas: coral, teal, mustard, blue, blush. */
   dtAwning: [
@@ -35,11 +35,11 @@ export const ROLES: RoleColors = {
   ],
   /** Awning stripes and valance piping. */
   dtCanvas: ['#FFF8EC', '#F5EFE3', '#FFFFFF'],
-  /** Sign boards: ink, teal, oxblood, gold, blue. */
+  /** Sign boards: navy, teal, red, gold, cream (gold and cream take dark lettering). */
   dtSign: [
-    ['#2B3348', '#2F8C80', '#A9483D', '#F2C14E', '#35558A'],
-    ['#2B2A28', '#2F7F7A', '#8C2F39', '#D9A441', '#22407A'],
-    ['#0B2A5B', '#25272B', '#7A2E2A', '#E9B03B', '#2E5B45'],
+    ['#2F4870', '#3FA796', '#C8573F', '#F2C14E', '#FFF8EC'],
+    ['#2B2A28', '#2F7F7A', '#8C2F39', '#D9A441', '#F5EFE3'],
+    ['#0B2A5B', '#25272B', '#7A2E2A', '#E9B03B', '#FFFFFF'],
   ],
   /** Lettering shapes on signs: cream, gold, white, dark (for gold boards). */
   dtInk: [
@@ -48,7 +48,7 @@ export const ROLES: RoleColors = {
     ['#FFFFFF', '#E9B03B', '#F5F2EA', '#0B2A5B'],
   ],
   /** Flat roof membrane. */
-  dtRoof: [['#D9CFC1', '#CEC3B3'], ['#8E9196', '#7E8186'], ['#5B6573', '#4E5866']],
+  dtRoof: [['#CDC2B3', '#C4BAAD'], ['#8E9196', '#7E8186'], ['#5B6573', '#4E5866']],
   /** Recesses, fan grilles, interiors. */
   dtDark: ['#39404F', '#2E2F33', '#25272B'],
   /** Rooftop units (idx 0) and railings / fire escapes (idx 1). */

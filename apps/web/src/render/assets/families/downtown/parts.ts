@@ -201,10 +201,12 @@ export function scheme(p: Dk, wall: 'brick' | 'paint' | 'any' = 'any'): Scheme {
   while (clash.includes(awning)) awning = (awning + 2) % 5;
   // Coral and blush on red brick only as stripes, so the canvas still reads against the wall.
   const striped = !paint && (awning === 0 || awning === 4) ? true : p.chance(0.55);
-  const front = p.int(5);
+  // Storefront frame: never brick-red on brick, never cream on cream paint.
+  let front = p.int(5);
+  if ((!paint && front === 2) || (paint && wallRef[1] === 0 && front === 4)) front = (front + 1) % 5;
   let sign = p.int(5);
   if (sign === front) sign = (sign + 1) % 5;
-  const ink = sign === 3 ? 3 : p.pick([0, 1, 2]);
+  const ink = sign >= 3 ? 3 : p.pick([0, 1, 2]);
   return { wall: wallRef, brick: !paint, awning, striped, front, sign, ink, door: p.int(5) };
 }
 
@@ -284,39 +286,36 @@ export interface AwningOpts {
   striped: boolean;
 }
 
-/** Awning facing +z: its top edge hangs on the wall at y = 0, z = 0; projects `depth`. */
+/** Awning facing +z: its top edge hangs on the wall at y = 0, z = 0; projects `depth`. A closed toy awning:
+ *  the side profile (slope or quarter round + valance) is one solid, so each stripe is a single cheap extrusion
+ *  and the end caps double as the side cheeks. */
 export function awning(p: Dk, width: number, depth: number, o: AwningOpts): THREE.Group {
   const g = new THREE.Group();
   const col: RoleRef = ['dtAwning', o.idx];
-  const t = 0.035, val = 0.11;
+  const val = 0.09;
   let profile: V2[];
-  let cheek: V2[];
   let lipY: number;
   if (o.style === 'shed') {
-    const drop = depth * 0.55;
-    profile = [[0, 0], [depth, -drop], [depth, -drop - val], [depth - t, -drop - val], [depth - t, -drop * ((depth - t) / depth) - t], [0, -t]];
-    cheek = [[0, 0], [depth, -drop], [0, -drop]];
+    const drop = depth * 0.46;
+    profile = [[0, 0], [depth, -drop], [depth, -drop - val], [0, -drop]];
     lipY = -drop;
   } else {
     const R = depth, n = 4;
-    const outer: V2[] = [], inner: V2[] = [];
+    profile = [];
     for (let i = 0; i <= n; i++) {
       const a = (Math.PI / 2) * (1 - i / n);
-      outer.push([R * Math.cos(a), -R + R * Math.sin(a)]);
-      inner.push([(R - t) * Math.cos(a), -R + (R - t) * Math.sin(a)]);
+      profile.push([R * Math.cos(a), -R + R * Math.sin(a)]);
     }
-    profile = [...outer, [R, -R - val], [R - t, -R - val], ...inner.reverse()];
-    cheek = [...outer, [0, -R]];
+    profile.push([R, -R - val], [0, -R]);
     lipY = -R;
   }
   if (o.striped) {
-    const n = Math.max(5, Math.round(width / (o.style === 'round' ? 0.36 : 0.3)) | 1), sw = width / n;
+    const n = Math.max(5, Math.round(width / 0.3) | 1), sw = width / n;
     for (let i = 0; i < n; i++) g.add(at(p.extrudeX(profile, sw, i % 2 ? CANVAS : col), -width / 2 + sw * (i + 0.5), 0, 0));
   } else {
     g.add(p.extrudeX(profile, width, col));
     g.add(p.detail(at(p.box(width + 0.004, 0.025, 0.02, CANVAS), 0, lipY - 0.01, depth + 0.004)));
   }
-  for (const s of [-1, 1]) g.add(at(p.extrudeX(cheek, 0.025, col), s * (width / 2 - 0.0125), 0, 0));
   return g;
 }
 
@@ -389,7 +388,7 @@ export function storefront(p: Dk, width: number, H: number, o: StorefrontOpts): 
     if (o.sideDoor === 'left') x0 += 0.66; else x1 -= 0.66;
   }
   const door = o.door ?? 'center';
-  const glassTop = H - headerH - 0.06, bulk = 0.26;
+  const glassTop = H - headerH - 0.06, bulk = 0.2;
   const display = (a: number, b: number) => {
     const w = b - a;
     if (w < 0.2) return;
@@ -408,8 +407,9 @@ export function storefront(p: Dk, width: number, H: number, o: StorefrontOpts): 
     display(x0, dx - doorW / 2 - 0.07);
     display(dx + doorW / 2 + 0.07, x1);
   }
-  const aw = o.awning ?? (s.striped ? 'shed' : p.pick(['shed', 'round'] as const));
-  if (aw !== 'none') g.add(at(awning(p, width - 0.06, aw === 'round' ? 0.4 : 0.5, { style: aw, idx: s.awning, striped: s.striped }), 0, H - headerH - 0.02, 0.02));
+  // Shallow, flat awnings so the lit shop glass still shows under them from the 32° game camera.
+  const aw = o.awning ?? (p.chance(0.22) ? 'none' : s.striped ? 'shed' : p.pick(['shed', 'round'] as const));
+  if (aw !== 'none') g.add(at(awning(p, width - 0.06, aw === 'round' ? 0.32 : 0.42, { style: aw, idx: s.awning, striped: s.striped }), 0, H - headerH - 0.02, 0.02));
   return g;
 }
 
@@ -485,6 +485,15 @@ export function chimney(p: Dk, wall: RoleRef, h = 0.55): THREE.Group {
   return g;
 }
 
+/** Little wall lantern facing +z (glows at dusk), centred on its bracket. */
+export function wallLamp(p: Dk): THREE.Group {
+  const g = new THREE.Group();
+  g.add(at(p.box(0.04, 0.04, 0.08, IRON), 0, 0, 0.04));
+  g.add(at(p.box(0.09, 0.11, 0.09, ['lamp', 0]), 0, -0.05, 0.1));
+  g.add(at(p.box(0.12, 0.03, 0.12, IRON), 0, 0.02, 0.1));
+  return p.detail(g);
+}
+
 /** Classic wooden rooftop water tank on legs (~1.05 tall). */
 export function waterTank(p: Dk): THREE.Group {
   const g = new THREE.Group();
@@ -521,6 +530,16 @@ export function flowerBox(p: Dk, w: number, flowers: number): THREE.Group {
   g.add(at(p.box(w - 0.04, 0.07, 0.1, ['leaf', 0]), 0, 0.03, 0.07));
   const n = Math.max(2, Math.round(w / 0.16));
   for (let i = 0; i < n; i++) g.add(at(p.box(0.055, 0.055, 0.055, ['dtFlower', (flowers + i) % 5]), -w / 2 + (w * (i + 0.5)) / n, 0.08, 0.09 + (i % 2) * 0.02));
+  return p.detail(g);
+}
+
+/** Rooftop garden: a long wooden planter with clipped shrubs (top of the roof at y = 0). */
+export function roofGarden(p: Dk, w: number): THREE.Group {
+  const g = new THREE.Group();
+  g.add(at(p.box(w, 0.2, 0.4, ['dtWood', 0]), 0, 0.1, 0));
+  g.add(at(p.box(w - 0.08, 0.06, 0.32, ['leaf', 1]), 0, 0.21, 0));
+  const n = Math.max(2, Math.round(w / 0.45));
+  for (let i = 0; i < n; i++) g.add(at(p.sphere(0.16, ['leaf', i % 3], 7), -w / 2 + (w * (i + 0.5)) / n, 0.32, 0));
   return p.detail(g);
 }
 

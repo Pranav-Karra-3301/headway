@@ -2,18 +2,17 @@
 import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
 import { variants } from './roles';
-import { at, bar, box, extrude, group, pick, rotX, rotZ } from './prims';
+import { at, bar, box, disc, extrude, group, pick, rotX, rotZ } from './prims';
 
-/** Round park bin: green body with a pale band, iron rims and a domed lid. */
+/** Round park bin: green body on a dark foot, pale rolled rim around an open, dark top so it reads as a bin. */
 export function buildBin(k: KitContext, _p: AssetParams): THREE.Object3D {
-  const iron = k.mat('post'), body = k.mat('stBin');
+  const iron = k.mat('post'), body = k.mat('stBin'), paint = k.mat('stPaint');
   const g = group('st.bin');
-  g.add(at(k.cyl(0.13, 0.14, 0.05, iron, 12), 0, 0.025, 0));
-  g.add(at(k.cyl(0.15, 0.13, 0.44, body, 12), 0, 0.27, 0));
-  g.add(k.detail(at(k.cyl(0.149, 0.146, 0.05, k.mat('stPaint'), 12), 0, 0.36, 0)));
-  g.add(at(k.cyl(0.165, 0.16, 0.05, iron, 12), 0, 0.505, 0));
-  g.add(at(k.cyl(0.07, 0.15, 0.07, iron, 12), 0, 0.565, 0));
-  g.add(k.detail(at(k.cyl(0.03, 0.035, 0.035, iron, 6), 0, 0.615, 0)));
+  g.add(at(k.cyl(0.135, 0.14, 0.04, iron, 12), 0, 0.02, 0));
+  g.add(at(k.cyl(0.15, 0.13, 0.5, body, 12), 0, 0.29, 0));
+  g.add(k.detail(at(k.cyl(0.151, 0.149, 0.03, iron, 12), 0, 0.43, 0)));
+  g.add(at(k.cyl(0.168, 0.162, 0.05, paint, 12), 0, 0.555, 0));
+  g.add(at(disc(k, 0.138, 12, iron), 0, 0.581, 0));
   return g;
 }
 
@@ -36,16 +35,16 @@ export function buildHydrant(k: KitContext, _p: AssetParams): THREE.Object3D {
 export function buildMailbox(k: KitContext, _p: AssetParams): THREE.Object3D {
   const blue = k.mat('stMail'), iron = k.mat('post');
   const g = group('st.mailbox');
-  const W = 0.32, H = 0.34, R = W / 2;
-  for (const x of [-0.12, 0.12]) for (const z of [-0.09, 0.09]) g.add(at(box(k, 0.045, 0.23, 0.045, iron), x, 0.115, z));
-  g.add(at(box(k, 0.36, 0.035, 0.29, blue), 0, 0.235, 0));
+  const W = 0.32, H = 0.4, R = W / 2;
+  for (const x of [-0.12, 0.12]) for (const z of [-0.09, 0.09]) g.add(at(box(k, 0.045, 0.16, 0.045, iron), x, 0.08, z));
+  g.add(at(box(k, 0.36, 0.035, 0.29, blue), 0, 0.165, 0));
   g.add(at(extrude(k, `mailbox:${W}:${H}`, () => {
     const s = new THREE.Shape();
     s.moveTo(-R, 0); s.lineTo(R, 0); s.lineTo(R, H); s.absarc(0, H, R, 0, Math.PI, false); s.lineTo(-R, 0);
     return s;
-  }, 0.24, blue, 0.018, 8), 0, 0.25, 0));
+  }, 0.24, blue, 0.018, 8), 0, 0.18, 0));
   g.add(at(rotX(box(k, 0.2, 0.05, 0.035, iron), -0.25), 0, 0.6, 0.14));
-  g.add(k.detail(at(rotX(k.cyl(0.055, 0.055, 0.012, k.mat('stPaint'), 12), Math.PI / 2), 0, 0.42, 0.145)));
+  g.add(k.detail(at(rotX(k.cyl(0.055, 0.055, 0.012, k.mat('stPaint'), 12), Math.PI / 2), 0, 0.4, 0.145)));
   return g;
 }
 
@@ -55,8 +54,8 @@ function bike(k: KitContext, colour: number): THREE.Group {
   const b = group('bike');
   const r = 0.135, rear: [number, number, number] = [-0.24, r, 0], front: [number, number, number] = [0.24, r, 0];
   for (const c of [rear, front]) {
-    b.add(at(rotX(k.cyl(r, r, 0.026, tyre, 10), Math.PI / 2), c[0], c[1], 0));
-    b.add(k.detail(at(rotX(k.cyl(r * 0.6, r * 0.6, 0.032, hub, 6), Math.PI / 2), c[0], c[1], 0)));
+    b.add(at(rotX(k.cyl(r, r, 0.022, tyre, 12), Math.PI / 2), c[0], c[1], 0));
+    b.add(k.detail(at(rotX(k.cyl(r * 0.74, r * 0.74, 0.026, hub, 7), Math.PI / 2), c[0], c[1], 0)));
   }
   const bb: [number, number, number] = [-0.02, 0.15, 0], seat: [number, number, number] = [-0.08, 0.36, 0], head: [number, number, number] = [0.15, 0.34, 0];
   b.add(bar(k, bb, head, 0.016, frame, 4));
@@ -76,8 +75,8 @@ export function buildBikeRack(k: KitContext, p: AssetParams): THREE.Object3D {
   const n = variants('stBike');
   const c1 = pick(k, p, n);
   const c2 = typeof p.color2 === 'number' ? pick(k, p, n, 'color2') : (c1 + 1 + pick(k, {}, n - 1)) % n;
-  for (const x of [-0.62, 0.62]) g.add(bar(k, [x, 0, -0.14], [x, 0.3, -0.14], 0.022, steel, 6));
-  g.add(bar(k, [-0.64, 0.3, -0.14], [0.64, 0.3, -0.14], 0.022, steel, 6));
+  for (const x of [-0.62, 0.62]) g.add(bar(k, [x, 0, -0.14], [x, 0.3, -0.14], 0.022, steel, 5));
+  g.add(bar(k, [-0.64, 0.3, -0.14], [0.64, 0.3, -0.14], 0.022, steel, 5));
   const a = bike(k, c1); a.position.set(-0.36, 0, 0.04); a.rotation.y = 0.05;
   const b = bike(k, c2); b.position.set(0.37, 0, 0.06); b.rotation.y = Math.PI - 0.05;
   g.add(a, b);

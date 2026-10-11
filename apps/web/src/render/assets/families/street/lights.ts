@@ -4,7 +4,7 @@ import type { AssetParams, KitContext } from '../../types';
 import { at, box, group, rotX } from './prims';
 
 /** Centre of the glowing lamp head (role `lamp`) above the lamp's base, and its radius: FX hangs the dusk glow here. */
-export const LAMP_HEAD = { y: 1.98, r: 0.13 } as const;
+export const LAMP_HEAD = { y: 1.99, r: 0.15 } as const;
 
 /** College-town lantern lamp: stepped plinth, tapered iron post, six-sided glass lantern with a hat. */
 export function buildLamp(k: KitContext, _p: AssetParams): THREE.Object3D {
@@ -14,10 +14,11 @@ export function buildLamp(k: KitContext, _p: AssetParams): THREE.Object3D {
   g.add(k.detail(at(k.cyl(0.075, 0.105, 0.08, iron, 10), 0, 0.2, 0)));
   g.add(at(k.cyl(0.036, 0.05, 1.54, iron, 8), 0, 0.98, 0));
   g.add(at(k.cyl(0.065, 0.045, 0.07, iron, 8), 0, 1.76, 0));
-  g.add(at(k.cyl(0.105, 0.06, 0.06, iron, 6), 0, 1.83, 0));
-  g.add(at(k.cyl(0.13, 0.095, 0.26, glow, 6), 0, LAMP_HEAD.y, 0));
-  g.add(at(k.cone(0.175, 0.14, iron, 6), 0, 2.18, 0));
-  g.add(k.detail(at(k.cone(0.035, 0.09, iron, 6), 0, 2.29, 0)));
+  g.add(at(k.cyl(0.115, 0.06, 0.06, iron, 6), 0, 1.82, 0));
+  g.add(at(k.cyl(0.15, 0.105, 0.3, glow, 6), 0, LAMP_HEAD.y, 0));
+  g.add(k.detail(at(k.cyl(0.162, 0.162, 0.03, iron, 6), 0, 2.145, 0)));
+  g.add(at(k.cone(0.2, 0.15, iron, 6), 0, 2.235, 0));
+  g.add(k.detail(at(k.cone(0.035, 0.09, iron, 6), 0, 2.35, 0)));
   return g;
 }
 

@@ -6,16 +6,16 @@ import type { AssetRegistry } from '../registry';
 import type { AssetDef, RoleColors } from '../types';
 import { buildClockTower, CLOCK_TOWER_FACES } from './landmarks/clockTower';
 import { buildLevelCrossing, buildRailSignal } from './landmarks/rail';
-import { buildStadium, STADIUM_BOWL } from './landmarks/stadium';
+import { buildStadium, STADIUM_BOWL, STADIUM_FLOODLIGHTS } from './landmarks/stadium';
 import { buildStationCentral, buildStationHalt } from './landmarks/stations';
 import { buildWaterTower } from './landmarks/waterTower';
 
-export { CLOCK_TOWER_FACES, STADIUM_BOWL };
+export { CLOCK_TOWER_FACES, STADIUM_BOWL, STADIUM_FLOODLIGHTS };
 
 /** Composer palette roles this family uses that the basic dev kit lacks (copied so previews match the town). */
 const SHARED: Role[] = [
   'stadium', 'mast', 'clock', 'hands', 'tower', 'towerRoof', 'post', 'frame', 'canopy', 'platform', 'safety', 'display',
-  'curb', 'rail', 'paper', 'accent', 'stripe', 'bench', 'taillight', 'column', 'hub',
+  'curb', 'rail', 'paper', 'accent', 'stripe', 'bench', 'taillight', 'column', 'hub', 'panel',
 ];
 const fromPalettes = (role: Role): RoleColors[string] => [PALETTES.a[role], PALETTES.b[role], PALETTES.c[role]];
 

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
 import { at, choices, int, limb, rooted, squash } from './util';
 
-export const TREE_SIZES = [0.88, 0.94, 1.0] as const;
+const TREE_SIZES = [0.88, 0.94, 1.0] as const;
 const YAW_STEPS = 5;
 
 /** One crown blob: radius, centre, vertical squash, sphere segments, alt tone. */
@@ -25,8 +25,11 @@ function blobs(k: KitContext, g: THREE.Object3D, list: readonly Blob[], main: TH
 /** Tapered trunk from the ground to `h`, optional root flare. */
 function trunk(k: KitContext, g: THREE.Object3D, rb: number, rt: number, h: number, m: THREE.Material, flare = false): void {
   g.add(at(k.cyl(rt, rb, h, m, 8), 0, h / 2, 0));
-  if (flare) g.add(at(k.cyl(rb * 1.02, rb * 1.42, 0.12, m, 8), 0, 0.06, 0));
+  if (flare) g.add(at(k.cyl(rb, rb * 1.32, 0.09, m, 8), 0, 0.045, 0));
 }
+
+/** (main, alt) tone pairs for 3-tone roles (two-tone blossom): mid + light top, dark + mid, light + mid. */
+const PAIRS3 = [[0, 1], [2, 0], [1, 0]] as const;
 
 function pickTree(k: KitContext, params: AssetParams, shapes: number, tones: number, yaw = true) {
   const r = choices(k, params);
@@ -36,29 +39,31 @@ function pickTree(k: KitContext, params: AssetParams, shapes: number, tones: num
 
 // ---------- oak: broad, lumpy "cloud" crown on a stout trunk ----------
 const OAK: readonly (readonly Blob[])[] = [
-  [[0.70, 0, 1.80, 0, 1, 13], [0.47, -0.37, 1.52, 0.17, 0.9, 10], [0.44, 0.40, 1.58, -0.19, 0.9, 10, true]],
-  [[0.68, 0.03, 1.74, 0.02, 1, 13], [0.42, 0.12, 2.24, -0.06, 1, 10, true], [0.46, -0.37, 1.48, -0.17, 0.9, 10]],
-  [[0.72, 0, 1.82, 0, 0.88, 13], [0.44, 0.40, 1.60, 0.18, 0.9, 10], [0.42, -0.30, 1.64, -0.34, 0.9, 10, true]],
+  [[0.80, 0, 1.56, 0, 0.82, 13], [0.46, -0.38, 1.90, 0.12, 0.95, 10], [0.44, 0.36, 1.96, -0.16, 0.95, 10]],
+  [[0.78, 0, 1.56, 0, 0.85, 13], [0.46, 0.06, 2.08, -0.04, 0.95, 10], [0.42, -0.44, 1.74, 0.12, 0.95, 10]],
+  [[0.82, 0, 1.60, 0, 0.78, 13], [0.44, 0.40, 1.86, 0.12, 0.9, 10], [0.42, -0.36, 1.90, -0.20, 0.9, 10]],
 ];
 
 export function buildOak(k: KitContext, params: AssetParams): THREE.Object3D {
   const t = pickTree(k, params, OAK.length, 3);
-  trunk(k, t.g, 0.15, 0.1, 1.5, k.mat('trunk'), true);
-  blobs(k, t.g, OAK[t.shape]!, k.mat('leaf', t.tone), k.mat('leaf', (t.tone + 1) % 3));
+  trunk(k, t.g, 0.15, 0.1, 1.35, k.mat('trunk'), true);
+  const leaf = k.mat('leaf', t.tone);
+  blobs(k, t.g, OAK[t.shape]!, leaf, leaf);
   return rooted('veg.oak', t.key, t.g);
 }
 
 // ---------- maple: smooth egg-shaped crown, lime in a, flaming in autumn ----------
 const MAPLE: readonly (readonly Blob[])[] = [
-  [[0.80, 0, 1.68, 0, 1.08, 14]],
-  [[0.74, 0.05, 1.72, 0, 1.08, 14], [0.40, -0.40, 1.34, 0.24, 0.92, 10, true]],
-  [[0.78, 0, 1.60, 0, 0.96, 14], [0.36, 0.10, 2.22, -0.08, 1, 10, true]],
+  [[0.82, 0, 1.62, 0, 1.06, 14]],
+  [[0.76, 0.05, 1.66, 0, 1.06, 14], [0.42, -0.38, 1.55, 0.24, 0.9, 10, true]],
+  [[0.80, 0, 1.56, 0, 0.95, 14], [0.38, 0.10, 2.20, -0.08, 1, 10, true]],
 ];
 
 export function buildMaple(k: KitContext, params: AssetParams): THREE.Object3D {
   const t = pickTree(k, params, MAPLE.length, 3);
-  trunk(k, t.g, 0.14, 0.09, 1.3, k.mat('trunk'), true);
-  blobs(k, t.g, MAPLE[t.shape]!, k.mat('vegMaple', t.tone), k.mat('vegMaple', (t.tone + 1) % 3));
+  trunk(k, t.g, 0.14, 0.09, 1.2, k.mat('trunk'), true);
+  const leaf = k.mat('vegMaple', t.tone);
+  blobs(k, t.g, MAPLE[t.shape]!, leaf, leaf);
   return rooted('veg.maple', t.key, t.g);
 }
 
@@ -73,18 +78,18 @@ const PINE: readonly (readonly (readonly [number, number, number])[])[] = [
 export function buildPine(k: KitContext, params: AssetParams): THREE.Object3D {
   const t = pickTree(k, params, PINE.length, 2, false);
   trunk(k, t.g, 0.11, 0.075, 0.9, k.mat('trunk'));
-  PINE[t.shape]!.forEach(([r, h, y0], i) => t.g.add(at(k.cone(r, h, k.mat('pine', (t.tone + i) % 2), 14), 0, y0 + h / 2, 0)));
+  PINE[t.shape]!.forEach(([r, h, y0], i) => t.g.add(at(k.cone(r, h, k.mat('pine', (t.tone + i) % 2), 18), 0, y0 + h / 2, 0)));
   return rooted('veg.pine', t.key, t.g);
 }
 
 // ---------- birch: slim white stem(s) with dark bark dashes, airy light crown ----------
 const BIRCH: readonly { crown: readonly Blob[]; second?: { base: readonly [number, number]; dir: readonly [number, number, number]; len: number; crown: Blob } }[] = [
-  { crown: [[0.38, 0.17, 1.78, 0.10, 1.2, 10], [0.35, -0.21, 2.02, -0.03, 1.2, 10, true], [0.31, 0.02, 2.32, -0.21, 1.15, 10]] },
+  { crown: [[0.44, 0.03, 1.84, 0.02, 1.5, 14], [0.30, -0.22, 1.58, -0.20, 1.4, 10, true]] },
   {
-    crown: [[0.36, -0.12, 1.90, -0.20, 1.2, 10], [0.31, -0.10, 2.25, 0.22, 1.2, 10, true]],
-    second: { base: [0.06, 0.04], dir: [0.16, 1, 0.08], len: 1.45, crown: [0.27, 0.28, 1.55, 0.14, 1.2, 10] },
+    crown: [[0.43, -0.10, 1.86, -0.10, 1.5, 14]],
+    second: { base: [0.06, 0.04], dir: [0.16, 1, 0.08], len: 1.45, crown: [0.28, 0.28, 1.62, 0.14, 1.45, 10] },
   },
-  { crown: [[0.37, -0.16, 1.70, 0.12, 1.2, 10], [0.35, 0.19, 1.98, 0.02, 1.2, 10, true], [0.30, -0.04, 2.30, -0.14, 1.15, 10]] },
+  { crown: [[0.43, -0.05, 1.76, 0.06, 1.48, 14], [0.30, 0.22, 2.08, -0.12, 1.4, 10, true]] },
 ];
 const MARKS: readonly (readonly [number, number])[] = [[0.32, 0.4], [0.6, 2.6], [0.88, 4.9], [1.18, 1.1], [1.46, 3.5]];
 
@@ -121,7 +126,8 @@ const POPLAR: readonly (readonly Blob[])[] = [
 export function buildPoplar(k: KitContext, params: AssetParams): THREE.Object3D {
   const t = pickTree(k, params, POPLAR.length, 2);
   trunk(k, t.g, 0.095, 0.065, 0.75, k.mat('trunk'));
-  blobs(k, t.g, POPLAR[t.shape]!, k.mat('vegPoplar', t.tone), k.mat('vegPoplar', (t.tone + 1) % 2));
+  const leaf = k.mat('vegPoplar', t.tone);
+  blobs(k, t.g, POPLAR[t.shape]!, leaf, leaf);
   return rooted('veg.poplar', t.key, t.g);
 }
 
@@ -137,6 +143,6 @@ export function buildCherry(k: KitContext, params: AssetParams): THREE.Object3D 
   const bark = k.mat('trunk');
   trunk(k, t.g, 0.13, 0.085, 1.15, bark);
   for (const d of [[0.55, 1, 0.2], [-0.5, 1, -0.25]] as const) t.g.add(k.detail(limb(k, new THREE.Vector3(0, 0.8, 0), new THREE.Vector3(...d), 0.55, 0.065, 0.04, bark, 6).mesh));
-  blobs(k, t.g, CHERRY[t.shape]!, k.mat('vegBlossom', t.tone), k.mat('vegBlossom', (t.tone + 1) % 3));
+  blobs(k, t.g, CHERRY[t.shape]!, k.mat('vegBlossom', PAIRS3[t.tone]![0]), k.mat('vegBlossom', PAIRS3[t.tone]![1]));
   return rooted('veg.cherry', t.key, t.g);
 }

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { AssetParams } from '../../types';
 import {
   acUnit, at, DARK, doorUnit, Dk, flatRoof, IRON, onFace, plainWindow, pottedShrub, scheme, STONE, STONE_DARK, TRIM, tinyCar,
-  vent, windowUnit, type Face, type RoleRef,
+  vent, wallLamp, windowUnit, type Face, type RoleRef,
 } from './parts';
 
 const TRIM_REF: RoleRef = TRIM;
@@ -14,10 +14,11 @@ const CANVAS_RED: RoleRef = ['dtAwning', 0];
 
 export function buildTheater(p: Dk, _params: AssetParams): THREE.Group {
   const g = new THREE.Group();
-  const s = scheme(p, p.chance(0.6) ? 'paint' : 'brick');
+  const s = scheme(p, p.chance(0.5) ? 'paint' : 'brick');
+  if (!s.brick) s.wall = ['dtPaint', p.pick([0, 1, 3])];
   const W = 4.7, D = 3.15, cz = -2 + D / 2, fz = cz + D / 2, H = 3.05;
   const dress: RoleRef = s.brick ? STONE : TRIM;
-  const marquee = p.pick([0, 1, 2, 4]);
+  const marquee = p.pick([0, 1, 2]);
   g.add(at(p.rbox(W, H, D, 0.09, s.wall), 0, H / 2, cz));
   // Stage house: the taller block at the back gives the theatre its stepped silhouette.
   g.add(at(p.rbox(3.2, H + 0.45, 1.2, 0.08, s.wall), 0, (H + 0.45) / 2, cz - D / 2 + 0.62));
@@ -34,14 +35,16 @@ export function buildTheater(p: Dk, _params: AssetParams): THREE.Group {
   g.add(at(p.box(2.9, 0.07, 0.3, dress), 0, H + 0.1 + 0.4, fz - 0.12));
   for (const x of [-0.9, 0.9]) g.add(p.detail(at(p.box(0.08, 0.26, 0.03, dress), x, H + 0.26, fz + 0.005)));
   // Entrance: recessed lobby, two pairs of glass doors, a ticket booth in the middle.
-  g.add(at(p.box(2.7, 1.35, 0.04, DARK), 0, 0.675, fz + 0.02));
+  g.add(at(p.box(2.5, 1.3, 0.04, DARK), 0, 0.65, fz + 0.02));
   for (const x of [-0.85, 0.85]) {
     g.add(at(doorUnit(p, { w: 0.62, h: 1.05, leaf: ['dtFront', s.front], glass: true, recess: false, transom: true, surround: TRIM }), x, 0, fz + 0.03));
   }
   const booth = new THREE.Group();
-  booth.add(at(p.soft(0.6, 0.62, 0.48, 0.06, ['dtFront', s.front]), 0, 0.31, 0));
-  booth.add(at(p.box(0.54, 0.36, 0.42, ['window', 1]), 0, 0.8, 0));
-  booth.add(at(p.soft(0.68, 0.08, 0.56, 0.05, ['dtSign', marquee]), 0, 1.02, 0));
+  booth.add(at(p.soft(0.56, 0.58, 0.44, 0.06, TRIM), 0, 0.29, 0));
+  booth.add(at(p.box(0.5, 0.34, 0.38, ['window', 1]), 0, 0.75, 0));
+  booth.add(p.detail(at(p.box(0.04, 0.34, 0.4, TRIM), 0, 0.75, 0)));
+  booth.add(at(p.soft(0.66, 0.1, 0.54, 0.05, ['dtSign', marquee]), 0, 0.97, 0));
+  booth.add(p.detail(at(p.sphere(0.06, ['lamp', 0], 6), 0, 1.07, 0)));
   g.add(at(booth, 0, 0, fz + 0.32));
   // Poster cases between the pilasters.
   for (const x of [-1.81, 1.81]) {
@@ -54,32 +57,41 @@ export function buildTheater(p: Dk, _params: AssetParams): THREE.Group {
   const mw = 3.0, md = 0.78, my = 1.48, mh = 0.42;
   g.add(at(p.box(mw, mh, md, ['dtSign', marquee]), 0, my + mh / 2, fz + md / 2));
   g.add(at(p.box(mw - 0.1, 0.03, md - 0.1, ['lamp', 0]), 0, my - 0.005, fz + md / 2));
-  g.add(at(p.box(mw + 0.04, 0.05, md + 0.04, ['lamp', 0]), 0, my + mh + 0.025, fz + md / 2));
-  g.add(at(p.box(mw - 0.2, mh - 0.14, 0.02, ['dtInk', 2]), 0, my + mh / 2, fz + md + 0.01));
-  for (const sx of [-1, 1]) g.add(at(p.box(0.02, mh - 0.14, md - 0.2, ['dtInk', 2]), sx * (mw / 2 + 0.01), my + mh / 2, fz + md / 2 + 0.04));
-  const rows = [my + mh / 2 + 0.06, my + mh / 2 - 0.06];
+  g.add(at(p.box(mw + 0.04, 0.05, 0.06, ['lamp', 0]), 0, my + mh + 0.02, fz + md - 0.01));
+  g.add(at(p.box(mw + 0.04, 0.05, 0.06, ['lamp', 0]), 0, my + 0.02, fz + md - 0.01));
+  for (const sx of [-1, 1]) g.add(at(p.box(0.06, 0.05, md, ['lamp', 0]), sx * (mw / 2 - 0.01), my + mh + 0.02, fz + md / 2));
+  const bw = mw - 0.6, bh = mh * 0.56;
+  g.add(at(p.box(bw, bh, 0.02, ['dtInk', 2]), 0, my + mh / 2, fz + md + 0.01));
+  for (const sx of [-1, 1]) g.add(at(p.box(0.02, bh, md - 0.3, ['dtInk', 2]), sx * (mw / 2 + 0.01), my + mh / 2, fz + md / 2 + 0.06));
+  const rows = [my + mh / 2 + 0.055, my + mh / 2 - 0.055];
   rows.forEach((y, r) => {
-    let x = -mw / 2 + 0.25 + r * 0.12;
-    while (x < mw / 2 - 0.35) {
+    let x = -bw / 2 + 0.12 + r * 0.1;
+    while (x < bw / 2 - 0.24) {
       const w = 0.1 + p.int(4) * 0.06;
       g.add(p.detail(at(p.box(w, 0.06, 0.012, ['dtSign', 0]), x + w / 2, y, fz + md + 0.025)));
       x += w + 0.08 + (p.chance(0.25) ? 0.12 : 0);
     }
   });
-  // Vertical blade sign standing on the marquee: letters as stacked discs, a bulb strip, a star on top.
-  const vy0 = my + mh + 0.05, vh = 2.1, vz = fz + 0.42, blade = p.pick([0, 1, 2, 4].filter((i) => i !== marquee));
+  // Vertical blade sign standing on the marquee: stacked letter tiles, a bulb-lit edge, a pointed crest + star.
+  const vy0 = my + mh + 0.05, vh = 2.0, vz = fz + 0.42, blade = p.pick([0, 1, 2].filter((i) => i !== marquee));
   g.add(at(p.box(0.14, vh, 0.62, ['dtSign', blade]), 0, vy0 + vh / 2, vz));
-  g.add(at(p.box(0.16, vh, 0.05, ['lamp', 0]), 0, vy0 + vh / 2, vz + 0.33));
-  g.add(at(p.box(0.16, 0.05, 0.62, ['lamp', 0]), 0, vy0 + vh + 0.025, vz));
+  g.add(at(p.box(0.17, vh, 0.05, ['lamp', 0]), 0, vy0 + vh / 2, vz + 0.33));
+  const crest = p.gable(0.62, 0.3, 0.14, ['dtSign', blade]);
+  crest.rotation.y = Math.PI / 2;
+  g.add(at(crest, -0.07, vy0 + vh, vz));
   for (let i = 0; i < 4; i++) {
-    const d = p.cyl(0.16, 0.16, 0.18, ['dtInk', p.chance(0.5) ? 0 : 2], 12);
-    d.rotation.z = Math.PI / 2;
-    g.add(at(d, 0, vy0 + 0.38 + i * 0.44, vz - 0.02));
+    const w = i % 2 ? 0.3 : 0.36;
+    g.add(at(p.box(0.18, 0.3, w, ['dtInk', i % 2 ? 0 : 1]), 0, vy0 + 0.32 + i * 0.44, vz - 0.03));
   }
-  g.add(at(p.sphere(0.11, ['lamp', 0], 8), 0, vy0 + vh + 0.16, vz));
+  g.add(at(p.sphere(0.1, ['lamp', 0], 8), 0, vy0 + vh + 0.36, vz));
   // Plain sides: an exit door with a little canopy on the right, a few high windows.
   g.add(onFace(doorUnit(p, { w: 0.55, leaf: ['dtDoor', 0], glass: false, main: false }), 'right', W, D, 0.6, 0, 0, cz));
-  for (const face of ['right', 'left'] as Face[]) for (const u of [-0.9, 0.1, 1.1]) g.add(onFace(plainWindow(p, 0.32, 0.4, dress), face, W, D, u, 2.45, 0, cz));
+  g.add(onFace(wallLamp(p), 'right', W, D, 0.6, 1.2, 0, cz));
+  for (const face of ['right', 'left'] as Face[]) {
+    for (const u of [-0.9, 0.1, 1.1]) g.add(onFace(plainWindow(p, 0.32, 0.4, dress), face, W, D, u, 2.45, 0, cz));
+    g.add(p.detail(onFace(p.box(D - 0.1, 0.07, 0.04, dress), face, W, D, 0, 2.05, 0, cz)));
+    g.add(onFace(p.box(D - 0.06, 0.22, 0.05, dress), face, W, D, 0, 0.11, 0, cz));
+  }
   g.add(at(acUnit(p), 1.4, top, cz + 0.3));
   g.add(at(vent(p), -1.5, top, cz + 0.5));
   return g;
@@ -151,6 +163,7 @@ export function buildGarage(p: Dk, _params: AssetParams): THREE.Group {
   const x0 = -3.0, x1 = 2.0, z0 = -2.45, z1 = 2.45, dw = x1 - x0, dd = z1 - z0, dcx = (x0 + x1) / 2;
   const levels = [0.95, 1.9, 2.85];
   const slab = 0.12, wallH = 0.32;
+  const stripe: RoleRef = ['dtAwning', p.pick([1, 2, 3])];
   // Ground pad, slabs, spandrel bands (the horizontal stripes of a parking deck), columns.
   g.add(at(p.box(dw, 0.04, dd, conc2), dcx, 0.02, 0));
   for (const y of levels) {
@@ -161,6 +174,8 @@ export function buildGarage(p: Dk, _params: AssetParams): THREE.Group {
     g.add(at(p.box(0.12, wallH, dd - 0.06, conc), x0 + 0.03, bandY, 0));
     g.add(at(p.box(0.12, wallH, dd - 0.06, conc), x1 - 0.03, bandY, 0));
     g.add(p.detail(at(p.box(dw + 0.08, 0.035, 0.15, STONE_DARK), dcx, y + wallH + 0.017, z1 - 0.03)));
+    g.add(at(p.box(dw + 0.07, 0.07, 0.13, stripe), dcx, bandY + 0.05, z1 - 0.03));
+    g.add(at(p.box(0.13, 0.07, dd - 0.06, stripe), x1 - 0.03, bandY + 0.05, 0));
   }
   const colXs = [x0 + 0.1, x0 + dw / 3, x0 + (2 * dw) / 3, x1 - 0.1];
   for (let l = 0; l < levels.length; l++) {
@@ -181,7 +196,7 @@ export function buildGarage(p: Dk, _params: AssetParams): THREE.Group {
   for (let i = 0; i < 3; i++) g.add(at(p.box(0.3, 0.6, 0.04, ['window', i === 1 ? 1 : 0]), tx, 0.95 + i * 0.95, z1 + 0.02));
   g.add(onFace(doorUnit(p, { w: 0.5, leaf: ['dtDoor', 2], glass: true, surround: STONE, main: false }), 'right', tw, td, 0.1, 0, tx, tz));
   const sign = new THREE.Group();
-  sign.add(at(p.box(0.62, 0.62, 0.06, ['dtSign', 4]), 0, 0, 0.03));
+  sign.add(at(p.box(0.62, 0.62, 0.06, ['dtSign', 0]), 0, 0, 0.03));
   const white: RoleRef = ['dtInk', 2];
   sign.add(at(p.box(0.08, 0.4, 0.02, white), -0.09, 0, 0.07));
   sign.add(at(p.box(0.2, 0.07, 0.02, white), 0.0, 0.165, 0.07));

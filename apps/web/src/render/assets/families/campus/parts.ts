@@ -83,6 +83,14 @@ export const halfCone = (k: KitContext, r: number, h: number, m: M, seg = 8) =>
     return g;
   }), m);
 
+/** Quarter-ish torus arc of tube radius `tube` along a dome meridian: from the front base (0, 0, r) over toward the top. */
+export const meridian = (k: KitContext, r: number, tube: number, arc: number, m: M) =>
+  custom(k, cached(`mr:${r3(r)},${r3(tube)},${r3(arc)}`, () => {
+    const g = new THREE.TorusGeometry(r, tube, 4, 8, arc);
+    g.rotateY(-Math.PI / 2);
+    return g;
+  }), m);
+
 /** Semicircular stone ring (arch) in the xy plane, springing at y = 0, extruded `depth` along z (centred). */
 export const archRing = (k: KitContext, rOut: number, rIn: number, depth: number, m: M, seg = 10) =>
   custom(k, cached(`ar:${r3(rOut)},${r3(rIn)},${r3(depth)},${seg}`, () => {
@@ -315,6 +323,10 @@ export interface PorticoOpts {
   stepDepth?: number;
   /** Round window in the tympanum. */
   oculus?: boolean;
+  /** Column shaft segments. */
+  seg?: number;
+  /** Cross-gable roof running `len` back from the pediment into the main roof (hides the pediment's back). */
+  backRoof?: { m: M; len: number };
 }
 /** Classical portico facing +z, its back on a wall at z = 0. Returns the group; extends `depth + steps*stepDepth` forward. */
 export function portico(k: KitContext, x: Mats, o: PorticoOpts): THREE.Group {
@@ -327,13 +339,17 @@ export function portico(k: KitContext, x: Mats, o: PorticoOpts): THREE.Group {
   }
   // Columns on the front line.
   const zc = o.depth - r - 0.12, span = o.width - 2 * r - 0.3;
-  for (const u of bays(o.n, span)) g.add(at(column(k, o.colH, r, x.trim), u, o.floor, zc));
+  for (const u of bays(o.n, span)) g.add(at(column(k, o.colH, r, x.trim, o.seg ?? 10), u, o.floor, zc));
   // Entablature + pediment.
   const yE = o.floor + o.colH;
   g.add(at(box(k, o.width, ent, o.depth, x.trim), 0, yE + ent / 2, o.depth / 2));
   g.add(k.detail(at(box(k, o.width + 0.06, 0.05, o.depth + 0.04, x.stone), 0, yE + 0.025, o.depth / 2 + 0.01)));
   if ((o.rise ?? 0) > 0) {
-    g.add(at(pediment(k, o.width + 0.08, o.rise!, o.depth + 0.04, x.trim), 0, yE + ent, o.depth / 2));
+    // Roof over the portico (roof-coloured, running back into the main roof when `backRoof` is set; white otherwise),
+    // fronted by a white raking cornice + tympanum.
+    const rimD = 0.16, z0 = -(o.backRoof?.len ?? 0), z1 = o.depth - rimD + 0.03;
+    g.add(at(pediment(k, o.width + 0.02, o.rise!, z1 - z0, o.backRoof?.m ?? x.trim), 0, yE + ent, (z0 + z1) / 2));
+    g.add(at(pediment(k, o.width + 0.1, o.rise! + 0.04, rimD, x.trim), 0, yE + ent, o.depth - rimD / 2 + 0.02));
     g.add(at(triPanel(k, o.width - 0.36, o.rise! - 0.12, x.stone), 0, yE + ent + 0.06, o.depth + 0.025));
     if (o.oculus ?? true) {
       const rr = Math.min(0.14, o.rise! * 0.28);
@@ -364,10 +380,11 @@ export function cupola(k: KitContext, x: Mats, s = 0.7, sink = 0): THREE.Group {
 
 /** Gold ball + spike finial standing at y. */
 export function finial(k: KitContext, x: Mats, h: number, y: number): THREE.Group {
-  const g = new THREE.Group();
-  g.add(at(k.cyl(0.018, 0.026, h * 0.55, x.gold, 6), 0, y + h * 0.275, 0));
-  g.add(at(k.sphere(h * 0.16, x.gold, 8), 0, y + h * 0.55, 0));
-  g.add(at(k.cone(h * 0.07, h * 0.4, x.gold, 6), 0, y + h * 0.8, 0));
+  const g = new THREE.Group(), r = h * 0.16;
+  g.add(at(k.cyl(0.018, 0.026, h * 0.5, x.gold, 6), 0, y + h * 0.25, 0));
+  g.add(at(k.cone(r, r, x.gold, 6).rotateX(Math.PI), 0, y + h * 0.5 + r / 2, 0)); // ball as a gold diamond
+  g.add(at(k.cone(r, r, x.gold, 6), 0, y + h * 0.5 + r * 1.5, 0));
+  g.add(at(k.cone(h * 0.06, h * 0.32, x.gold, 6), 0, y + h * 0.5 + r * 2 + h * 0.16, 0));
   return k.detail(g);
 }
 
@@ -380,14 +397,28 @@ export function chimney(k: KitContext, x: Mats, w: number, d: number, h: number)
   return g;
 }
 
-/** Stone quoins: alternating big/small stone blocks wrapping the 4 vertical corners of a block, from y0 to y1. */
-export function quoins(k: KitContext, x: Mats, b: Block, y0: number, y1: number, out = 0.022): THREE.Group {
-  const g = new THREE.Group(), n = Math.max(2, Math.round((y1 - y0) / 0.34)), step = (y1 - y0) / n;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let i = 0; i < n; i++) {
+const ALL_CORNERS: Array<[number, number]> = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+/** Stone quoins: alternating big/small stone blocks wrapping vertical corners of a block (sign pairs [sx, sz]). */
+export function quoins(k: KitContext, x: Mats, b: Block, y0: number, y1: number, corners = ALL_CORNERS, out = 0.022): THREE.Group {
+  const g = new THREE.Group(), n = Math.max(2, Math.round((y1 - y0) / 0.4)), step = (y1 - y0) / n;
+  for (const [sx, sz] of corners) for (let i = 0; i < n; i++) {
     const l = i % 2 === 0 ? 0.32 : 0.2;
     g.add(at(box(k, l, step - 0.05, l, x.stone), b.cx + sx * (b.w / 2 - l / 2 + out), y0 + step * (i + 0.5), b.cz + sz * (b.d / 2 - l / 2 + out)));
   }
   return k.detail(g);
+}
+
+/** Flat roof: a deck in `deckM` framed by a parapet ring (`wallM`) with a stone coping. Bottom at y. */
+export function flatRoof(k: KitContext, x: Mats, b: Block, y: number, h: number, wallM: M, deckM: M, t = 0.14): THREE.Group {
+  const g = new THREE.Group();
+  g.add(at(box(k, b.w - 2 * t + 0.02, 0.06, b.d - 2 * t + 0.02, deckM), b.cx, y + 0.03, b.cz));
+  for (const s of [-1, 1]) {
+    g.add(at(box(k, b.w, h, t, wallM), b.cx, y + h / 2, b.cz + s * (b.d / 2 - t / 2)));
+    g.add(at(box(k, t, h, b.d - 2 * t, wallM), b.cx + s * (b.w / 2 - t / 2), y + h / 2, b.cz));
+    g.add(at(box(k, b.w + 0.06, 0.06, t + 0.08, x.stone), b.cx, y + h + 0.03, b.cz + s * (b.d / 2 - t / 2)));
+    g.add(at(box(k, t + 0.08, 0.06, b.d - 2 * t - 0.08, x.stone), b.cx + s * (b.w / 2 - t / 2), y + h + 0.03, b.cz));
+  }
+  return g;
 }
 
 /** Thin horizontal band (string course / cornice) around a block at height y. */
@@ -413,4 +444,12 @@ export function roundel(k: KitContext, x: Mats, r: number): THREE.Group {
   g.add(at(panel(k, 0.035, r * 2, x.trim), 0, 0, 0.03));
   g.add(at(panel(k, r * 2, 0.035, x.trim), 0, 0, 0.03));
   return g;
+}
+
+/** Clipped cone topiary in a stone planter (flanks entrances). Base at y = 0. */
+export function topiary(k: KitContext, x: Mats): THREE.Group {
+  const g = new THREE.Group();
+  g.add(at(box(k, 0.32, 0.24, 0.32, x.stone), 0, 0.12, 0));
+  g.add(at(k.cone(0.18, 0.62, k.mat('leaf', 2), 8), 0, 0.24 + 0.31, 0));
+  return k.detail(g);
 }

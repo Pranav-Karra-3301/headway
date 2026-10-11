@@ -3,7 +3,7 @@
 // boxes. 6 × 3.5 footprint, about 4.6 tall (pediment ≈ 5.1), front toward +z.
 import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
-import { at, band, box, bays, door, mats, onFace, panel, pediment, roundel, sash, triPanel, type Block, type Face, type Mats } from './parts';
+import { at, band, box, bays, door, flatRoof, mats, onFace, panel, pediment, roundel, sash, topiary, triPanel, type Block, type Face, type Mats } from './parts';
 import { pick } from './pick';
 
 const BASE = 0.26, F1 = 1.14, F = 1.04, TOP = BASE + F1 + 3 * F; // 4.52
@@ -21,9 +21,8 @@ export function buildDorm(k: KitContext, p: AssetParams): THREE.Group {
   g.add(k.detail(band(k, body, BASE + F1 + F + 0.02, 0.05, 0.02, x.stone)));
   g.add(k.detail(band(k, body, BASE + F1 + 2 * F + 0.02, 0.05, 0.02, x.stone)));
   g.add(band(k, body, TOP + 0.05, 0.14, 0.07, x.trim));
-  // Parapet with coping; roof colour reads as the coping band.
-  g.add(at(box(k, body.w - 0.02, 0.26, body.d - 0.02, x.brick), 0, TOP + 0.25, body.cz));
-  g.add(at(box(k, body.w + 0.06, 0.07, body.d + 0.06, x.roof), 0, TOP + 0.4, body.cz));
+  // Flat roof deck framed by a brick parapet with stone coping.
+  g.add(flatRoof(k, x, body, TOP + 0.12, 0.26, x.brick, x.roof));
 
   // Entrance bay: slightly proud, full height, pediment above the parapet.
   g.add(at(box(k, bay.w, TOP - BASE - F1, bay.d + 0.02, x.brick), bay.cx, BASE + F1 + (TOP - BASE - F1) / 2, bay.cz - 0.01));
@@ -32,19 +31,21 @@ export function buildDorm(k: KitContext, p: AssetParams): THREE.Group {
   g.add(k.detail(at(triPanel(k, bay.w - 0.2, 0.34, x.stone), 0, TOP + 0.18, bay.cz + 0.075)));
   g.add(k.detail(at(roundel(k, x, 0.12), 0, TOP + 0.33, bay.cz + 0.08)));
   g.add(onFace(door(k, x, { w: 0.72, h: 1.02, double: true, surround: 'pediment', step: true }), body, 'front', 0, 0, 0.14));
+  for (const s of [-1, 1]) g.add(onFace(topiary(k, x), body, 'front', s * 0.98, 0, 0.3));
 
   // Windows: five bays front/back, two per side, four storeys.
   const ys = [BASE + 0.58, BASE + F1 + 0.5, BASE + F1 + F + 0.5, BASE + F1 + 2 * F + 0.5];
   const front = [-2.3, -1.2, 0, 1.2, 2.3], back = bays(5, 4.6);
   ys.forEach((y, i) => {
-    for (const u of front) if (!(i === 0 && u === 0)) g.add(onFace(dormWindow(k, x, i === 0, u === 0), body, 'front', u, y, u === 0 ? 0.14 : 0));
-    for (const u of back) g.add(onFace(dormWindow(k, x, i === 0, false), body, 'back', u, y));
-    for (const f of ['left', 'right'] as Face[]) for (const u of [-0.65, 0.65]) g.add(onFace(dormWindow(k, x, i === 0, false), body, f, u, y));
+    const out = i === 0 ? 0.026 : 0; // ground floor windows sit on the limestone cladding
+    for (const u of front) if (!(i === 0 && u === 0)) g.add(onFace(dormWindow(k, x, i === 0, u === 0), body, 'front', u, y, u === 0 ? 0.14 : out));
+    for (const u of back) g.add(onFace(dormWindow(k, x, i === 0, false), body, 'back', u, y, out));
+    for (const f of ['left', 'right'] as Face[]) for (const u of [-0.65, 0.65]) g.add(onFace(dormWindow(k, x, i === 0, false), body, f, u, y, out));
   });
 
   // Roof: stair hut + vents.
-  g.add(at(box(k, 0.95, 0.5, 0.85, x.brick), 1.6, TOP + 0.5, body.cz - 0.5));
-  g.add(at(box(k, 1.05, 0.07, 0.95, x.roof), 1.6, TOP + 0.78, body.cz - 0.5));
+  g.add(at(box(k, 0.95, 0.5, 0.85, x.brick), 1.6, TOP + 0.4, body.cz - 0.5));
+  g.add(at(box(k, 1.05, 0.07, 0.95, x.stone), 1.6, TOP + 0.68, body.cz - 0.5));
   for (const vx of [-1.4, -0.9]) g.add(k.detail(at(k.cyl(0.08, 0.08, 0.28, k.mat('cpMetal'), 8), vx, TOP + 0.38, body.cz - 0.6)));
   return g;
 }

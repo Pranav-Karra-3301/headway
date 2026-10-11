@@ -56,7 +56,7 @@ export function buildWaterTower(k: Kit, _params: AssetParams): THREE.Object3D {
   tank.add(at(cyl(k, TANK_R + 0.015, TANK_R + 0.015, 0.36, 'lmTankBand', 0, 28), 0, TANK_Y0 + 0.66, 0));
   tank.add(k.detail(at(cyl(k, TANK_R + 0.02, TANK_R + 0.02, 0.05, 'lmTank', 0, 28), 0, TANK_Y0 + 0.88, 0)));
   tank.add(k.detail(at(cyl(k, TANK_R + 0.02, TANK_R + 0.02, 0.05, 'lmTank', 0, 28), 0, TANK_Y0 + 0.44, 0)));
-  for (const a of [0, Math.PI / 2]) {
+  for (const a of [0, Math.PI]) {
     const em = group('emblem');
     em.add(at(disc(k, 0.24, 0.03, 'lmTank', 0, 16), 0, 0, 0));
     em.add(at(disc(k, 0.16, 0.03, 'lmTankBand', 0, 16), 0, 0, 0.012));

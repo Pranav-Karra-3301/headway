@@ -182,5 +182,10 @@ export function bush(k: K, r: number, idx: number, x: number, z: number, y0 = 0)
   return at(b, x, y0 + r * 0.86, z);
 }
 
-/** xorshift-free pick helper: integer in [0, n) from a 0..1 random. */
+/** Integer in [0, n) from a 0..1 random. */
 export const pick = (r: number, n: number): number => Math.min(n - 1, Math.floor(r * n));
+
+/** Siding index that clashes with a roof index (same hue family in Wooden Toy: coral/blush, mustard/butter). */
+const CLASH: Record<number, number> = { 0: 2, 2: 3 };
+/** Siding indices (of 4) that sit well under a roof index. */
+export const sidingsFor = (roof: number): number[] => [0, 1, 2, 3].filter((i) => i !== CLASH[((roof % 3) + 3) % 3]);

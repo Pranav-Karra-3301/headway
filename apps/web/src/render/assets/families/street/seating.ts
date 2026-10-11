@@ -2,20 +2,28 @@
 import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
 import { variants } from './roles';
-import { at, bar, box, coneSector, group, pick, rotX } from './prims';
+import { at, box, coneSector, extrude, group, pick, rotX, rotY, rotZ } from './prims';
 
-/** Park bench (1.2 × 0.5): three wooden seat slats, two back slats, dark iron side frames with armrests. Sits facing +z. */
+/** Cast-iron bench side in the z-y plane (front at +z): front leg, seat rail, raked back leg rising into the back support. */
+function benchSide(): THREE.Shape {
+  const pts: Array<[number, number]> = [[0.18, 0], [0.18, 0.255], [-0.125, 0.255], [-0.185, 0.52], [-0.235, 0.51], [-0.17, 0], [-0.115, 0], [-0.09, 0.205], [0.13, 0.205], [0.13, 0]];
+  const s = new THREE.Shape();
+  pts.forEach(([u, v], i) => (i ? s.lineTo(u, v) : s.moveTo(u, v)));
+  s.closePath();
+  return s;
+}
+
+/** Park bench (1.2 × 0.5): three wooden seat slats, two raked back slats, cast-iron sides with armrests. Faces +z. */
 export function buildBench(k: KitContext, _p: AssetParams): THREE.Object3D {
   const iron = k.mat('post'), wood = k.mat('bench');
   const g = group('st.bench');
-  for (const z of [0.13, 0.015, -0.1]) g.add(at(box(k, 1.16, 0.04, 0.1, wood), 0, 0.255, z));
-  for (const y of [0.35, 0.455]) g.add(at(rotX(box(k, 1.16, 0.085, 0.03, wood), -0.14), 0, y, -0.175 - (y - 0.35) * 0.14));
+  for (const z of [0.14, 0.03, -0.08]) g.add(at(box(k, 1.16, 0.04, 0.1, wood), 0, 0.275, z));
+  const rake = Math.atan2(0.06, 0.265);
+  for (const y of [0.37, 0.47]) g.add(at(rotX(box(k, 1.16, 0.08, 0.03, wood), -rake), 0, y, -0.125 - (0.06 * (y - 0.255)) / 0.265 + 0.012));
   for (const x of [-0.47, 0.47]) {
-    g.add(at(box(k, 0.05, 0.24, 0.05, iron), x, 0.12, 0.14));
-    g.add(bar(k, [x, 0, -0.13], [x, 0.5, -0.205], 0.026, iron, 4));
-    g.add(at(box(k, 0.05, 0.04, 0.36, iron), x, 0.215, -0.01));
-    g.add(k.detail(at(box(k, 0.055, 0.035, 0.32, iron), x, 0.37, -0.02)));
-    g.add(k.detail(at(box(k, 0.04, 0.13, 0.04, iron), x, 0.3, 0.12)));
+    g.add(at(rotY(extrude(k, 'benchSide', benchSide, 0.04, iron, 0.006, 1), -Math.PI / 2), x, 0.006, 0));
+    g.add(k.detail(at(box(k, 0.055, 0.035, 0.33, iron), x, 0.385, -0.02)));
+    g.add(k.detail(at(box(k, 0.04, 0.12, 0.04, iron), x, 0.32, 0.12)));
   }
   return g;
 }
@@ -41,7 +49,8 @@ export function buildTableUmbrella(k: KitContext, p: AssetParams): THREE.Object3
     const chair = group('chair');
     chair.add(at(k.cyl(0.1, 0.1, 0.03, paint, 10), 0, 0.25, 0));
     chair.add(at(k.cyl(0.018, 0.022, 0.24, iron, 5), 0, 0.12, 0));
-    chair.add(at(box(k, 0.03, 0.17, 0.2, iron), 0.105, 0.37, 0));
+    chair.add(at(rotZ(box(k, 0.025, 0.13, 0.17, paint), -0.18), 0.1, 0.34, 0));
+    chair.add(k.detail(at(rotZ(box(k, 0.02, 0.1, 0.02, iron), -0.18), 0.095, 0.295, 0)));
     chair.add(k.detail(at(k.cyl(0.07, 0.08, 0.02, iron, 8), 0, 0.01, 0)));
     chair.position.x = s * 0.43;
     chair.rotation.y = s > 0 ? 0 : Math.PI;

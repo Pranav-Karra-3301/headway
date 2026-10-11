@@ -15,7 +15,7 @@ export const ROLES: RoleColors = {
   tire: fromPalette('tire'),
   hub: fromPalette('hub'),
   taillight: fromPalette('taillight'), // red signal lens (glows at dusk like tail lights)
-  stPaint: ['#FFF8EC', '#F5EFE3', '#FFFFFF'], // white paint: pickets, café tables, emblems
+  stPaint: ['#FFFBF3', '#F7F2E8', '#FFFFFF'], // white paint: pickets, café tables, emblems
   stStone: ['#EEE5D4', '#DCCFB6', '#E3DED2'], // light stone: fountain, flag plinth
   stWater: ['#8FD5EA', '#9CC9C8', '#A3C7E2'],
   stFoam: ['#E6F7FB', '#EAF2EE', '#F1F7FB'], // falling water, jets

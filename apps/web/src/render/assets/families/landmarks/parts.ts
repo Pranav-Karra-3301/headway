@@ -1,5 +1,5 @@
 // Owner: A4. Shared building blocks for the landmark builders. Everything goes through the KitContext materials
-// (so the composer's clay materials apply); custom geometries are indexed with position/normal/uv like the
+// (so the composer's clay materials apply); custom geometries are indexed and carry position/normal/uv like the
 // stock three.js primitives, so they merge cleanly with them. No geometry is shared between meshes.
 import * as THREE from 'three';
 import type { KitContext } from '../../types';

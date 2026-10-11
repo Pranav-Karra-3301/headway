@@ -2,14 +2,14 @@
 import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
 import {
-  at, band, box, bays, chimney, cupola, door, gableRoof, hipRoof, mats, onFace, pediment, portico, quoins, sash, sashRow,
-  roundel, triPanel, type Block, type Mats,
+  at, band, box, bays, chimney, cupola, door, gableRoof, hipRoof, mats, onFace, panel, pediment, portico, quoins, roundel, sash,
+  sashRow, topiary, triPanel, type Block, type Mats,
 } from './parts';
 import { pick } from './pick';
 
 const W = 6.5, D = 2.5, BASE = 0.24, G1 = 1.22, G2 = 1.1, EAVE = BASE + G1 + G2;
 const CZ = -0.42; // body centre: front wall at z = 0.83, portico + steps in front of it
-const ROOF_RISE = 0.95, TOP = EAVE + 0.12; // roof springs from the cornice top
+const ROOF_RISE = 0.9, TOP = EAVE + 0.12; // roof springs from the cornice top
 
 /**
  * params: `variant` 0 = hip roof + cupola + giant portico, 1 = gable roof + paired end chimneys + giant portico,
@@ -35,7 +35,7 @@ export function buildHall(k: KitContext, p: AssetParams): THREE.Group {
   } else {
     g.add(at(hipRoof(k, W + 0.3, D + 0.3, ROOF_RISE, x.roof), 0, TOP, CZ));
     for (const sx of [-1, 1]) g.add(at(chimney(k, x, 0.36, 0.3, 1.05), sx * 2.35, TOP - 0.1, CZ - 0.38));
-    if (variant === 0) g.add(at(cupola(k, x, 0.62, 0.24), 0, TOP + ROOF_RISE - 0.24, CZ));
+    if (variant === 0) g.add(at(cupola(k, x, 0.7, 0.26), 0, TOP + ROOF_RISE - 0.26, CZ));
   }
 
   // Front: entrance + windows either side.
@@ -47,9 +47,13 @@ export function buildHall(k: KitContext, p: AssetParams): THREE.Group {
     g.add(onFace(dormers(k, x), body, 'front', 0, 0));
     g.add(k.detail(onFace(roundel(k, x, 0.2), body, 'front', 0, yB + 0.2)));
   } else {
-    g.add(onFace(portico(k, x, { n: 4, width: 2.5, depth: 0.78, floor: BASE, colH: EAVE - 0.18 - BASE, r: 0.11, ent: 0.3, rise: 0.62, steps: 2, stepDepth: 0.12 }), body, 'front', 0, 0));
+    g.add(onFace(portico(k, x, {
+      n: 4, width: 2.5, depth: 0.78, floor: BASE, colH: EAVE - 0.18 - BASE, r: 0.11, ent: 0.3, rise: 0.62, steps: 2, stepDepth: 0.12,
+      backRoof: { m: x.roof, len: 1.25 },
+    }), body, 'front', 0, 0));
     g.add(onFace(door(k, x, { w: 0.72, h: 1.12, double: true, surround: 'plain', step: false }), body, 'front', 0, BASE));
     g.add(onFace(sash(k, x, ww, hB, { sill: false }), body, 'front', 0, yB));
+    for (const s of [-1, 1]) g.add(onFace(topiary(k, x), body, 'front', s * 1.45, 0, 0.42));
   }
 
   // Back and sides.
@@ -77,10 +81,11 @@ function dormers(k: KitContext, x: Mats): THREE.Group {
   const y0 = TOP + (t - 0.15) * slope - 0.06;
   for (const u of [-1.7, 1.7]) {
     const d = new THREE.Group();
-    d.add(at(box(k, 0.56, 0.5, 0.9, x.trim), 0, 0.25, -0.45));
+    d.add(at(box(k, 0.56, 0.5, 0.9, x.roof), 0, 0.25, -0.45));
+    d.add(at(panel(k, 0.5, 0.48, x.trim), 0, 0.25, 0.005));
     d.add(at(pediment(k, 0.72, 0.26, 1.0, x.roof), 0, 0.5, -0.47));
-    d.add(k.detail(at(triPanel(k, 0.5, 0.17, x.trim), 0, 0.53, 0.035)));
-    d.add(at(sash(k, x, 0.32, 0.3, { sill: false }), 0, 0.24, 0));
+    d.add(k.detail(at(triPanel(k, 0.52, 0.18, x.trim), 0, 0.53, 0.035)));
+    d.add(at(sash(k, x, 0.3, 0.3, { sill: false }), 0, 0.25, 0.005));
     g.add(at(d, u, y0, -t + 0.15));
   }
   return g;

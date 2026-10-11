@@ -1,16 +1,18 @@
 // Owner: A3. res.house — a gabled clapboard cottage with chimney, porch and a stepping-stone path (2.5 × 2.5).
 // Params (all optional, otherwise seeded per placement): wall (siding idx 0-3), roof (idx 0-2),
-// style ('side' gable eaves to the street | 'front' gable end to the street), porch ('left' | 'right').
+// style ('side' gable eaves to the street | 'front' gable end to the street), porch ('left' | 'right'),
+// dormer (boolean, side-gable only).
 import * as THREE from 'three';
 import type { AssetParams } from '../../types';
-import { at, big, box, bush, cyl, doorUnit, gable, type K, onFace, pick, soft, windowUnit } from './parts';
+import { at, big, box, bush, cyl, doorUnit, gable, type K, onFace, pick, sidingsFor, soft, windowUnit } from './parts';
 
 const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d);
 
 export function house(k: K, p: AssetParams): THREE.Group {
-  const r = Array.from({ length: 8 }, () => k.rand());
-  const wall = num(p.wall, pick(r[0]!, 4));
+  const r = Array.from({ length: 9 }, () => k.rand());
   const roof = num(p.roof, pick(r[1]!, 3));
+  const ok = sidingsFor(roof);
+  const wall = num(p.wall, ok[pick(r[0]!, ok.length)]!);
   const frontGable = p.style === 'front' || (p.style !== 'side' && r[2]! < 0.45);
   const side = p.porch === 'left' ? -1 : p.porch === 'right' ? 1 : r[3]! < 0.5 ? -1 : 1;
   const acc = pick(r[4]!, 4);
@@ -37,6 +39,13 @@ export function house(k: K, p: AssetParams): THREE.Group {
     for (const f of ['left', 'right'] as const) g.add(onFace(windowUnit(k, 0.3, 0.3, lit(f === 'left' ? 7 : 8), { sill: false }), f, w, d, 0, h + 0.3, 0, cz));
     g.add(at(soft(k, 0.26, 1.0, 0.26, 0.04, 'brick'), -side * 0.58, h + 0.5, cz - 0.28));
     g.add(k.detail(at(box(k, 0.32, 0.05, 0.32, 'resStone'), -side * 0.58, h + 1.02, cz - 0.28)));
+    if (p.dormer === true || (p.dormer !== false && r[8]! < 0.6)) {
+      // Dormer on the street slope, above the window side: little box, its own gable, one window.
+      const dx = -side * 0.4, dz = fz - 0.53, dh = 0.4, dy = h + 0.18;
+      g.add(at(soft(k, 0.62, dh, 0.62, 0.03, 'resSiding', wall), dx, dy + dh / 2, dz));
+      gable(k, g, { w: 0.62, d: 0.62, y: dy + dh, x: dx, z: dz, rise: 0.2, ridge: 'z', roofIdx: roof, endRole: 'resSiding', endIdx: wall, over: 0.06, thick: 0.07 });
+      g.add(at(windowUnit(k, 0.3, 0.24, lit(6), { sill: false, mullion: false }), dx, dy + 0.21, dz + 0.31));
+    }
   }
 
   // Porch on the door side: deck, two posts, a little roof, steps.
@@ -53,7 +62,7 @@ export function house(k: K, p: AssetParams): THREE.Group {
 
   // Windows: front (with shutters or flowers), sides, back.
   const shut = r[6]! < 0.55;
-  g.add(onFace(windowUnit(k, 0.46, 0.5, lit(0), shut ? { shutters: acc } : { flowers: pick(r[7]!, 4) }), 'front', w, d, -side * 0.5, 0.74, 0, cz));
+  g.add(onFace(windowUnit(k, 0.46, 0.5, lit(0), shut ? { shutters: acc } : { flowers: [0, 3, 2][pick(r[7]!, 3)]! }), 'front', w, d, -side * 0.5, 0.74, 0, cz));
   for (const f of ['left', 'right'] as const) g.add(onFace(windowUnit(k, 0.46, 0.46, lit(f === 'left' ? 1 : 2)), f, w, d, 0, 0.72, 0, cz));
   for (const [i, u] of [-0.5, 0.5].entries()) g.add(onFace(windowUnit(k, 0.46, 0.46, lit(3 + i)), 'back', w, d, u, 0.72, 0, cz));
 

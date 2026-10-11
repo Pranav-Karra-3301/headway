@@ -1,5 +1,5 @@
 // Owner: A5. Low vegetation: bush clusters, clipped hedges, flowerbeds and street planters.
-// Flowers are tiny inverted cones ("cups") sitting on a surface: cheap (18 triangles) and read as dots of colour.
+// Flowers are tiny flat inverted cones ("cups") sitting on a surface: cheap (12 triangles), read as dots of colour.
 import * as THREE from 'three';
 import type { AssetParams, KitContext } from '../../types';
 import { at, choices, int, keyed, rooted, squash, weighted } from './util';
@@ -7,7 +7,7 @@ import { at, choices, int, keyed, rooted, squash, weighted } from './util';
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** A flower cup at `p` opening along the surface normal `n`. */
-function cup(k: KitContext, m: THREE.Material, p: THREE.Vector3, n: THREE.Vector3, r = 0.06, h = 0.1): THREE.Mesh {
+function cup(k: KitContext, m: THREE.Material, p: THREE.Vector3, n: THREE.Vector3, r = 0.065, h = 0.05): THREE.Mesh {
   const c = k.cone(r, h, m, 6);
   const nn = n.clone().normalize();
   c.quaternion.setFromUnitVectors(UP, nn.clone().negate());
@@ -46,7 +46,7 @@ export function buildBush(k: KitContext, params: AssetParams): THREE.Object3D {
     const fl = k.mat('vegFlower', bloom), c = new THREE.Vector3(x, y, z), a = new THREE.Vector3(rad, rad * BUSH_SQUASH, rad);
     for (let i = 0; i < L.flowers; i++) {
       const { p, n } = onEllipsoid(c, a, i * 2.39996 + shape, 0.45 + (i % 3) * 0.3);
-      g.add(k.detail(cup(k, fl, p, n, 0.055, 0.09)));
+      g.add(k.detail(cup(k, fl, p, n, 0.06, 0.045)));
     }
   }
   return rooted('veg.bush', key, g);
@@ -70,7 +70,7 @@ export function buildHedge(k: KitContext, params: AssetParams): THREE.Object3D {
       const side = i % 3; // top, front, back
       const p = side === 0 ? new THREE.Vector3(x, H, (d() - 0.5) * 0.3) : new THREE.Vector3(x, 0.34 + d() * 0.26, side === 1 ? D / 2 : -D / 2);
       const nrm = side === 0 ? UP : new THREE.Vector3(0, 0, side === 1 ? 1 : -1);
-      g.add(k.detail(cup(k, fl, p, nrm, 0.055, 0.09)));
+      g.add(k.detail(cup(k, fl, p, nrm, 0.06, 0.045)));
     }
   }
   return rooted('veg.hedge', key, g);
@@ -80,8 +80,8 @@ export function buildHedge(k: KitContext, params: AssetParams): THREE.Object3D {
 const BED_PAIRS: readonly (readonly [number, number])[] = [[0, 2], [1, 4], [3, 2], [0, 1], [4, 1]];
 /** Flower spots in mound-unit coordinates (u along x, v along z), 2 staggered rows. */
 const BED_SPOTS: readonly (readonly [number, number])[] = [
-  [-0.74, -0.32], [-0.46, 0.36], [-0.3, -0.42], [-0.04, 0.3], [0.14, -0.36], [0.42, 0.34], [0.6, -0.3], [0.78, 0.18],
-  [-0.62, 0.06], [-0.16, -0.02], [0.3, 0.02], [0.66, -0.02],
+  [-0.78, -0.18], [-0.6, 0.4], [-0.48, -0.5], [-0.3, 0.12], [-0.14, -0.38], [0.02, 0.52], [0.12, -0.04], [0.26, -0.56],
+  [0.36, 0.34], [0.52, -0.2], [0.68, 0.36], [0.8, -0.06], [-0.68, 0.0], [-0.12, 0.3], [0.4, 0.0], [-0.38, -0.12],
 ];
 
 export function buildFlowerbed(k: KitContext, params: AssetParams): THREE.Object3D {
@@ -91,8 +91,8 @@ export function buildFlowerbed(k: KitContext, params: AssetParams): THREE.Object
   const g = new THREE.Group();
   g.add(squash(at(k.cyl(1, 1, 0.14, k.mat('vegEdge'), 20), 0, 0.07, 0), 0.98, 1, 0.48));
   g.add(squash(at(k.cyl(1, 1, 0.04, k.mat('vegSoil'), 20), 0, 0.14, 0), 0.9, 1, 0.41));
-  const mound = new THREE.Vector3(0.82, 0.15, 0.33), c = new THREE.Vector3(0, 0.15, 0);
-  g.add(squash(at(k.sphere(1, k.mat('vegBush', tone), 12), c.x, c.y, c.z), mound.x, mound.y, mound.z));
+  const mound = new THREE.Vector3(0.84, 0.17, 0.36), c = new THREE.Vector3(0, 0.17, 0);
+  g.add(squash(at(k.sphere(1, k.mat('vegBed', tone), 12), c.x, c.y, c.z), mound.x, mound.y, mound.z));
   const [a, b] = BED_PAIRS[pair]!;
   const ca = k.mat('vegFlower', a), cb = k.mat('vegFlower', b);
   BED_SPOTS.forEach(([u, v], i) => {
@@ -101,7 +101,7 @@ export function buildFlowerbed(k: KitContext, params: AssetParams): THREE.Object
     const n = new THREE.Vector3(u / mound.x, w / mound.y, v / mound.z);
     // patterns: 0 = mixed, 1 = front/back rows, 2 = drift of one colour with a few accents
     const useB = pattern === 0 ? i % 2 === 1 : pattern === 1 ? v > 0.1 : i % 4 === 3;
-    g.add(cup(k, useB ? cb : ca, p, n, 0.065, 0.1));
+    g.add(cup(k, useB ? cb : ca, p, n, 0.075, 0.05));
   });
   return rooted('veg.flowerbed', key, g);
 }
@@ -117,25 +117,27 @@ export function buildPlanter(k: KitContext, params: AssetParams): THREE.Object3D
   let top: number;
   if (pot === 0) {
     g.add(at(k.rbox(0.84, 0.44, 0.84, 0.08, pm), 0, 0.22, 0));
-    top = 0.44;
+    g.add(at(k.cyl(0.35, 0.35, 0.02, k.mat('vegSoil'), 12), 0, 0.445, 0));
+    top = 0.45;
   } else {
     g.add(at(k.cyl(0.37, 0.29, 0.42, pm, 14), 0, 0.21, 0));
     g.add(at(k.cyl(0.41, 0.41, 0.08, pm, 14), 0, 0.42, 0));
+    g.add(at(k.cyl(0.35, 0.35, 0.02, k.mat('vegSoil'), 12), 0, 0.455, 0));
     top = 0.46;
   }
   const green = k.mat('vegBush', tone);
   if (shrub === 0) {
-    g.add(squash(at(k.sphere(0.33, green, 14), 0, top + 0.3, 0), 1, 0.94));
+    g.add(squash(at(k.sphere(0.33, green, 13), 0, top + 0.3, 0), 1, 0.94));
   } else if (shrub === 1) {
     g.add(at(k.cyl(0.035, 0.045, 0.14, k.mat('trunk'), 6), 0, top + 0.05, 0));
     g.add(at(k.cone(0.29, 0.54, k.mat('pine', tone % 2), 14), 0, top + 0.1 + 0.27, 0));
   } else if (shrub === 2) {
     const c = new THREE.Vector3(0, top + 0.06, 0), a = new THREE.Vector3(0.36, 0.18, 0.36);
-    g.add(squash(at(k.sphere(0.36, green, 11), c.x, c.y, c.z), 1, 0.5));
+    g.add(squash(at(k.sphere(0.36, k.mat('vegBed', tone), 11), c.x, c.y, c.z), 1, 0.5));
     const fl = k.mat('vegFlower', bloom), fl2 = k.mat('vegFlower', 2);
     for (let i = 0; i < 7; i++) {
-      const { p, n } = i === 0 ? onEllipsoid(c, a, 0, 0) : onEllipsoid(c, a, i * 1.047 + 0.3, 0.95);
-      g.add(cup(k, i % 3 === 2 ? fl2 : fl, p, n, 0.065, 0.1));
+      const { p, n } = i === 0 ? onEllipsoid(c, a, 0, 0) : onEllipsoid(c, a, i * 1.047 + 0.3, 0.72);
+      g.add(cup(k, i % 3 === 2 ? fl2 : fl, p, n, 0.075, 0.05));
     }
   } else {
     const alt = k.mat('vegBush', (tone + 1) % 3);

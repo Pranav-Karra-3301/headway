@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { AssetParams } from '../../types';
 import {
   acUnit, at, bladeSign, cafeTable, chimney, cornice, doorUnit, Dk, flatRoof, flowerBox, IRON, onFace, parapetCrest, plainWindow,
-  pottedShrub, scheme, signBoard, skylight, STONE, STONE_DARK, stairHut, storefront, TRIM, vent, waterTank, windowUnit,
+  pottedShrub, roofGarden, scheme, signBoard, skylight, STONE, STONE_DARK, stairHut, storefront, TRIM, vent, wallLamp, waterTank, windowUnit,
   type Face, type ParapetStyle, type RoleRef, type Scheme, type V2,
 } from './parts';
 
@@ -30,7 +30,7 @@ function roofClutter(g: THREE.Group, p: Dk, y: number, x0: number, x1: number, z
     if (kind === 0) g.add(at(acUnit(p), x, y, z));
     else if (kind === 1) g.add(at(vent(p), x, y, z));
     else if (kind === 2 && x1 - x0 > 1.6) g.add(at(skylight(p, 0.7, 0.55), x, y, z));
-    else g.add(at(chimney(p, wall, 0.4), x, y, z));
+    else g.add(at(chimney(p, wall, 0.32), x, y, z));
   }
 }
 
@@ -62,14 +62,17 @@ export function buildShop(p: Dk, params: AssetParams): THREE.Group {
   const g = new THREE.Group();
   const s = scheme(p);
   const storeys = params.storeys === 1 || params.storeys === 2 ? params.storeys : p.chance(0.7) ? 2 : 1;
-  const W = 2.9, D = 2.45, cz = -1.5 + D / 2, fz = cz + D / 2;
+  const W = 2.9, D = 2.4, cz = -1.45 + D / 2, fz = cz + D / 2;
   const H = storeys === 2 ? G + S + FRIEZE : G + 0.8;
   g.add(at(p.rbox(W, H, D, 0.08, s.wall), 0, H / 2, cz));
   const door = p.pick(['left', 'right', 'center'] as const);
   g.add(at(storefront(p, W - 0.16, G, { scheme: s, door, sign: storeys === 2 }), 0, 0, fz));
   if (storeys === 2) {
     const layout = p.int(3);
-    if (layout === 0) upperWindows(g, p, 'front', W, D, 0, cz, [-0.7, 0.7], G, 1, 0.5, 0.62, s);
+    if (layout === 0) {
+      upperWindows(g, p, 'front', W, D, 0, cz, [-0.7, 0.7], G, 1, 0.5, 0.62, s);
+      if (p.chance(0.5)) for (const u of [-0.7, 0.7]) g.add(at(flowerBox(p, 0.6, p.int(5)), u, G + 0.17, fz + 0.02));
+    }
     else if (layout === 1) upperWindows(g, p, 'front', W, D, 0, cz, [-0.85, 0, 0.85], G, 1, 0.4, 0.62, s, p.chance(0.5));
     else g.add(at(windowUnit(p, 1.5, 0.6, { lintel: dressing(s), sill: dressing(s), bars: 'v' }), 0, G + 0.52, fz));
     if (p.chance(0.55)) {
@@ -84,9 +87,12 @@ export function buildShop(p: Dk, params: AssetParams): THREE.Group {
   const crest = p.pick<ParapetStyle>(['flat', 'stepped', 'peak', 'arch']);
   const top = flatRoof(g, p, W, D, H, 0, cz, p.int(2), dressing(s));
   g.add(at(parapetCrest(p, W, crest, s.wall, dressing(s)), 0, H + 0.1, fz - 0.02));
-  roofClutter(g, p, top, -W / 2 + 0.3, W / 2 - 0.3, cz - D / 2 + 0.3, fz - 0.45, s.wall, 1 + p.int(2));
+  if (p.chance(0.3)) g.add(at(roofGarden(p, 1.6), p.range(-0.3, 0.3), top, cz - 0.55));
+  else roofClutter(g, p, top, -W / 2 + 0.3, W / 2 - 0.3, cz - D / 2 + 0.3, fz - 0.45, s.wall, 1 + p.int(2));
   // Back: service door + windows; exposed right side may carry a faded painted ad.
   g.add(onFace(doorUnit(p, { w: 0.5, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', W, D, 0.7, 0, 0, cz));
+  g.add(onFace(wallLamp(p), 'back', W, D, 0.7, 1.2, 0, cz));
+  g.add(onFace(plainWindow(p, 0.5, 0.4, dressing(s)), 'back', W, D, -0.5, 0.75, 0, cz));
   if (storeys === 2) for (const u of [-0.7, 0.4]) g.add(onFace(plainWindow(p, 0.46, 0.55, dressing(s)), 'back', W, D, u, G + 0.5, 0, cz));
   if (s.brick && p.chance(0.4)) g.add(onFace(ghostSign(p, 1.3, Math.min(0.7, H - G - 0.1), s), 'right', W, D, 0, (H + G) / 2 + 0.05, 0, cz));
   if (p.chance(0.5)) g.add(at(pottedShrub(p), door === 'right' ? -1.18 : 1.18, 0, fz + 0.32));
@@ -104,26 +110,32 @@ export function buildShopRow(p: Dk, _params: AssetParams): THREE.Group {
   const tall = p.int(3);
   let x = -total / 2;
   let prevAwning = -1;
+  let roundUsed = false;
   widths.forEach((uw, i) => {
     const s = scheme(p);
     if (s.awning === prevAwning) s.awning = (s.awning + 1) % 5;
     prevAwning = s.awning;
-    const fz = 0.95, W = uw - gap, D = 2.45 - p.range(0, 0.15), cx = x + uw / 2, cz = fz - D / 2;
+    const fz = 0.95, W = uw - gap, D = 2.4 - p.range(0, 0.15), cx = x + uw / 2, cz = fz - D / 2;
     const storeys = i === tall ? 2 : 1;
     const H = G + S * storeys + (storeys === 2 ? 0.12 : FRIEZE);
     g.add(at(p.soft(W, H, D, 0.08, s.wall), cx, H / 2, cz));
     const door = p.pick(['left', 'right', 'center'] as const);
-    g.add(at(storefront(p, W - 0.14, G, { scheme: s, door, awning: p.pick(['shed', 'round', s.striped ? 'shed' : 'none'] as const) }), cx, 0, fz));
+    let aw = p.pick(['shed', 'round', s.striped ? 'shed' : 'none'] as const);
+    if (aw === 'round' && roundUsed) aw = 'shed';
+    roundUsed ||= aw === 'round';
+    g.add(at(storefront(p, W - 0.14, G, { scheme: s, door, awning: aw }), cx, 0, fz));
     const n = W > 2.3 ? 3 : 2, span = W - 0.9;
     const us = n === 3 ? [-span / 2, 0, span / 2] : [-span / 3, span / 3];
-    upperWindows(g, p, 'front', W, D, cx, cz, us, G, storeys, n === 3 ? 0.4 : 0.48, 0.6, s, storeys === 1 && p.chance(0.4));
+    upperWindows(g, p, 'front', W, D, cx, cz, us, G, storeys, n === 3 ? 0.4 : 0.44, 0.6, s, storeys === 1 && n === 2 && p.chance(0.5));
     g.add(at(cornice(p, W - 0.08, dressing(s), false), cx, H, fz));
     const top = flatRoof(g, p, W, D, H, cx, cz, p.int(2), dressing(s));
     if (storeys === 1) g.add(at(parapetCrest(p, W, p.pick<ParapetStyle>(['stepped', 'peak', 'arch', 'flat']), s.wall, dressing(s)), cx, H + 0.1, fz - 0.02));
     if (storeys === 1) roofClutter(g, p, top, cx - W / 2 + 0.3, cx + W / 2 - 0.3, cz - D / 2 + 0.3, fz - 0.4, s.wall, 1);
     if (storeys === 2 && p.chance(0.5)) g.add(at(bladeSign(p, s.sign, s.ink, 'board'), cx + (door === 'left' ? 1 : -1) * (W / 2 - 0.2), G + 0.9, fz));
     g.add(onFace(plainWindow(p, 0.44, 0.55, dressing(s)), 'back', W, D, 0, G + 0.5, cx, cz));
-    g.add(onFace(doorUnit(p, { w: 0.48, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', W, D, p.range(-0.4, 0.4), 0, cx, cz));
+    const bu = p.range(-0.4, 0.4);
+    g.add(onFace(doorUnit(p, { w: 0.48, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', W, D, bu, 0, cx, cz));
+    if (i !== 1) g.add(onFace(wallLamp(p), 'back', W, D, bu, 1.2, cx, cz));
     x += uw;
   });
   return g;
@@ -135,7 +147,7 @@ export function buildCafe(p: Dk, _params: AssetParams): THREE.Group {
   const g = new THREE.Group();
   const s = scheme(p, p.chance(0.6) ? 'paint' : 'brick');
   s.striped = true;
-  const W = 2.9, D = 1.95, cz = -1.5 + D / 2, fz = cz + D / 2, H = G + S + 0.1;
+  const W = 2.9, D = 1.9, cz = -1.45 + D / 2, fz = cz + D / 2, H = G + S + 0.1;
   g.add(at(p.rbox(W, H, D, 0.08, s.wall), 0, H / 2, cz));
   const door = p.pick(['left', 'right'] as const);
   g.add(at(storefront(p, W - 0.16, G, { scheme: s, door, awning: 'shed' }), 0, 0, fz));
@@ -163,6 +175,7 @@ export function buildCafe(p: Dk, _params: AssetParams): THREE.Group {
   board.add(at(p.box(0.18, 0.2, 0.01, ['dtInk', 2]), 0, 0.22, 0.07));
   g.add(p.detail(at(board, 0, 0, fz + 0.95)));
   g.add(onFace(doorUnit(p, { w: 0.48, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', W, D, 0.6, 0, 0, cz));
+  g.add(onFace(wallLamp(p), 'back', W, D, 0.6, 1.2, 0, cz));
   g.add(onFace(plainWindow(p, 0.46, 0.5, dressing(s)), 'back', W, D, -0.6, G + 0.5, 0, cz));
   return g;
 }
@@ -219,7 +232,11 @@ export function buildCorner(p: Dk, _params: AssetParams): THREE.Group {
     g.add(onFace(plainWindow(p, 0.44, 0.55, dressing(s)), face, side, side, u, G + 0.525 + f * S));
   }
   g.add(onFace(doorUnit(p, { w: 0.5, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', side, side, 0, 0));
-  roofClutter(g, p, top, -a + 0.35, a - 0.9, -a + 0.35, a - 0.9, s.wall, 2);
+  g.add(onFace(wallLamp(p), 'back', side, side, 0, 1.2));
+  if (p.chance(0.35)) {
+    g.add(at(roofGarden(p, 1.5), -0.45, top, -a + 0.55));
+    g.add(at(acUnit(p), -1.05, top, 0.1));
+  } else roofClutter(g, p, top, -a + 0.35, a - 0.9, -a + 0.35, a - 0.9, s.wall, 2);
   return g;
 }
 
@@ -259,6 +276,7 @@ export function buildMidrise(p: Dk, _params: AssetParams): THREE.Group {
   for (const face of ['right', 'left'] as Face[]) upperWindows(g, p, face, W, D, 0, cz, [-0.9, 0.9], G, floors, 0.44, 0.58, s, false, true);
   for (let f = 0; f < floors; f++) for (const u of [-1.2, 0, 1.2]) g.add(onFace(plainWindow(p, 0.44, 0.56, dress), 'back', W, D, u, G + 0.55 + f * S, 0, cz));
   g.add(onFace(doorUnit(p, { w: 0.5, leaf: ['dtDoor', 0], glass: false, surround: null, main: false }), 'back', W, D, 0.6, 0, 0, cz));
+  g.add(onFace(wallLamp(p), 'back', W, D, 0.6, 1.2, 0, cz));
   if (p.chance(0.5)) g.add(onFace(fireEscape(p, floors), 'back', W, D, -0.6, G - 0.1, 0, cz));
   // Roof: a wooden water tank or a stair hut, plus a unit.
   if (p.chance(0.6)) g.add(at(waterTank(p), p.range(-0.9, 0.9), top, cz - 0.55));
@@ -275,7 +293,6 @@ function fireEscape(p: Dk, floors: number): THREE.Group {
     const y = f * S;
     g.add(at(p.box(1.3, 0.03, dep, IRON), 0, y, dep / 2));
     g.add(at(p.box(1.3, 0.03, 0.02, IRON), 0, y + 0.26, dep));
-    for (const x of [-0.64, 0.64]) g.add(at(p.box(0.02, 0.26, dep, IRON), x, y + 0.13, dep / 2));
     if (f > 0) {
       const flight = p.box(1.3, 0.03, 0.24, IRON);
       flight.rotation.z = (f % 2 ? 1 : -1) * 0.75;

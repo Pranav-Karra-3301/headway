@@ -3,7 +3,7 @@
 // Params: scheme ('brick' | 'painted'), roof (idx), accent (idx).
 import * as THREE from 'three';
 import type { AssetParams } from '../../types';
-import { at, big, box, doorUnit, gable, type K, onFace, pick, soft, windowUnit } from './parts';
+import { at, big, box, doorUnit, gable, type K, onFace, pick, sidingsFor, soft, windowUnit } from './parts';
 
 const num = (v: unknown, d: number): number => (typeof v === 'number' ? v : d);
 
@@ -24,10 +24,11 @@ export function garden(k: K, p: AssetParams): THREE.Group {
   const painted = p.scheme === 'painted' || (p.scheme !== 'brick' && r[0]! < 0.5);
   const roof = num(p.roof, pick(r[1]!, 3));
   const acc = num(p.accent, pick(r[2]!, 4));
-  const tone = pick(r[3]!, 3);
+  const ok = sidingsFor(roof), tone = ok[pick(r[3]!, ok.length)]!;
   const lit = (i: number) => ((r[4]! * 983 + i * 0.31) % 1) < 0.4;
-  const body: [string, number] = painted ? ['wall', tone] : ['brick', tone % 2];
-  const panel: [string, number] = painted ? ['resAccent', acc] : ['resFrame', 0];
+  const body: [string, number] = painted ? ['resSiding', tone] : ['brick', tone % 2];
+  // Brick → white balconies; cream → accent balconies; pastel → white balconies.
+  const panel: [string, number] = painted && tone === 0 ? ['resAccent', acc] : ['resFrame', 0];
 
   const g = new THREE.Group();
   const w = 5.6, d = 2.5, cz = -0.25, fz = cz + d / 2, g0 = 1.15, fh = 1.1, H = g0 + 2 * fh;
@@ -36,6 +37,10 @@ export function garden(k: K, p: AssetParams): THREE.Group {
   for (const y of [g0, g0 + fh]) g.add(k.detail(at(box(k, w + 0.04, 0.06, d + 0.04, 'resTrim'), 0, y, cz)));
   g.add(at(box(k, w + 0.06, 0.1, d + 0.06, 'resTrim'), 0, H - 0.02, cz));
   gable(k, g, { w, d, y: H, z: cz, rise: 0.66, ridge: 'x', roofIdx: roof, endRole: body[0], endIdx: body[1], over: 0.18, bigSlabs: true });
+  for (const s of [-1, 1]) {
+    g.add(at(soft(k, 0.3, 0.6, 0.34, 0.04, 'brick', 1), s * 1.55, H + 0.66, cz - 0.2));
+    g.add(k.detail(at(box(k, 0.36, 0.05, 0.4, 'resStone'), s * 1.55, H + 0.98, cz - 0.2)));
+  }
 
   // Front: entrance + stair windows in the middle, windows either side, balconies/patios on the outer bays.
   g.add(onFace(doorUnit(k, { w: 0.62, h: 1.0, role: 'resAccent', idx: acc, step: false, lamp: true }), 'front', w, d, 0, 0.14, 0, cz));
@@ -52,13 +57,13 @@ export function garden(k: K, p: AssetParams): THREE.Group {
     // Ground-floor patio: paving, a glass door, a low hedge.
     g.add(k.detail(at(box(k, 1.3, 0.04, 0.5, 'resStone'), s * 2.02, 0.02, fz + 0.25)));
     g.add(onFace(windowUnit(k, 0.5, 0.82, lit(14 + s), { sill: false, mullion: false }), 'front', w, d, s * 2.02 - 0.22, 0.6, 0, cz));
-    g.add(at(soft(k, 1.3, 0.3, 0.22, 0.08, 'leaf', 2), s * 2.02, 0.15, fz + 0.58));
+    g.add(at(soft(k, 1.3, 0.32, 0.26, 0.06, 'resHedge'), s * 2.02, 0.16, fz + 0.58));
   }
   // Back and side windows.
   for (let f = 0; f < 3; f++) {
     const y = f === 0 ? 0.7 : g0 + (f - 1) * fh + 0.58;
     for (const [i, u] of [-2.0, -0.75, 0.75, 2.0].entries()) g.add(onFace(windowUnit(k, 0.56, 0.54, lit(20 + f * 4 + i), { sill: false }), 'back', w, d, u, y, 0, cz));
-    for (const fc of ['left', 'right'] as const) for (const u of [-0.55, 0.55]) g.add(onFace(windowUnit(k, 0.5, 0.54, lit(40 + f + u), { sill: false }), fc, w, d, u, y, 0, cz));
+    for (const fc of ['left', 'right'] as const) g.add(onFace(windowUnit(k, 0.56, 0.54, lit(40 + f + fc.length)), fc, w, d, 0, y, 0, cz));
   }
   return g;
 }

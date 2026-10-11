@@ -63,8 +63,9 @@ if (view === 'one') {
   const kind = q.get('kind') ?? 'st.lamp';
   const c = CATALOG_BY_KIND.get(kind)!;
   items = [{ kind, x: 0, z: 0, params: kind === 'st.fence' ? { length: 3 } : {} }];
-  viewSize = Math.max(c.w, c.d, c.h) * 1.7;
-  center = new THREE.Vector3(0, c.h * 0.42, 0);
+  // Fit the projected iso silhouette (plus room for the shadow, which falls to the right).
+  viewSize = Math.max(0.85 * c.h + 0.37 * (c.w + c.d), 0.71 * (c.w + c.d)) * 1.45;
+  center = new THREE.Vector3(0.16 * c.h, c.h * 0.45, -0.16 * c.h);
 } else if (view === 'grid') {
   const rows = [
     ['st.lamp', 'st.trafficLight', 'st.flag', 'st.kiosk'],
@@ -82,7 +83,7 @@ if (view === 'one') {
   extras.push(slab(cell * 4 + 1, cell * 3 + 1, 0, 0, 0.0, 'curb'));
 } else {
   // Street corner: road A along x (z = 3.6), road B along z (x = 4.2), plaza with fountain, café, lawns, field.
-  viewSize = 17; center = new THREE.Vector3(0.3, 0.4, 0.2);
+  viewSize = Number(q.get('size') ?? 16); center = new THREE.Vector3(Number(q.get('cx') ?? -0.6), 0.4, Number(q.get('cz') ?? -0.8));
   extras.push(slab(40, 2.4, 0, 3.6, 0.03, 'road'), slab(2.4, 40, 4.2, 0, 0.031, 'road'));
   extras.push(slab(40, 1.0, 0, 1.9, 0.045, 'curb'), slab(40, 1.0, 0, 5.3, 0.045, 'curb'));
   extras.push(slab(1.0, 40, 2.5, 0, 0.046, 'curb'), slab(1.0, 40, 5.9, 0, 0.046, 'curb'));
@@ -92,37 +93,41 @@ if (view === 'one') {
   for (let z = -11; z < 11; z += 1.6) if (Math.abs(z - 3.6) > 1.6) extras.push(slab(0.1, 0.8, 4.2, z, 0.056, 'mark'));
   for (let i = 0; i < 6; i++) extras.push(slab(0.32, 1.9, 1.5 - i * 0.55 + 0.2, 3.6, 0.057, 'mark'));
   const F = { x: -2.6, z: -2.2 };
-  items = [
-    { kind: 'st.fountain', x: F.x, z: F.z },
-    { kind: 'st.bench', x: F.x, z: F.z + 2.15, rot: Math.PI },
-    { kind: 'st.bench', x: F.x, z: F.z - 2.15 },
-    { kind: 'st.bench', x: F.x - 2.15, z: F.z, rot: Math.PI / 2 },
-    { kind: 'st.bench', x: F.x + 2.15, z: F.z, rot: -Math.PI / 2 },
-    { kind: 'st.bin', x: F.x + 1.0, z: F.z + 2.2 },
-    { kind: 'st.bin', x: F.x - 2.2, z: F.z - 1.0 },
-    { kind: 'st.lamp', x: F.x - 1.75, z: F.z + 1.75 }, { kind: 'st.lamp', x: F.x + 1.75, z: F.z + 1.75 },
-    { kind: 'st.lamp', x: F.x - 1.75, z: F.z - 1.75 }, { kind: 'st.lamp', x: F.x + 1.75, z: F.z - 1.75 },
-    { kind: 'st.kiosk', x: -7.6, z: -1.6, rot: Math.PI / 2, params: { color: 0 } },
-    { kind: 'st.tableUmbrella', x: -6.6, z: 0.4, params: { color: 0 } },
-    { kind: 'st.tableUmbrella', x: -6.9, z: -4.0, params: { color: 1 } },
-    { kind: 'st.tableUmbrella', x: -5.2, z: -5.6, params: { color: 2 } },
-    { kind: 'st.flag', x: -3.9, z: -6.6, params: { color: 0 } },
-    { kind: 'st.flag', x: -2.6, z: -6.6, params: { color: 1 } },
-    { kind: 'st.flag', x: -1.3, z: -6.6, params: { color: 2 } },
-    { kind: 'st.lamp', x: -6.0, z: 2.15 }, { kind: 'st.lamp', x: 0.4, z: 2.15 }, { kind: 'st.lamp', x: 2.25, z: -4.5 },
-    { kind: 'st.lamp', x: -4.0, z: 5.05 }, { kind: 'st.lamp', x: 1.8, z: 5.05 }, { kind: 'st.lamp', x: 5.65, z: -1.5 },
-    { kind: 'st.trafficLight', x: 2.25, z: 2.15 },
-    { kind: 'st.trafficLight', x: 6.15, z: 5.05, rot: Math.PI },
-    { kind: 'st.hydrant', x: 1.3, z: 2.1 },
-    { kind: 'st.mailbox', x: -1.1, z: 2.0 },
-    { kind: 'st.bikeRack', x: -3.6, z: 1.95, params: { color: 0 } },
-    { kind: 'st.bench', x: -1.2, z: 5.45, rot: Math.PI },
-    { kind: 'st.bin', x: -0.2, z: 5.45 },
-    { kind: 'st.fence', x: 6.75, z: -3.6, rot: Math.PI / 2, params: { length: 10.4 } },
-    { kind: 'st.fence', x: 9.2, z: 1.75, params: { length: 4.8 } },
-    { kind: 'st.fence', x: 9.2, z: 6.1, params: { length: 4.8, style: 'rail' } },
-    { kind: 'st.fence', x: 6.75, z: 8.5, rot: Math.PI / 2, params: { length: 4.8, style: 'rail' } },
-  ];
+  const tags: Array<[PlacedAsset, string]> = [];
+  const add = (kind: string, x: number, z: number, rot = 0, params: PlacedAsset['params'] = {}, tag?: string) => {
+    const it: PlacedAsset = { kind, x, z, rot, params };
+    items.push(it);
+    if (tag) tags.push([it, tag]);
+  };
+  add('st.fountain', F.x, F.z, 0, {}, 'fountain');
+  add('st.bench', F.x, F.z + 2.2, Math.PI);
+  add('st.bench', F.x, F.z - 2.2);
+  add('st.bench', F.x - 2.2, F.z, Math.PI / 2);
+  add('st.bench', F.x + 2.2, F.z, -Math.PI / 2, {}, 'bench');
+  add('st.bin', F.x + 1.05, F.z + 2.25);
+  add('st.bin', F.x - 2.25, F.z - 1.05);
+  add('st.lamp', F.x - 2.3, F.z + 2.3); add('st.lamp', F.x + 2.3, F.z - 2.3); add('st.lamp', F.x - 2.3, F.z - 2.3);
+  add('st.kiosk', -7.6, -1.4, Math.PI / 2, { color: 0 }, 'kiosk');
+  add('st.tableUmbrella', -6.4, 0.6, 0, { color: 0 });
+  add('st.tableUmbrella', -6.6, -3.6, 0, { color: 1 }, 'table + umbrella');
+  add('st.tableUmbrella', -5.0, -5.7, 0, { color: 2 });
+  add('st.flag', -2.0, -6.7, 0, { color: 0 });
+  add('st.flag', -0.9, -6.7, 0, { color: 1 }, 'flag');
+  add('st.flag', 0.2, -6.7, 0, { color: 2 });
+  add('st.lamp', -5.6, 2.15); add('st.lamp', 1.2, 2.15); add('st.lamp', 2.25, -3.8, 0, {}, 'lamp');
+  add('st.lamp', -2.6, 5.05); add('st.lamp', 5.65, -2.6);
+  add('st.trafficLight', 2.25, 2.15);
+  add('st.trafficLight', 6.15, 5.05, Math.PI, {}, 'traffic light');
+  add('st.hydrant', 0.3, 2.1, 0, {}, 'hydrant');
+  add('st.mailbox', -1.4, 2.0, 0, {}, 'mailbox');
+  add('st.bikeRack', -3.8, 1.95, 0, { color: 0 }, 'bike rack');
+  add('st.bench', -0.8, 5.45, Math.PI);
+  add('st.bin', 0.25, 5.45, 0, {}, 'bin');
+  add('st.fence', 6.75, -3.6, Math.PI / 2, { length: 10.4 });
+  add('st.fence', 9.2, 1.75, 0, { length: 4.8 }, 'picket fence');
+  add('st.fence', 9.2, 6.1, 0, { length: 4.8, style: 'rail' }, 'rail fence');
+  add('st.fence', 6.75, 8.5, Math.PI / 2, { length: 4.8, style: 'rail' });
+  if (q.get('labels') === '1') for (const [it, text] of tags) label(text, new THREE.Vector3(it.x, CATALOG_BY_KIND.get(it.kind)!.h + 0.3, it.z));
 }
 
 const { scene, camera, renderer, loop } = devScene(viewSize, center);

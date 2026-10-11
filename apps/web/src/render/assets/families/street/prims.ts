@@ -74,6 +74,11 @@ export function extrude(k: KitContext, key: string, shape: () => THREE.Shape, de
   }), m);
 }
 
+/** Upward-facing disc at y = 0 (water surfaces, openings): only its top is ever seen, so no sides or underside. */
+export function disc(k: KitContext, r: number, seg: number, m: Mat): THREE.Mesh {
+  return shaped(k, cached(`disc:${r3(r)},${seg}`, () => new THREE.CircleGeometry(r, seg).rotateX(-Math.PI / 2)), m);
+}
+
 /** Closed cone sector (apex up, base at y = 0) spanning [t0, t0 + dt] around y; used for striped umbrellas. */
 export function coneSector(k: KitContext, r: number, h: number, t0: number, dt: number, m: Mat): THREE.Mesh {
   return shaped(k, cached(`cs:${r3(r)},${r3(h)},${r3(t0)},${r3(dt)}`, () => {

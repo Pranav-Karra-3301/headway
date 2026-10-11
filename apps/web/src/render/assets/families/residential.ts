@@ -2,6 +2,12 @@
 // apartments, balcony towers, playgrounds and parking lots. Builders live in ./residential/*.
 // Shared roles used as-is (same in the basic kit and the town palette): wall, roof, window (idx 1 glows at dusk),
 // door, brick, leaf, lawn, mark, car, lamp. Everything else is a res-prefixed role below (no cross-family clashes).
+// Optional params (otherwise seeded per placement via k.rand()):
+//   res.tower { floors 5-7, wall, accent, roof }   res.garden { scheme 'brick'|'painted', roof, accent }
+//   res.townhouses { wall, roof }                    res.house { wall, roof, style 'side'|'front', porch 'left'|'right', dormer }
+//   res.parking { cars 0-5 }                         res.playground {}
+// Front (doors, porches, balconies, driveway gap) faces +z; every face has windows, so any quarter turn works.
+// Dev art-direction page: /src/render/assets/families/residential/preview.html (?kind=, ?palette=b|c, ?detail=min).
 import type { AssetRegistry } from '../registry';
 import { CATALOG } from '../catalog';
 import type { AssetDef, AssetParams, KitContext, RoleColors } from '../types';
@@ -35,6 +41,8 @@ export const ROLES: RoleColors = {
   /** Playground rubber pad and sandbox sand. */
   resPad: ['#F1BFA0', '#D9B99A', '#D9C7B0'],
   resSand: ['#F5E2AE', '#E2CFA3', '#E6D6AE'],
+  /** Clipped hedges stay green in every palette (round bushes follow the seasonal leaf role). */
+  resHedge: ['#5DB57A', '#7E9F6B', '#7F9C58'],
 };
 
 const BUILDERS: Record<string, (k: KitContext, p: AssetParams) => import('three').Object3D> = {
