@@ -50,6 +50,8 @@ const boat = (kind: string, ids: KenneyId[], w: number, d: number, h: number, si
 export const NO_PAINT: ReadonlySet<KenneyId> = new Set(['watercraft-pack/boat-row-small', 'watercraft-pack/boat-row-large']);
 /** car-kit glass: Kenney's white windows (the lighter of the two white blocks) → our vehicle glass. */
 const isCarGlass = (role: string, shade: number) => role === 'knWhite' && Math.abs(shade + 0.03) < 1e-6;
+/** Marina boats: Kenney's dark slate hulls/decks → soft silver, so small boats read light and toy-like. */
+const LIGHT_HULL = { recolor: { knSlate: ['knSilver', 0] as const } };
 
 /** Everyday parked cars (kn.car.random) with relative frequency. */
 const EVERYDAY: KenneyId[] = [
@@ -83,19 +85,19 @@ export const VEHICLE_SPECS: readonly VehicleSpec[] = [
   car('kn.car.tractor', ['car-kit/tractor'], 0.9, 1.3, 1.25, false, 'Kenney farm tractor (outskirts fields)'),
   car('kn.car.random', EVERYDAY, 1.0, 1.95, 1.05, true, 'random everyday car per placement (parking lots, driveways)', { weights: EVERYDAY_W }),
   boat('kn.boat.sail', ['watercraft-pack/boat-sail-a'], 1.2, 2.5, 2.55, 0.2, true, 'sailboat, tall mast (moored: place at water level)'),
-  boat('kn.boat.sailLarge', ['watercraft-pack/boat-sail-b'], 1.2, 2.65, 2.1, 0.2, true, 'longer sailboat with cabin'),
-  boat('kn.boat.speed', ['watercraft-pack/boat-speed-a'], 1.2, 2.2, 1.0, 0.17, true, 'speedboat with windscreen'),
-  boat('kn.boat.runabout', ['watercraft-pack/boat-speed-c'], 1.2, 2.1, 0.85, 0.17, true, 'small open runabout'),
+  boat('kn.boat.sailLarge', ['watercraft-pack/boat-sail-b'], 1.2, 2.65, 2.1, 0.2, true, 'longer sailboat with cabin', LIGHT_HULL),
+  boat('kn.boat.speed', ['watercraft-pack/boat-speed-a'], 1.2, 2.2, 1.0, 0.17, true, 'speedboat with windscreen', LIGHT_HULL),
+  boat('kn.boat.runabout', ['watercraft-pack/boat-speed-c'], 1.2, 2.1, 0.85, 0.17, true, 'small open runabout', LIGHT_HULL),
   boat('kn.boat.fishing', ['watercraft-pack/boat-fishing-small'], 1.2, 2.55, 1.7, 0.2, true, 'small fishing boat with wheelhouse'),
   boat('kn.boat.row', ['watercraft-pack/boat-row-small'], 1.8, 1.55, 0.55, 0.08, false, 'wooden rowing boat with oars'),
   boat('kn.boat.rowLarge', ['watercraft-pack/boat-row-large'], 1.8, 1.9, 0.55, 0.08, false, 'larger wooden rowing boat with oars'),
   boat('kn.boat.tug', ['watercraft-pack/boat-tug-b'], 1.2, 1.9, 1.5, 0.2, false, 'harbour tug'),
   boat('kn.boat.house', ['watercraft-pack/boat-house-a'], 1.75, 3.05, 1.45, 0.18, false, 'house boat'),
-  boat('kn.boat.buoy', ['watercraft-pack/buoy'], 0.6, 0.6, 1.2, 0.25, false, 'channel buoy'),
+  boat('kn.boat.buoy', ['watercraft-pack/buoy'], 0.6, 0.6, 1.2, 0, false, 'channel buoy (Kenney float already reaches below y = 0)'),
   boat('kn.boat.cargoShip', ['watercraft-pack/ship-cargo-a'], 2.55, 6.9, 2.2, 0.35, false, 'coastal cargo ship (far out in the bay)', {
     recolor: { knYellow: ['car', 1], knRed: ['car', 0], knGreen: ['car', 3], knBlue: ['car', 2] },
   }),
-  boat('kn.boat.random', MARINA, 1.8, 2.65, 2.55, MARINA_SINK, true, 'random marina boat per placement (moorings)', { weights: MARINA_W }),
+  boat('kn.boat.random', MARINA, 1.8, 2.65, 2.55, MARINA_SINK, true, 'random marina boat per placement (moorings)', { weights: MARINA_W, ...LIGHT_HULL }),
 ];
 export const VEHICLE_KINDS: readonly string[] = VEHICLE_SPECS.map((s) => s.kind);
 const SPEC_BY_KIND = new Map(VEHICLE_SPECS.map((s) => [s.kind, s] as const));

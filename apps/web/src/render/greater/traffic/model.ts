@@ -13,7 +13,7 @@ import { signalGreen, type LevelCrossing, type TLane, type TrafficGraph } from '
 import { mulberry32 } from './rng';
 
 export const MIN_GAP = 0.35;
-export const DEFAULT_CARS = 36;
+export const DEFAULT_CARS = 40;
 export const MAX_CARS = 64;
 /** Speed hints are scaled by this (G0 hints ≈ real m/s-ish; 0.55 keeps pace with the town's own traffic). */
 export const SPEED_SCALE = 0.55;
@@ -22,8 +22,9 @@ const ACCEL = 2.2;
 const BRAKE = 3.2;
 const MAX_DT = 0.2;
 const HORIZON = 14;
-const STOP_BACK = 0.15;
-const YIELD_BACK = 0.45;
+/** How long (u along the lane) a diverging car still blocks cars entering a sibling lane. */
+const SIB_SEP = 2.6;
+const GHOST_S = 45;
 const CROSS_STOP = 1.5; // front bumper stops this far before the rail centre line
 const TRAIN_BEHIND = 11, TRAIN_AHEAD = 16; // rail arc window around the train front that closes a crossing
 const SPAWN_GAP = 0.45;
@@ -39,7 +40,7 @@ export const DEFAULT_SPECS: VehicleSpec[] = [
 
 export interface GreaterTrafficModelOptions {
   seed: number;
-  /** Target number of cars on the network (default 36, ≤ MAX_CARS). */
+  /** Target number of cars on the network (default 40, ≤ MAX_CARS). */
   cars?: number;
   variants?: VehicleSpec[];
   /** Number of body colours (palette `car` roles), default 6. */
@@ -67,11 +68,13 @@ export interface GreaterCar {
   plan: TLane[];
   dest: TLane;
   via: TLane | null;
-  /** Lane whose entry permission this car holds (box / merge), until it is on it. */
-  committed: TLane | null;
+  /** Lanes ahead whose entry permission this car holds (box / merge), until it is on them. */
+  commits: TLane[];
   /** Box lanes reserved (released when the rear clears them). */
   holds: TLane[];
   x: number;
+  /** Road surface height under the car (G1 ramps / overpass), 0 when flat. */
+  y: number;
   z: number;
   /** Viewer heading: rotation.y for a model facing +x (pointAt convention). */
   heading: number;
@@ -101,6 +104,21 @@ export interface GreaterTrafficModel {
   signal(junctionId: string): 0 | 1 | null;
   crossingClosed(id: string): boolean;
   setVariants(specs: VehicleSpec[]): void;
+}
+
+/** Road height along a lane (linear between path points). */
+export function heightAt(l: TLane, s: number): number {
+  const ys = l.ys;
+  if (!ys) return 0;
+  const cum = l.poly.cum;
+  if (s <= 0) return ys[0]!;
+  for (let i = 1; i < cum.length; i++) {
+    if (s <= cum[i]!) {
+      const span = cum[i]! - cum[i - 1]!;
+      return span > 1e-9 ? ys[i - 1]! + (ys[i]! - ys[i - 1]!) * ((s - cum[i - 1]!) / span) : ys[i]!;
+    }
+  }
+  return ys[ys.length - 1]!;
 }
 
 export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTrafficModelOptions): GreaterTrafficModel {
@@ -192,13 +210,13 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
     return d >= -TRAIN_BEHIND && d <= TRAIN_AHEAD;
   };
 
-  const permit = (c: GreaterCar, from: TLane, to: TLane): boolean => {
+  const permit = (c: GreaterCar, from: TLane, to: TLane, k: number): boolean => {
     const need = 2 * c.halfLen + MIN_GAP;
     if (to.box) {
       if (!isGreen(from)) return false;
       for (const q of to.conflicts) if ((held.get(q) ?? 0) > 0) return false;
       // don't block the box: room after it for this car and everyone already inside heading the same way
-      const exit = c.plan[1];
+      const exit = c.plan[k + 1];
       if (exit && !exit.sink) {
         let room = Math.min(firstRear(exit), exit.len + 4);
         for (const o of cars) if (o !== c && o.lane.box && o.plan[0] === exit) room -= 2 * o.halfLen + MIN_GAP;
@@ -238,6 +256,12 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
       const o = own[idx + 1]!;
       gap = Math.min(gap, o.s - o.halfLen - front);
     }
+    // cars that just diverged onto a sibling lane ahead of me
+    for (const sl of c.lane.siblings) {
+      for (const o of byLane.get(sl) ?? []) {
+        if (o.s > c.s && o.s - o.halfLen < SIB_SEP) gap = Math.min(gap, o.s - o.halfLen - front);
+      }
+    }
     // level crossings on the current lane
     for (const x of c.lane.crossings) {
       const stop = x.s - CROSS_STOP;
@@ -252,11 +276,11 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
       const vn = vLane(l);
       if (vn < vCap) vCap = Math.min(vCap, Math.sqrt(vn * vn + 2 * BRAKE * Math.max(0, base - c.halfLen)));
       // permission to enter l
-      if (needsPermit(from, l) && c.committed !== l) {
-        const back = from.yield ? YIELD_BACK : STOP_BACK;
-        const stopGap = base - c.halfLen - back;
-        if (k === 0 && stopGap <= (c.v * c.v) / (2 * BRAKE) + 0.9 && permit(c, from, l)) {
-          c.committed = l;
+      if (needsPermit(from, l) && !c.commits.includes(l)) {
+        const stopGap = base - (from.len - from.holdS) - c.halfLen;
+        // liveness: after GHOST_S at the line a car goes anyway (only a gridlock would hold it that long)
+        if (stopGap <= (c.v * c.v) / (2 * BRAKE) + 0.9 && (permit(c, from, l, k) || c.wait > GHOST_S)) {
+          c.commits.push(l);
           if (l.box) { c.holds.push(l); held.set(l, (held.get(l) ?? 0) + 1); }
         } else {
           gap = Math.min(gap, stopGap);
@@ -269,10 +293,16 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
           if (q === from) continue;
           for (const o of byLane.get(q) ?? []) {
             if (o.plan[0] !== l) continue;
-            if (needsPermit(q, l) && o.committed !== l) continue;
+            if (needsPermit(q, l) && !o.commits.includes(l)) continue;
             const od = q.len - o.s; // other's centre → merge point
             if (od < base || (od === base && o.id < c.id)) gap = Math.min(gap, base - od - o.halfLen - c.halfLen);
           }
+        }
+      }
+      // cars just past the diverge on l's siblings
+      for (const sl of l.siblings) {
+        for (const o of byLane.get(sl) ?? []) {
+          if (o.s - o.halfLen < SIB_SEP) gap = Math.min(gap, base + o.s - o.halfLen - c.halfLen);
         }
       }
       // first car on l
@@ -294,8 +324,9 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
 
   // ---------------------------------------------------------------- lifecycle
   const placeCar = (c: GreaterCar): void => {
-    const p = pointAt(c.lane.poly, Math.min(c.lane.len, Math.max(0, c.s)));
-    c.x = p.x; c.z = p.z; c.heading = p.heading;
+    const s = Math.min(c.lane.len, Math.max(0, c.s));
+    const p = pointAt(c.lane.poly, s);
+    c.x = p.x; c.z = p.z; c.heading = p.heading; c.y = heightAt(c.lane, s);
   };
   const spawnOn = (lane: TLane, dest: TLane, variant = pickVariant(), color = Math.floor(rand() * colors)): GreaterCar | null => {
     const spec = specs[variant % specs.length]!;
@@ -303,8 +334,8 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
     if (firstRear(lane) < 2 * halfLen + MIN_GAP + 0.2) return null;
     const c: GreaterCar = {
       id: nextId++, variant: variant % specs.length, color, halfLen, vf: (spec.speed ?? 1) * (0.92 + rand() * 0.16),
-      lane, s: 0, v: lane.speed * speedScale * 0.8, plan: [], dest, via: null, committed: null, holds: [],
-      x: 0, z: 0, heading: 0, scale: lane.board ? 1 : 0, age: 0, wait: 0, done: false, noise: 0.05 + rand() * 0.2,
+      lane, s: 0, v: lane.speed * speedScale * 0.8, plan: [], dest, via: null, commits: [], holds: [],
+      x: 0, y: 0, z: 0, heading: 0, scale: lane.board ? 1 : 0, age: 0, wait: 0, done: false, noise: 0.05 + rand() * 0.2,
     };
     if (graph.streets.length && rand() < viaShare) {
       const v = graph.streets[Math.floor(rand() * graph.streets.length)]!;
@@ -344,7 +375,7 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
 
   const release = (c: GreaterCar, all = false): void => {
     c.holds = c.holds.filter((h) => {
-      const keep = !all && (h === c.lane || (c.lane.prev.includes(h) && c.s - c.halfLen < 0.1) || c.plan[0] === h);
+      const keep = !all && (h === c.lane || (c.lane.prev.includes(h) && c.s - c.halfLen < 0.1) || c.plan.includes(h));
       if (!keep) held.set(h, Math.max(0, (held.get(h) ?? 1) - 1));
       return keep;
     });
@@ -382,11 +413,11 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
       while (c.s > c.lane.len) {
         if (!c.lane.next.length) { c.done = true; break; }
         const to = c.plan[0];
-        if (!to || (needsPermit(c.lane, to) && c.committed !== to)) { c.s = c.lane.len; c.v = 0; break; }
+        if (!to || (needsPermit(c.lane, to) && !c.commits.includes(to))) { c.s = c.lane.len; c.v = 0; break; }
         c.s -= c.lane.len;
         c.lane = to;
         c.plan.shift();
-        if (c.committed === to) c.committed = null;
+        c.commits = c.commits.filter((l) => l !== to);
         ensurePlan(c);
       }
       if (c.lane.sink && c.s >= c.lane.len - 0.02) c.done = true;
@@ -397,8 +428,9 @@ export function createGreaterTrafficModel(graph: TrafficGraph, opts: GreaterTraf
       if (c.lane.source) sc = Math.min(sc, c.s / GROW);
       if (c.lane.sink) sc = Math.min(sc, (c.lane.len - c.s) / GROW);
       c.scale = Math.max(0, Math.min(1, sc));
-      const p = pointAt(c.lane.poly, Math.min(c.lane.len, c.s));
-      c.x = p.x; c.z = p.z;
+      const sc2 = Math.min(c.lane.len, c.s);
+      const p = pointAt(c.lane.poly, sc2);
+      c.x = p.x; c.z = p.z; c.y = heightAt(c.lane, sc2);
       let dh = p.heading - c.heading;
       while (dh > Math.PI) dh -= 2 * Math.PI;
       while (dh < -Math.PI) dh += 2 * Math.PI;

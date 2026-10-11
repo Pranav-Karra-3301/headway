@@ -16,7 +16,7 @@ import type { FrameContext, RenderLayer } from '../../layers';
 import { KitMaterial } from '../../materials';
 import { createClayKit, createClayKitShared, disposeClayKitShared, placementSeed, roleResolver } from '../../town/kitContext';
 import type { PaletteId } from '../../types';
-import { buildBoardwalk, buildBollard, buildDeck, buildPavilion, buildPromenade, buildTelescope, WF_ROLES } from './build';
+import { buildBoardwalk, buildBollard, buildDeck, buildPavilion, buildPromenade, buildSeaWall, buildTelescope, WF_ROLES } from './build';
 import { planWaterfront, type WaterfrontPlan, type WfItem } from './plan';
 
 export { planWaterfront, inWaterfront, runAt, WF } from './plan';
@@ -55,6 +55,8 @@ export function preloadWaterfront(map: TownMap): Promise<void> {
 }
 
 const BOB = { amp: 0.05, roll: 0.035 };
+/** Registry kinds drawn as swaying InstancedMeshes (everything else bakes into the static mesh). */
+const TREE_KINDS = new Set(['veg.oak', 'veg.maple', 'veg.birch', 'veg.poplar', 'veg.cherry', 'veg.pine']);
 
 export function createWaterfrontLayer(map: TownMap, opts: WaterfrontOptions = {}): WaterfrontLayer {
   let palette: PaletteId = opts.palette ?? 'a';
@@ -73,7 +75,10 @@ export function createWaterfrontLayer(map: TownMap, opts: WaterfrontOptions = {}
 
   // ---- procedural pieces + static registry items → one baked mesh
   const statics = new THREE.Group();
-  for (const run of plan.runs) statics.add(run.kind === 'promenade' ? buildPromenade(run) : buildBoardwalk(run));
+  for (const run of plan.runs) {
+    statics.add(run.kind === 'promenade' ? buildPromenade(run) : buildBoardwalk(run));
+    if (run.kind === 'promenade') statics.add(buildSeaWall(run));
+  }
   for (const d of plan.decks) statics.add(buildDeck(d));
   for (const p of plan.pavilions) statics.add(buildPavilion(p));
 
@@ -95,7 +100,7 @@ export function createWaterfrontLayer(map: TownMap, opts: WaterfrontOptions = {}
     if (it.boat && opts.boats === false) continue;
     const def = reg.get(it.kind);
     items++;
-    if (def?.sway) {
+    if (def?.sway && TREE_KINDS.has(it.kind)) {
       const key = `${it.kind}#${String(it.params?.variant ?? 0)}`;
       let t = trees.get(key);
       if (!t) {

@@ -15,7 +15,7 @@ const VP = { w: 1440, h: 900 };
 const B = viewBasis();
 
 /** A real camera framed by a fit; returns CSS px for world points (three's own projection). */
-function cameraFor(fit: { zoom: number; target: { x: number; y: number; z: number } }, vp = VP, el = CAMERA.elevationDeg, az = CAMERA.azimuthDeg) {
+function cameraFor(fit: { zoom: number; target: { x: number; y: number; z: number } }, vp = VP, el: number = CAMERA.elevationDeg, az: number = CAMERA.azimuthDeg) {
   const h = CAMERA.viewH / 2, a = vp.w / vp.h;
   const cam = new THREE.OrthographicCamera(-h * a, h * a, h, -h, CAMERA.near, CAMERA.far);
   cam.zoom = fit.zoom;

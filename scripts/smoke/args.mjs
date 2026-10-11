@@ -44,6 +44,8 @@ export const USAGE = `Headway smoke test (headless Chrome over the DevTools prot
   --size <WxH>            viewport (default 1600x1000)
   --ignore <regex>        ignore console errors whose text or url matches (repeatable)
   --api                   also check /api/champion validates and /api/generations has >= 1 entry
+  --hash                  spec §12 determinism: on Watch, window.__headway.hash() (a full g0 run of the stadium_exit
+                          showcase crowd 4001 in the browser) must equal the Node hash (runs pnpm sim:run locally)
   -h, --help              this text
 
 Fails on: page HTTP errors, console errors / uncaught exceptions (page and workers), window.__headway never ready,
@@ -58,7 +60,7 @@ const num = (flag, v) => {
 export function parseArgs(argv) {
   const o = {
     url: null, query: '', routes: DEFAULT_ROUTES, outDir: DEFAULT_OUT_DIR, chromePath: null,
-    readyTimeoutMs: 45_000, advanceTimeoutMs: 10_000, width: 1600, height: 1000, ignore: [], api: false, help: false,
+    readyTimeoutMs: 45_000, advanceTimeoutMs: 10_000, width: 1600, height: 1000, ignore: [], api: false, hash: false, help: false,
   };
   for (let i = 0; i < argv.length; i++) {
     let flag = argv[i];
@@ -75,6 +77,7 @@ export function parseArgs(argv) {
     switch (flag) {
       case '-h': case '--help': o.help = true; break;
       case '--api': o.api = true; break;
+      case '--hash': o.hash = true; break;
       case '--url': {
         const raw = take();
         let u;

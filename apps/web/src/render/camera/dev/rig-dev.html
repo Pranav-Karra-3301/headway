@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · camera rig (C2)</title>
+    <link rel="preload" href="/fonts/GumballRounded.ttf" as="font" type="font/ttf" crossorigin />
+    <style>
+      @font-face { font-family: "Gumball Rounded"; src: url("/fonts/GumballRounded.ttf") format("truetype"); font-display: block; }
+      :root { --ink: #1F2A44; --paper: #FFFBF2; --accent: #2E5BDA; --sun: #F2C14E; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: var(--ink);
+        font-family: "Avenir Next Rounded Std", Nunito, ui-rounded, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .gb { font-family: "Gumball Rounded", "Avenir Next Rounded Std", ui-rounded, sans-serif; font-weight: 400; }
+      /* mock HUD: the real shell's boxes (tokens.css: gap 14, bar 52, legend 236, inspector 332, dock 780 × 140) */
+      .hud { position: fixed; background: rgba(255, 251, 242, 0.92); border-radius: 18px; box-shadow: 0 8px 26px rgba(20, 30, 50, 0.12);
+        display: flex; align-items: center; gap: 10px; padding: 0 16px; box-sizing: border-box; pointer-events: none; }
+      #bar { left: 14px; right: 14px; top: 14px; height: 52px; justify-content: space-between; }
+      #bar h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+      #bar .presets { display: flex; gap: 6px; pointer-events: auto; }
+      .chip { border: 0; border-radius: 999px; padding: 7px 12px; font-size: 14px; background: rgba(31, 42, 68, 0.07); color: var(--ink); cursor: pointer; }
+      .chip.on { background: var(--accent); color: #fff; }
+      .chip kbd { font: inherit; opacity: 0.55; margin-right: 4px; }
+      #legend { left: 14px; bottom: 14px; width: 236px; height: 200px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; font-size: 13px; }
+      #legend .r { display: flex; align-items: center; gap: 8px; }
+      #legend .sw { width: 26px; height: 6px; border-radius: 3px; }
+      #bottom { left: 50%; transform: translateX(-50%); bottom: 14px; width: 760px; height: 100px; justify-content: center; font-size: 15px; }
+      body.play #bottom { width: 780px; height: 140px; }
+      #insp { right: 14px; top: 80px; width: 332px; height: 400px; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 16px; display: none; }
+      body.insp #insp { display: flex; }
+      #insp h2 { margin: 0; font-size: 22px; }
+      #insp p { margin: 0; font-size: 13px; opacity: 0.7; line-height: 1.4; }
+      #safe { position: fixed; border: 2px dashed rgba(46, 91, 218, 0.55); border-radius: 6px; pointer-events: none; display: none; }
+      body.guides #safe { display: block; }
+      #msg { position: fixed; left: 50%; transform: translateX(-50%); top: 74px; font-size: 13px; opacity: 0.6; pointer-events: none; white-space: nowrap; }
+      body.clean #msg { display: none; }
+      body.nohud .hud { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="safe"></div>
+    <div id="bar" class="hud"><h1 class="gb">HEADWAY</h1><div class="presets" id="presets"></div><span class="gb" id="mode" style="font-size:14px;opacity:.6"></span></div>
+    <div id="legend" class="hud gb">
+      <div class="r"><span class="sw" style="background:#E5484D"></span>Route 1</div>
+      <div class="r"><span class="sw" style="background:#2E5BDA"></span>Route 2</div>
+      <div class="r"><span class="sw" style="background:#F2A33A"></span>Route 3</div>
+      <div class="r"><span class="sw" style="background:#6B5B95"></span>Rail loop</div>
+    </div>
+    <div id="bottom" class="hud gb">Q / E peek · double-click focus · 1–5 presets · X x-ray</div>
+    <div id="insp" class="hud"><h2 class="gb">Central Station</h2><p>Inspector open: the safe rect shrinks and the Overview springs to fit it.</p></div>
+    <div id="msg" class="gb"></div>
+    <script type="module" src="./rig-dev.ts"></script>
+  </body>
+</html>

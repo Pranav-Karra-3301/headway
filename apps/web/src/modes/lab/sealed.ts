@@ -80,10 +80,15 @@ async function getJson(url: string): Promise<unknown> {
   return res.json();
 }
 
+/** Same rule as api.ts: `vite dev` has no Worker behind it, so skip `/api` there unless VITE_HEADWAY_API names one. */
+const API_BASE: string = (import.meta.env?.VITE_HEADWAY_API as string | undefined) ?? '';
+const API_ENABLED = import.meta.env?.MODE !== 'development' || API_BASE !== '';
+
 /** Sealed results live only in D1 (the CLI posts them to /api/admin/sealed-eval), so there is no static fallback. */
 export async function loadSealed(): Promise<SealedRow[]> {
+  if (!API_ENABLED) return [];
   try {
-    return normalizeSealed(await getJson('/api/sealed'));
+    return normalizeSealed(await getJson(`${API_BASE}/api/sealed`));
   } catch {
     return [];
   }

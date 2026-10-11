@@ -95,7 +95,7 @@ function frame(now: number): void {
     runner.frame(dt);
     r.render(runner.prev, runner.next, runner.alpha);
   } catch (e) { fail(e); return; }
-  if (++frames === 30 || frames % 120 === 0) {
+  if (++frames === 1 || frames === 30 || frames % 120 === 0) {
     msg.textContent = `world v1 · ${light} · palette ${palette} · elev ${num('elev', 35.264)}° az ${num('az', 45)}° · ${q.get('shot') ?? 'overview'} ×${num('zoom', 1)}`
       + ` · layers ${r.layers.map((l) => l.name).join('+')} · world ${worldCalls()} draw calls · t=${Math.round(runner.simT)}s`;
   }

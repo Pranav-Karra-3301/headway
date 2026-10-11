@@ -22,7 +22,7 @@ export const PRESETS: readonly PresetDef[] = [
   { id: 'stadium', label: 'Stadium', key: '2', box: { minX: -26, maxX: -4, minZ: 2, maxZ: 24 }, top: 3 },
   { id: 'downtown', label: 'Downtown hub', key: '3', box: { minX: -4, maxX: 14, minZ: -10, maxZ: 8 }, top: 3 },
   { id: 'campus', label: 'Campus', key: '4', box: { minX: -22, maxX: 0, minZ: -22, maxZ: 0 }, top: 3 },
-  { id: 'central', label: 'Central Station', key: '5', box: { minX: 16, maxX: 32, minZ: -10, maxZ: 12 }, top: 3 },
+  { id: 'central', label: 'Central Station', key: '5', box: { minX: 17, maxX: 34, minZ: -13, maxZ: 5 }, top: 3 },
 ] as const;
 
 export const PRESET_BY_ID: ReadonlyMap<PresetId, PresetDef> = new Map(PRESETS.map((p) => [p.id, p] as const));

@@ -211,7 +211,7 @@ describe('K2 builders with Kenney templates', () => {
       const o = r.build(createBasicKit(r.roles, 0, 9), { kind: s.kind, x: 0, z: 0 });
       o.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(o);
-      if (s.boat) { expect(box.min.y, s.kind).toBeLessThan(-0.05); expect(box.min.y, s.kind).toBeGreaterThan(-0.4); }
+      if (s.boat) { expect(box.min.y, s.kind).toBeLessThanOrEqual(1e-6); expect(box.min.y, s.kind).toBeGreaterThan(-0.4); }
       else expect(box.min.y, s.kind).toBeCloseTo(0, 5);
       const size = box.getSize(new THREE.Vector3());
       expect(size.x, s.kind).toBeLessThanOrEqual(s.w * 1.1);

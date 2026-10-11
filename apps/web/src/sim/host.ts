@@ -1,7 +1,7 @@
 // Canvas host (T3a): owns the SimRunner and the TownRenderer for the page.
 // rAF: runner.frame → renderer.render every frame; HUD feed (setHudFeed) at 4 Hz; snapshot events → toasts.
 // Store ↔ runner/renderer sync: session, paused, speed, palette/detail/light/quality, highlight, selection.
-import { TOWN, createStubSim, stationById, stopById } from '@headway/sim';
+import { G0, PolicyController, TOWN, createStubSim, runSync, stationById, stopById } from '@headway/sim';
 import type { DecisionRecord, QueuePlace, Sim, SimSnapshot } from '@headway/sim';
 import { TownRenderer } from '../render/index';
 import type { TownRendererApi } from '../render/types';
@@ -31,6 +31,14 @@ export interface HeadwayProbe {
   readonly session: string | null; readonly error: string | null;
   /** The app store, for smoke tests and screenshot scripts (e.g. __headway.app.getState().select({ kind: 'bus', id: 'b1' })). */
   readonly app: typeof useApp;
+  /** Spec §12 determinism check: RunResult.hash of a full g0 run in this browser (default: the stadium_exit showcase
+   *  crowd 4001). The smoke test compares it with the Node hash of the same run. */
+  hash(scenarioId?: string, seed?: number): string;
+}
+
+/** Hash of a full headless g0 run (no rendering), e.g. for comparing browser and Node determinism. */
+export function g0RunHash(scenarioId = 'stadium_exit', seed = 4001): string {
+  return runSync({ map: TOWN, scenario: { scenarioId, seed, split: 'showcase' }, controller: new PolicyController(G0) }).hash;
 }
 declare global { interface Window { __headway?: HeadwayProbe } }
 
@@ -322,6 +330,7 @@ export function startHost(a: HostOptions): () => void {
     get session() { return session?.key ?? null; },
     get error() { return lastError; },
     get app() { return store; },
+    hash: (scenarioId?: string, seed?: number) => g0RunHash(scenarioId, seed),
   };
   Object.defineProperty(win, '__headway', { value: probe, configurable: true, writable: true });
 

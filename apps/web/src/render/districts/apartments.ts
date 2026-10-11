@@ -6,9 +6,9 @@
 //
 // Composition follows the art bible (docs/research/iso-art-direction.md): the camera looks from +x/+z, so heights
 // step down toward the south and east, and route r2 (Station Rd → South Rd → Atherton St) keeps its camera side low.
-// - Tower block (Allen ↔ Station Rd, the tall west side of Station Rd): Eastview (door on Main St) and Parkside (door
-//   on South Rd) towers open east onto a paved promenade where both bus queues stand (2 u kept clear around each); a
-//   pocket green between them ends the Park Ave vista and carries it on as a footpath to the promenade.
+// - Tower block (Allen ↔ Station Rd, the tall west side of Station Rd): Eastview Gardens (3-storey walk-up, door on
+//   Main St; a tower there hid Main St) and Parkside Tower (door on South Rd) open east onto a paved promenade where
+//   both bus queues stand (2 u kept clear around each); a mews path between them runs from Allen St to the promenade.
 // - South side (Park Ave ↔ South Rd, west of Allen St; the back of the district): the garden walk-up and the Allen
 //   Court tower on South Rd's tall north side, the tower 1.5 u off Allen St and well clear of Atherton St.
 // - East band (Station Rd ↔ rail, the camera side of the stops): Garden Row, two cottages with a shared garden, a low
@@ -69,7 +69,11 @@ const areas: GroundArea[] = [];
 // lines (queue slots reach 2.4 u). Butter roofs with slate-blue or coral balconies: the district's roof family.
 const TX = Math.min(XL + 3.27, S_NORTH.x - 2.4 - 2.0 - 1.78);
 const EAST_Z = D_EAST.z + 0.1 + 1.75, PARK_Z = D_PARK.z - 0.05 - 1.75;
-put('res.tower', TX, EAST_Z, E, { floors: 5, accent: 3, roof: 2, wall: 0 });   // Eastview Towers
+// Eastview is a 3-storey brick walk-up, not a tower: on the Main St / Allen St corner a tower stood on the camera side
+// of the busiest street (all three routes) and hid it (town-art review; camera study: the worst route occluder).
+// It runs north-south along Allen St, balconies east to the promenade and the stops.
+const GARDEN_X = XL + 1.5 + 1.75, GARDEN_Z0 = D_EAST.z + 0.1, GARDEN_Z1 = GARDEN_Z0 + 6;
+put('res.garden', GARDEN_X, (GARDEN_Z0 + GARDEN_Z1) / 2, E, { scheme: 'brick', roof: 0, accent: 2 }); // Eastview Gardens
 put('res.tower', TX, PARK_Z, S, { floors: 5, accent: 0, roof: 2, wall: 1 });   // Parkside Towers, lobby to South Rd at its door
 // Promenade: one paved forecourt along Station Rd holding both queues; a birch and a lamp between the two stops (the
 // quiet zone keeps one lamp within 3 u of each stop).
@@ -80,13 +84,9 @@ tree('birch', PX0 + 1.3, midZ, 0.7);
 put('st.lamp', XS - 1.55, midZ, W);
 put('st.lamp', XS - 1.55, ZM + 1.75, W);
 put('st.bikeRack', PX0 + 2.3, ZM + 2.25, S);
-// Pocket green between the towers on the Park Ave axis; Park Ave carries on as a path to the promenade.
-const G0 = EAST_Z + 1.75, G1 = PARK_Z - 1.75; // green spans z between the towers
-areas.push({ kind: 'lawn', polygon: rect(XL + 1.9, G0 + 0.2, PX0 - 0.2, G1 - 0.2) });
-paths.push({ points: [v(XL + 1.9, ZP), v(PX0 + 0.3, ZP)], width: 0.8, kind: 'footpath' });
-put('veg.flowerbed', TX - 0.5, G0 + 0.6, S);
-tree('birch', TX + 1.0, G0 + 0.75, 1.4);
-put('st.bench', TX + 0.85, ZP + 0.95, N);
+// A mews between Eastview and Parkside: a footpath from Allen St through to the promenade.
+const G0 = GARDEN_Z1, G1 = PARK_Z - 1.75; // the gap between the two buildings
+paths.push({ points: [v(XL + 1.9, (G0 + G1) / 2), v(PX0 + 0.3, (G0 + G1) / 2)], width: 0.8, kind: 'footpath' });
 
 // ---------------------------------------------------------------- east band (Station Rd ↔ rail): Garden Row
 // The camera side of Station Rd and its stops, so only cottages (≤ 2.4 u), low hedges and bushes face the street;
@@ -119,6 +119,7 @@ put('veg.hedge', WU_X, ZP + 1.95, S, { length: 5 });
 put('veg.bush', XA + 2.0, ZP + 2.0, 0.6);
 put('st.lamp', AC_X - 2.15, ZS - 1.55, S);
 put('st.lamp', AC_X - 2.15, ZP + 1.55, N);
+put('st.bench', AC_X - 1.05, ZP + 1.6, N);    // under Allen Court, facing Park Ave
 
 // ---------------------------------------------------------------- south band (South Rd ↔ rail), fronts north
 // Camera side of South Rd (a bus route): townhouses (≤ 2.8 u) 2 u back, tall crowns only in the back gardens.

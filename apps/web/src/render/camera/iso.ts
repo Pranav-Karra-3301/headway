@@ -24,8 +24,8 @@ export const CAMERA = {
   maxZoomK: 4,
   /** Below this fraction of Overview the pan clamp lets the diorama's cut edge show (bible §1.4). */
   edgeClampK: 0.85,
-  /** Spring settle time (s) for presets, focus and refits; zoom springs in log space. */
-  springS: 0.65,
+  /** Spring settle time (s, to 0.1 %) for presets, focus and refits; zoom springs in log space. */
+  springS: 0.7,
   /** Hold Q / E to peek: swing the azimuth by this much, spring back on release (no 90° steps, bible §1.6). */
   peekDeg: 20,
   /** Focus (double-click / F): entity ± radius, at least this × Overview. */

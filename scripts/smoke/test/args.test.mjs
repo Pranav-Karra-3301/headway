@@ -74,3 +74,8 @@ test('routeFor maps known paths and tolerates trailing slashes', () => {
   assert.equal(routeFor('/lab').requireCanvas, false);
   assert.equal(routeFor('/x').mode, null);
 });
+
+test('--hash turns on the spec §12 browser = Node hash check (off by default)', () => {
+  assert.equal(parseArgs(['--url', 'http://localhost:5173']).hash, false);
+  assert.equal(parseArgs(['--url', 'http://localhost:5173', '--hash']).hash, true);
+});

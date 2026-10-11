@@ -8,8 +8,8 @@ import { WF, type WfDeck, type WfPavilion, type WfRun } from './plan';
 
 /** G3 palette roles: [palette a, b, c]. Wood + stone harmonised with the town's platforms, kerbs and benches. */
 export const WF_ROLES: RoleColors = {
-  wfPave: ['#EBE1CE', '#E3D7BF', '#E7E1D3'],
-  wfPaveEdge: ['#D6C7AC', '#C9B898', '#D0C7B5'],
+  wfPave: [['#E6E0D3', '#DED7C8'], ['#DCD2BF', '#D3C8B3'], ['#E2DED5', '#D9D4CA']],
+  wfPaveEdge: ['#C9C0AE', '#BBAF98', '#C4BDB0'],
   wfDeck: [['#CFA274', '#C39468', '#D8AE80'], ['#B08A63', '#A27E59', '#BA956C'], ['#B08A68', '#A47F5E', '#BC9774']],
   wfBeam: ['#9C7553', '#7E604A', '#7A5D47'],
   wfPile: ['#8A6A50', '#6C5442', '#64503F'],
@@ -72,15 +72,21 @@ export function buildPromenade(run: WfRun): THREE.Group {
   const side = (o: number) => P.map((p, i) => add(p, run.sea[i]!, o));
   // bands across the width (sea side = +): [from, to, role]
   const bands: Array<[number, number, string]> = [[-hw, -hw + border, 'wfPaveEdge'], [-hw + border, hw - border, 'wfPave'], [hw - border, hw, 'wfPaveEdge']];
+  const SLAB = 5; // samples per paving slab band (alternating shades in the centre)
   for (const [o0, o1, role] of bands) {
     const A = side(o0), B = side(o1);
-    const pos: number[] = [], idx: number[] = [];
+    const pos: number[] = [];
     for (let i = 0; i < P.length; i++) pos.push(A[i]!.x, top, A[i]!.z, B[i]!.x, top, B[i]!.z);
-    for (let i = 0; i + 1 < P.length; i++) {
-      const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
-      idx.push(a, c, b, b, c, d);
+    const slabs = role === 'wfPave' ? 2 : 1;
+    for (let v = 0; v < slabs; v++) {
+      const idx: number[] = [];
+      for (let i = 0; i + 1 < P.length; i++) {
+        if (slabs > 1 && Math.floor(i / SLAB) % 2 !== v) continue;
+        const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+        idx.push(a, c, b, b, c, d);
+      }
+      if (idx.length) g.add(mesh(ribbon(pos, idx), role, v, false));
     }
-    g.add(mesh(ribbon(pos, idx), role, 0, false));
   }
   // kerb faces (outer edges), from the paving down to just below the ground
   for (const o of [-hw, hw]) {
@@ -98,6 +104,24 @@ export function buildPromenade(run: WfRun): THREE.Group {
     const a = add(P[i]!, run.sea[i]!, -hw), b = add(P[i]!, run.sea[i]!, hw);
     const pos = [a.x, top, a.z, b.x, top, b.z, a.x, -0.05, a.z, b.x, -0.05, b.z];
     g.add(mesh(ribbon(pos, i === 0 ? [0, 1, 2, 1, 3, 2] : [0, 2, 1, 1, 2, 3]), 'wfPaveEdge', 0, false));
+  }
+  return g;
+}
+
+/** Low stone sea wall along the promenade's sea edge (gaps where jetties leave). */
+export function buildSeaWall(run: WfRun): THREE.Group {
+  const g = new THREE.Group();
+  const hw = run.width / 2, h = 0.24, w = 0.26, gaps = run.gaps ?? [];
+  const P = run.pts;
+  let acc = 0;
+  for (let i = 0; i + 1 < P.length; i++) {
+    const a = add(P[i]!, run.sea[i]!, hw - w / 2), b = add(P[i + 1]!, run.sea[i + 1]!, hw - w / 2);
+    const L = Math.hypot(b.x - a.x, b.z - a.z);
+    const mid = acc + L / 2;
+    acc += L;
+    if (L < 1e-3 || gaps.some(([s0, s1]) => mid > s0 && mid < s1)) continue;
+    const f = { x: (b.x - a.x) / L, z: (b.z - a.z) / L };
+    g.add(put(mesh(box(w, h, L + 0.06), 'wfStone', 0, true), (a.x + b.x) / 2, WF.paveTop + h / 2, (a.z + b.z) / 2, f));
   }
   return g;
 }
@@ -235,10 +259,14 @@ export function buildBoardwalk(run: WfRun): THREE.Group {
   // the sea-side rail: posts at the pile stations, rails between them
   const h = 0.52;
   const post = box(0.075, h, 0.075);
+  const gaps = run.gaps ?? [];
+  const railS = (i: number) => (i / m) * run.length;
+  const gapAt = (s: number) => gaps.some(([s0, s1]) => s > s0 && s < s1);
   for (let i = 0; i < railPts.length; i++) {
     const p = railPts[i]!;
+    if (gapAt(railS(i))) continue;
     g.add(put(mesh(post, 'wfRail', 0, true), p.x, top + h / 2, p.z));
-    if (i > 0) {
+    if (i > 0 && !gapAt(railS(i - 1)) && !gapAt((railS(i - 1) + railS(i)) / 2)) {
       const a = railPts[i - 1]!, L = Math.hypot(p.x - a.x, p.z - a.z), f = { x: (p.x - a.x) / (L || 1), z: (p.z - a.z) / (L || 1) };
       const c = add(a, f, L / 2);
       g.add(put(mesh(box(0.07, 0.07, L + 0.04), 'wfRail', 0, true), c.x, top + h - 0.02, c.z, f));

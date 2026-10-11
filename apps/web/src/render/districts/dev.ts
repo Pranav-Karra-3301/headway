@@ -1,4 +1,5 @@
-// District preview: /districts-dev.html?d=campus (default: all; &view=30&cx=0&cz=0 for close-ups). Roads/rail as flat strips + district items + paths/areas.
+// District preview: /districts-dev.html?d=campus (default: all; &view=30&cx=0&cz=0 for close-ups;
+// &street=0 for flat path/area stand-ins instead of S1's streetscape). Roads/rail as flat strips + district items + paths/areas.
 import * as THREE from 'three';
 import { TOWN } from '@headway/sim';
 import type { Vec2 } from '@headway/sim';
@@ -6,6 +7,7 @@ import { createBasicKit } from '../assets/basicKit';
 import { createRegistry } from '../assets/index';
 import { kenneyIdsFor, preloadKenney } from '../assets/kenney';
 import { devScene } from '../assets/devScene';
+import { createStreetscapeLayer } from '../streetscape/index';
 import { DISTRICTS } from './index';
 
 const msg = document.getElementById('msg')!;
@@ -34,14 +36,34 @@ if (!TOWN.roads) {
     }
   };
   for (const e of TOWN.roads.edges) strip(e.path.points, e.path.closed, 2.4, '#515566', 0.02);
-  strip(TOWN.rail.loop.points, true, 1.6, '#C9B79C', 0.03);
+  // rail: ballast + two steel rails, only over the board (the world layer carries it off-board)
+  const onBoard = (p: Vec2) => p.x >= b.minX - 2 && p.x <= b.maxX + 2 && p.z >= b.minZ - 2 && p.z <= b.maxZ + 2;
+  const railRuns: Vec2[][] = [];
+  const R = TOWN.rail.loop.points;
+  for (let i = 0; i <= R.length; i++) {
+    const p = R[i % R.length]!;
+    if (!onBoard(p)) { railRuns.push([]); continue; }
+    if (!railRuns.length) railRuns.push([]);
+    railRuns[railRuns.length - 1]!.push(p);
+  }
+  const offset = (pts: Vec2[], d: number): Vec2[] => pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)]!, c = pts[Math.min(pts.length - 1, i + 1)]!, l = Math.hypot(c.x - a.x, c.z - a.z) || 1;
+    return { x: p.x - ((c.z - a.z) / l) * d, z: p.z + ((c.x - a.x) / l) * d };
+  });
+  for (const run of railRuns.filter((r) => r.length > 1)) {
+    strip(run, false, 1.5, '#B4A592', 0.03);
+    for (const d of [-0.32, 0.32]) strip(offset(run, d), false, 0.09, '#6E7480', 0.06);
+  }
+  // &street=0: flat stand-ins for paths/areas instead of S1's streetscape (sidewalks, zebras, flagstones, beds)
+  const street = new URLSearchParams(location.search).get('street') !== '0';
+  if (street) scene.add(createStreetscapeLayer(TOWN, ds).object);
   const registry = createRegistry();
   await preloadKenney(kenneyIdsFor(ds.flatMap((d) => d.items.map((it) => it.kind)))); // Kenney-backed builders need their models first
   const kit = createBasicKit(registry.roles);
   let count = 0;
   for (const d of ds) {
-    for (const p of d.paths) strip(p.points, false, p.width, '#EADCC6', 0.025);
-    for (const a of d.areas) {
+    if (!street) for (const p of d.paths) strip(p.points, false, p.width, '#EADCC6', 0.025);
+    if (!street) for (const a of d.areas) {
       const shape = new THREE.Shape(a.polygon.map((p) => new THREE.Vector2(p.x, -p.z)));
       const g = new THREE.ShapeGeometry(shape); g.rotateX(-Math.PI / 2);
       const col = { lawn: '#8FCB9B', plaza: '#EFE4D2', parking: '#C9CCD1', sports: '#6FC07F', garden: '#9BD3A8' }[a.kind];

@@ -24,11 +24,11 @@ export const WF = {
   /** Stone promenade: centreline offset inland from the shore, width. */
   prom: { offset: 2.7, width: 2.0 },
   /** Timber boardwalk: centreline offset (negative = seaward, over the water on piles), width. */
-  walk: { offset: -0.55, width: 1.8 },
+  walk: { offset: -0.95, width: 1.8 },
   /** Land deeper than this (shore → first road / board cell) gets the promenade, else a boardwalk. */
   promDepth: 6,
   /** Keep every deck and item this far from the rail centreline (bay bridge, beach run). */
-  railClear: 3.1,
+  railClear: 2.9,
   sample: 0.5,
 } as const;
 
@@ -41,6 +41,8 @@ export interface WfRun {
   sea: Vec2[];
   width: number;
   length: number;
+  /** Promenades: arc-length spans with no sea wall (where a jetty or lookout leaves it). */
+  gaps?: Array<[number, number]>;
 }
 
 export type DeckKind = 'pier' | 'head' | 'finger' | 'lookout';
@@ -177,18 +179,28 @@ function buildPlan(map: TownMap, g: GreaterGrid): WaterfrontPlan {
     }
     return d;
   });
-  const kindAt = (i: number): RunKind => (depth[i]! >= WF.promDepth ? 'promenade' : 'boardwalk');
   const okAt = (i: number, kind: RunKind): boolean => {
     const { offset, width } = kind === 'promenade' ? WF.prom : WF.walk;
     const c = add(S[i]!, N[i]!, -offset);
-    for (const e of [-width / 2 - 0.15, 0, width / 2 + 0.15]) if (!open(add(c, N[i]!, e))) return false;
+    for (const e of [-width / 2 - 0.15, 0, width / 2 + 0.15]) {
+      const q = add(c, N[i]!, e);
+      // a boardwalk may brush a kerb corner with its landward edge (the deck steps up from the sidewalk)
+      if (!open(q) && !(kind === 'boardwalk' && e < 0 && use(q) === 'road' && open(c))) return false;
+    }
     // promenades stay on land; boardwalks need waterfront land or shore within reach (not a lone deck in the bay)
     if (kind === 'promenade') return land(add(c, N[i]!, -width / 2)) && land(add(c, N[i]!, width / 2 - 0.4));
-    return land(add(S[i]!, N[i]!, -0.6)) || land(add(S[i]!, N[i]!, -1.6));
+    return [0.6, 1.6, 2.6].some((t) => { const u = use(add(S[i]!, N[i]!, -t)); return u === 'free' || u === 'road'; });
   };
-  // smooth the kind decision a little (no 1-sample flips)
-  const kinds = S.map((_, i) => kindAt(i));
-  for (let i = 2; i + 2 < kinds.length; i++) if (kinds[i - 2] === kinds[i + 2] && kinds[i] !== kinds[i - 2]) kinds[i] = kinds[i - 2]!;
+  // promenade where the land is deep enough along a stretch of ≥ 10 u, a boardwalk everywhere else
+  const pf = S.map((_, i) => depth[i]! >= WF.promDepth && okAt(i, 'promenade'));
+  for (let i = 0; i < pf.length;) {
+    if (!pf[i]) { i++; continue; }
+    let j = i;
+    while (j < pf.length && pf[j]) j++;
+    if ((j - i) * WF.sample < 10) for (let k = i; k < j; k++) pf[k] = false;
+    i = j;
+  }
+  const kinds: RunKind[] = pf.map((f) => (f ? 'promenade' : 'boardwalk'));
 
   const runs: WfRun[] = [];
   let cur: number[] = [];
@@ -262,16 +274,19 @@ function buildPlan(map: TownMap, g: GreaterGrid): WaterfrontPlan {
     const { away, root } = e;
     const side = rightOf(away);
     const onWalk = nearBoardwalk(add(root, away, 0.9), 1.6);
-    const railFrom = onWalk ? WF.walk.width + 0.5 : 0.3;
+    let tShore = 0;
+    while (tShore < 3 && !isWater(g, root.x + away.x * tShore, root.z + away.z * tShore)) tShore += 0.1;
+    // decks clear of the land / boardwalk start here (rails, lamps)
+    const railFrom = tShore + (onWalk ? WF.walk.width - WF.walk.offset - 0.85 : 0.2);
     if (e === harbourEnd) {
       // HARBOUR: main pier with two rows of finger slips each side, a T head, moored boats, lamps
-      const len = Math.min(e.reach, 10.5);
+      const len = Math.min(e.reach - 0.4, 13);
       harbour = { root, dir: away, len, street: e.street };
       piers.push(add(root, away, len / 2));
       deck({ id: 'harbour-main', kind: 'pier', c: add(root, away, len / 2), dir: away, len, w: 1.6, rails: [], railFrom });
       const headW = 6.2;
-      deck({ id: 'harbour-head', kind: 'head', c: add(root, away, len - 0.6), dir: away, len: 1.2, w: headW, rails: ['e'] });
-      const rows = [len * 0.38, len * 0.66];
+      deck({ id: 'harbour-head', kind: 'head', c: add(root, away, len - 0.8), dir: away, len: 1.6, w: headW, rails: ['e'] });
+      const rows = len >= 11 ? [len * 0.3, len * 0.52, len * 0.74] : [len * 0.38, len * 0.66];
       rows.forEach((at, ri) => {
         for (const s of [-1, 1]) {
           const fl = 3.0;
@@ -279,7 +294,7 @@ function buildPlan(map: TownMap, g: GreaterGrid): WaterfrontPlan {
           if (reach(add(root, away, at), s > 0 ? side : neg(side), 0.45, 0.8 + fl + 1.6) < 0.8 + fl + 1.2) continue;
           deck({ id: `harbour-finger-${ri}-${s}`, kind: 'finger', c: fc, dir: s > 0 ? side : neg(side), len: fl, w: 0.6, rails: [] });
           // moored boats: in the slip on the shore side of the finger, bow toward the main pier... and one outside
-          const boats = ['kn.boat.sail', 'kn.boat.speed', 'kn.boat.fishing', 'kn.boat.runabout', 'kn.boat.sailLarge', 'kn.boat.row'];
+          const boats = ['kn.boat.sail', 'kn.boat.speed', 'kn.boat.fishing', 'kn.boat.runabout', 'kn.boat.sailLarge', 'kn.boat.speed'];
           const bk = boats[(ri * 2 + (s > 0 ? 1 : 0)) % boats.length]!;
           const bp = add(add(add(root, away, at - 1.25), side, s * (0.8 + fl * 0.55)), away, 0);
           item(bk, bp, WF.waterY, facing(s > 0 ? neg(side) : side), { boat: true });
@@ -288,10 +303,11 @@ function buildPlan(map: TownMap, g: GreaterGrid): WaterfrontPlan {
         }
       });
       // lamps along the main pier + at the head, a flag at the head, life ring post
-      for (const at of [railFrom + 0.6, len * 0.52, len - 0.6]) item('st.lamp', add(add(root, away, at), side, -0.62), WF.pierTop, facing(side), { scale: 0.92 });
-      item('st.flag', add(add(root, away, len - 0.6), side, headW / 2 - 0.4), WF.pierTop, facing(away));
-      item('st.bench', add(add(root, away, len - 0.75), side, -headW / 2 + 1.0), WF.pierTop, facing(away));
-      item('kn.boat.sail', add(add(root, away, len + 1.6), side, -2.2), WF.waterY, facing(side) + 0.25, { boat: true });
+      for (const at of [railFrom + 0.6, len * 0.41, len * 0.63]) item('st.lamp', add(add(root, away, at), side, -0.62), WF.pierTop, facing(side), { scale: 0.92 });
+      item('st.flag', add(add(root, away, len - 0.5), side, headW / 2 - 0.35), WF.pierTop, facing(away), { params: { color: 0 } });
+      item('st.kiosk', add(add(root, away, len - 0.85), side, -headW / 2 + 0.85), WF.pierTop, facing(neg(away)), { params: { color: 0 } });
+      item('st.bench', add(add(root, away, len - 0.45), side, 1.1), WF.pierTop, facing(away));
+      item('kn.boat.sail', add(add(root, away, len + 1.7), side, 2.4), WF.waterY, facing(side) + 0.25, { boat: true });
       continue;
     }
     const headOk = (len: number, w: number) => reach(add(root, away, len - 0.1), side, 0.7, w / 2) >= w / 2 - 0.3 && reach(add(root, away, len - 0.1), neg(side), 0.7, w / 2) >= w / 2 - 0.3;
@@ -310,90 +326,118 @@ function buildPlan(map: TownMap, g: GreaterGrid): WaterfrontPlan {
       continue;
     }
     // LOOKOUT: a short deck out over the water with a flag, a bench and a telescope
-    const len = Math.min(e.reach, 3.6);
+    const len = Math.min(e.reach, railFrom + 3.0);
     piers.push(add(root, away, len / 2));
-    deck({ id: `lookout-${e.j.id}`, kind: 'lookout', c: add(root, away, len / 2), dir: away, len, w: 2.8, rails: ['l', 'r', 'e'], railFrom: 0.3 });
+    deck({ id: `lookout-${e.j.id}`, kind: 'lookout', c: add(root, away, len / 2), dir: away, len, w: 2.8, rails: ['l', 'r', 'e'], railFrom });
     item('st.bench', add(add(root, away, len - 0.75), side, -0.55), WF.pierTop, facing(away));
     item('wf.telescope', add(add(root, away, len - 0.6), side, 0.75), WF.pierTop, facing(away));
-    item('st.flag', add(add(root, away, 0.6), side, 1.05), WF.pierTop, 0);
+    item('st.flag', add(add(root, away, 0.6), side, 1.05), WF.pierTop, 0, { params: { color: 0 } });
   }
 
-  // ---- promenade + boardwalk furniture, jetties and pavilions
+  // ---- per run: jetties (promenades), sea-wall gaps, lamps + benches, a café kiosk, tree rows
   const longestProm = runs.filter((r) => r.kind === 'promenade').sort((a, b) => b.length - a.length)[0];
   for (const run of runs) {
     const prom = run.kind === 'promenade';
     const hw = run.width / 2;
+    if (prom) {
+      // jetties off long promenades (spaced from each other and the cul-de-sac piers), the longest gets a pavilion
+      if (run.length >= 14) {
+        const cand: Array<{ s: number; reach: number }> = [];
+        for (let s = 6; s <= run.length - 6; s += 1) {
+          const { p, sea } = runAt(run, s);
+          const root = add(p, sea, hw);
+          if (piers.some((q) => dist(q, root) < 16)) continue;
+          const rch = reach(add(root, sea, 0.2), sea, 1.0, 9);
+          if (rch >= 4.6) cand.push({ s, reach: rch });
+        }
+        let made = 0;
+        for (const c of cand.sort((a, b) => b.reach - a.reach || a.s - b.s)) {
+          if (made >= 2) break;
+          const { p, sea } = runAt(run, c.s);
+          const root = add(p, sea, hw - 0.1);
+          if (piers.some((q) => dist(q, root) < 16)) continue;
+          const side = rightOf(sea);
+          const len = Math.min(c.reach - (made === 0 ? 2.8 : 1.5), 6.5);
+          if (len < 1.6) continue;
+          piers.push(add(root, sea, len / 2));
+          deck({ id: `jetty-${run.id}-${made}`, kind: 'pier', c: add(root, sea, len / 2), dir: sea, len, w: 1.4, rails: ['l', 'r'], railFrom: 0.5 });
+          if (made === 0) {
+            deck({ id: `jetty-${run.id}-${made}-head`, kind: 'head', c: add(root, sea, len + 1.25), dir: sea, len: 2.8, w: 2.8, rails: [] });
+            pavilions.push({ id: `pavilion-${run.id}`, c: add(root, sea, len + 1.25), r: 1.25, y: WF.pierTop });
+            item('kn.boat.speed', add(add(root, sea, len * 0.6), side, 1.7), WF.waterY, facing(sea), { boat: true });
+          } else {
+            deck({ id: `jetty-${run.id}-${made}-head`, kind: 'head', c: add(root, sea, len + 0.6), dir: sea, len: 1.4, w: 3.4, rails: ['l', 'r', 'e'] });
+            item('st.lamp', add(add(root, sea, len + 0.7), side, 1.4), WF.pierTop, 0, { scale: 0.92 });
+            item('st.bench', add(add(root, sea, len + 0.85), side, -0.6), WF.pierTop, facing(sea));
+          }
+          made++;
+        }
+      }
+    }
+    // gaps in the sea wall / sea rail where a deck crosses the run's sea edge
+    const gaps: Array<[number, number]> = [];
+    const edgeS: Array<{ q: Vec2; s: number }> = [];
+    for (let i = 0, acc = 0; i < run.pts.length; i++) {
+      if (i > 0) acc += dist(run.pts[i - 1]!, run.pts[i]!);
+      edgeS.push({ q: add(run.pts[i]!, run.sea[i]!, hw), s: acc });
+    }
+    for (const d of decks) {
+      const root = add(d.c, d.dir, -d.len / 2);
+      let hit: number | null = null;
+      for (let t = 0; t <= Math.min(d.len, 4.5) && hit === null; t += 0.1) {
+        const q = add(root, d.dir, t);
+        for (const e of edgeS) if (dist(e.q, q) < 0.3) { hit = e.s; break; }
+      }
+      if (hit !== null) gaps.push([hit - d.w / 2 - 0.2, hit + d.w / 2 + 0.2]);
+    }
+    run.gaps = gaps;
+    const inGap = (s: number, pad: number) => gaps.some(([a, b]) => s > a - pad && s < b + pad);
+    // lamps and benches alternate along the sea side (inside the wall on promenades, by the rail on boardwalks)
     const lampStep = prom ? 8 : 6.5;
     const phase = (hash(run.pts[0]!.x, run.pts[0]!.z) * 2) | 0;
-    // keep furniture off the pier roots
-    const nearPier = (p: Vec2, r: number) => piers.some((q) => dist(q, p) < r) || decks.some((d) => dist(add(d.c, d.dir, -d.len / 2), p) < r * 0.6);
+    const nearPier = (p: Vec2, r: number) => decks.some((d) => dist(add(d.c, d.dir, -d.len / 2), p) < r);
+    const top = prom ? WF.paveTop : WF.walkTop;
     let n = 0;
     for (let s = 1.2; s <= run.length - 1.0; s += lampStep / 2, n++) {
       const { p, sea, tan } = runAt(run, s);
-      const edge = add(p, sea, hw + (prom ? 0.32 : -0.22));
-      if (nearPier(edge, 2.2)) continue;
+      if (inGap(s, 1.2) || nearPier(add(p, sea, hw), 1.4)) continue;
       if ((n + phase) % 2 === 0) {
-        item('st.lamp', edge, prom ? WF.paveTop : WF.walkTop, facing(tan), { scale: prom ? 1 : 0.92 });
+        item('st.lamp', add(p, sea, hw - (prom ? 0.38 : 0.22)), top, facing(tan), { scale: prom ? 1 : 0.92 });
       } else {
-        const bench = add(p, sea, hw - (prom ? 0.45 : 0.42));
-        item('st.bench', bench, prom ? WF.paveTop : WF.walkTop, facing(sea));
-        if (n % 4 === 1) item('st.bin', add(bench, tan, 1.0), prom ? WF.paveTop : WF.walkTop, 0);
+        const bench = add(p, sea, hw - (prom ? 0.72 : 0.42));
+        item('st.bench', bench, top, facing(sea));
+        if (n % 4 === 1) item('st.bin', add(bench, tan, 1.0), top, 0);
       }
     }
     if (!prom) continue;
-    // a tree row on the land side of the promenade, a few bushes / flower beds behind it
-    for (let s = 2.5; s <= run.length - 2; s += 6.2) {
-      const j = hash(s, run.length);
-      const { p, sea, tan } = runAt(run, s + (j - 0.5) * 1.6);
-      const tp = add(p, sea, -(hw + 1.25 + j * 0.5));
-      if (!land(tp) || !land(add(tp, sea, -0.9)) || !land(add(tp, tan, 0.9)) || !land(add(tp, tan, -0.9))) continue;
-      const kinds = ['veg.oak', 'veg.maple', 'veg.birch'];
-      item(kinds[Math.floor(hash(tp.x, tp.z) * kinds.length)]!, tp, 0, hash(tp.z, tp.x) * Math.PI * 2, { scale: 0.9 + hash(tp.x + 3, tp.z) * 0.25, params: { variant: Math.floor(hash(tp.x, tp.z + 9) * 2) } });
-      const bp = add(add(tp, tan, 3.1), sea, -0.4);
-      if (j > 0.45 && land(bp) && land(add(bp, sea, -1))) item(j > 0.75 ? 'veg.flowerbed' : 'veg.bush', bp, 0, facing(sea), { params: { variant: 0 } });
-    }
-    // jetties off long promenades (spaced from each other and the cul-de-sac piers), the longest gets a pavilion
-    if (run.length < 14) continue;
-    const cand: Array<{ s: number; reach: number }> = [];
-    for (let s = 6; s <= run.length - 6; s += 1) {
-      const { p, sea } = runAt(run, s);
-      const root = add(p, sea, hw);
-      if (piers.some((q) => dist(q, root) < 16)) continue;
-      const rch = reach(add(root, sea, 0.2), sea, 1.0, 9);
-      if (rch >= 4.6) cand.push({ s, reach: rch });
-    }
-    let made = 0;
-    for (const c of cand.sort((a, b) => b.reach - a.reach || a.s - b.s)) {
-      if (made >= 2) break;
-      const { p, sea } = runAt(run, c.s);
-      const root = add(p, sea, hw - 0.1);
-      if (piers.some((q) => dist(q, root) < 16)) continue;
-      const side = rightOf(sea);
-      const len = Math.min(c.reach - (made === 0 ? 2.8 : 1.5), 6.5);
-      if (len < 1.6) continue;
-      piers.push(add(root, sea, len / 2));
-      deck({ id: `jetty-${run.id}-${made}`, kind: 'pier', c: add(root, sea, len / 2), dir: sea, len, w: 1.4, rails: ['l', 'r'], railFrom: 0.5 });
-      if (made === 0) {
-        deck({ id: `jetty-${run.id}-${made}-head`, kind: 'head', c: add(root, sea, len + 1.25), dir: sea, len: 2.8, w: 2.8, rails: [] });
-        pavilions.push({ id: `pavilion-${run.id}`, c: add(root, sea, len + 1.25), r: 1.25, y: WF.pierTop });
-        item('kn.boat.speed', add(add(root, sea, len * 0.6), side, 1.7), WF.waterY, facing(sea), { boat: true });
-      } else {
-        deck({ id: `jetty-${run.id}-${made}-head`, kind: 'head', c: add(root, sea, len + 0.6), dir: sea, len: 1.4, w: 3.4, rails: ['l', 'r', 'e'] });
-        item('st.lamp', add(add(root, sea, len + 0.7), side, 1.4), WF.pierTop, 0, { scale: 0.92 });
-        item('st.bench', add(add(root, sea, len + 0.85), side, -0.6), WF.pierTop, facing(sea));
-      }
-      made++;
-    }
     // a café kiosk with parasol tables on the lawn behind the longest promenade (near its middle)
-    if (run !== longestProm) continue;
+    const kiosks: Vec2[] = [];
     for (const frac of [0.5, 0.35, 0.65]) {
       const { p, sea, tan } = runAt(run, run.length * frac);
       const k = add(p, sea, -(hw + 1.9));
+      if (run !== longestProm) break;
       if (![k, add(k, tan, 2.6), add(k, tan, -2.6), add(k, sea, -1.2)].every(land) || piers.some((q) => dist(q, k) < 5)) continue;
-      item('st.kiosk', k, 0, facing(sea));
+      kiosks.push(k);
+      item('st.kiosk', k, 0, facing(sea), { params: { color: 1 } });
       item('st.tableUmbrella', add(add(k, tan, 1.9), sea, 0.2), 0, 0);
       item('st.tableUmbrella', add(add(k, tan, -1.9), sea, 0.2), 0, 0.6);
       break;
+    }
+      // two loose tree rows on the land side (by the promenade, and staggered toward the parkway), bushes between
+    const TREES = ['veg.oak', 'veg.maple', 'veg.birch'];
+    const clearOf = (q: Vec2, r: number) => !kiosks.some((k) => dist(k, q) < r + 1.6) && !piers.some((k) => dist(k, q) < r + 1.2);
+    const roomy = (q: Vec2, r: number) => land(q) && [0, 1, 2, 3, 4, 5].every((k) => land(add(q, { x: Math.cos(k * 1.047), z: Math.sin(k * 1.047) }, r)));
+    for (const [off, step, s0] of [[hw + 1.3, 4.6, 2.2], [hw + 3.7, 5.6, 4.4]] as const) {
+      for (let s = s0; s <= run.length - 1.5; s += step) {
+        const j = hash(s * 1.7 + off, run.length);
+        const { p, sea } = runAt(run, Math.min(run.length - 1, s + (j - 0.5) * 1.4));
+        const tp = add(p, sea, -(off + (j - 0.5) * 0.6));
+        if (!roomy(tp, 0.95) || !clearOf(tp, 1)) continue;
+        item(TREES[Math.floor(hash(tp.x, tp.z) * TREES.length)]!, tp, 0, hash(tp.z, tp.x) * Math.PI * 2, { scale: 0.88 + hash(tp.x + 3, tp.z) * 0.3, params: { variant: Math.floor(hash(tp.x, tp.z + 9) * 2) } });
+        if (off > hw + 2) continue;
+        const bp = add(add(tp, runAt(run, s).tan, 2.6), sea, -1.3);
+        if (j > 0.4 && roomy(bp, 0.6) && clearOf(bp, 0.6)) item(j > 0.72 ? 'veg.flowerbed' : 'veg.bush', bp, 0, facing(sea), { params: { variant: 0 } });
+      }
     }
   }
 

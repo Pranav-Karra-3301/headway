@@ -1,10 +1,10 @@
 // Owner: C2 (camera rig). Critically damped springs (no overshoot) for camera moves: exact closed-form step, so the
-// motion is frame-rate independent. `settleS` is the time to get within 1 % of the goal.
+// motion is frame-rate independent. `settleS` is the time to get within 0.1 % of the goal (1 % at ~0.7 × settleS).
 
 export interface Spring { x: number; v: number }
 
-/** ω for a critically damped spring that settles to 1 % in `settleS` ((1 + ωt)e^(−ωt) = 0.01 at ωt ≈ 6.64). */
-export const omegaFor = (settleS: number): number => 6.64 / Math.max(1e-3, settleS);
+/** ω for a critically damped spring that settles to 0.1 % in `settleS` ((1 + ωt)e^(−ωt) = 0.001 at ωt ≈ 9.23). */
+export const omegaFor = (settleS: number): number => 9.23 / Math.max(1e-3, settleS);
 
 /** Advance `s` toward `goal` by dt seconds (in place). */
 export function stepSpring(s: Spring, goal: number, omega: number, dt: number): Spring {

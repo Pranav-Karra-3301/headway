@@ -12,6 +12,7 @@
 // highway band or the board); street items (lamps, signals, signs) stand on road-tile sidewalks only. Camera-side
 // blocks (south / east of the board) keep low buildings so nothing hides the playable town.
 import type { TownMap, Vec2 } from '@headway/sim';
+import { BUILDING_SPEC_BY_KIND } from '../../assets/families/kenney-buildings';
 import type { AssetParams } from '../../assets/types';
 import { greaterGrid, type Block, type Dir, type GreaterGrid, type Rect, type RoadClass } from '../grid';
 import { footprintRect, frameOf, inset, pick, rng, sizeOf, type Frame } from './frame';
@@ -71,6 +72,8 @@ const OPP: Record<Dir, Dir> = { n: 's', s: 'n', e: 'w', w: 'e' };
 /** Frame ends: which block side the u = 0 / u = L end of a strip along `side` touches. */
 const ENDS: Record<Dir, [Dir, Dir]> = { n: ['w', 'e'], s: ['e', 'w'], w: ['s', 'n'], e: ['n', 's'] };
 const STRIP = 4.4;
+/** Shipping containers at toy scale (K3's 3.2 u box reads as big as a house). */
+const CONTAINER = 0.62;
 
 // ---------------------------------------------------------------- context
 interface Ctx {
@@ -89,7 +92,7 @@ interface Ctx {
 }
 
 function add(c: Ctx, kind: string, p: Vec2, rot: number, role: ItemRole, extra: Partial<BlockItem> = {}): BlockItem {
-  const it: BlockItem = { kind, x: round(p.x), z: round(p.z), rot, role, block: c.block.id, ...extra };
+  const it: BlockItem = { kind, x: round(p.x), z: round(p.z), rot: rot + frontYaw(kind), role, block: c.block.id, ...extra };
   if (role === 'building' || role === 'car' || SOLID.test(kind)) {
     const s = sizeOf(kind);
     it.fp = footprintRect(it.x, it.z, s.w * (extra.scale ?? 1), s.d * (extra.scale ?? 1), rot);
@@ -98,6 +101,16 @@ function add(c: Ctx, kind: string, p: Vec2, rot: number, role: ItemRole, extra: 
   return it;
 }
 const round = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * Yaw that turns a Kenney city-kit building's front to +z. The kits' doors / shopfronts / loading bays face −z as
+ * authored and K3's kn.house / kn.shop / kn.works builders keep that (measured in the ?solo= preview); if K3 adds a
+ * spec `yaw` to fix it, this correction steps back automatically.
+ */
+export function frontYaw(kind: string): number {
+  if (!/^kn\.(house|shop|works)\./.test(kind) || kind === 'kn.works.container') return 0;
+  return Math.PI - (BUILDING_SPEC_BY_KIND.get(kind)?.yaw ?? 0);
+}
 /** Props with a footprint worth checking (no overlaps with buildings). */
 const SOLID = /^kn\.works\.|^kn\.prop\.dumpster$|^res\./;
 
@@ -333,12 +346,12 @@ function fillWorks(c: Ctx): void {
     if (f.L - u >= 1.5) add(c, 'kn.works.chimney', f.at(u + 0.65, f.D - 1.0), 0, 'building');
     const frontV = Math.min(1.55, (f.D - 0.35 - deepest) / 2);
     let cu = 0.5;
-    while (cu + 3.3 < f.L - 0.4) {
+    while (cu + 2.3 < f.L - 0.4) {
       const stack = r() < 0.55 ? 2 : 1;
       for (let s = 0; s < stack; s++) {
-        add(c, 'kn.works.container', f.at(cu + 1.6, frontV), f.rot + Math.PI / 2 + (s ? 0.05 : 0), 'prop', { y: s * 1.15, params: { model: Math.floor(r() * 3) } });
+        add(c, 'kn.works.container', f.at(cu + 1.1, frontV), f.rot + Math.PI / 2 + (s ? 0.05 : 0), 'prop', { y: s * 1.38 * CONTAINER, scale: CONTAINER, params: { model: Math.floor(r() * 3) } });
       }
-      cu += 3.5;
+      cu += 2.5;
       if (cu + 1 < f.L - 0.4 && r() < 0.6) { add(c, 'kn.prop.barrel', f.at(cu + 0.2, frontV - 0.3), 0, 'prop'); add(c, 'kn.prop.crates', f.at(cu + 0.4, frontV + 0.35), f.rot, 'prop'); cu += 1; }
     }
     return;
@@ -356,7 +369,10 @@ function fillWorks(c: Ctx): void {
     u += w + 0.25;
     const gap = 1.6 + r() * 1.4;
     if (u + gap < f.L - 0.3) {
-      if (r() < 0.6 && f.D >= 3.6) add(c, 'kn.works.container', f.at(u + gap / 2, f.D * 0.55), f.rot, 'prop', { params: { model: Math.floor(r() * 3) } });
+      if (r() < 0.6 && f.D >= 3.6) {
+        const two = r() < 0.5;
+        for (let s = 0; s < (two ? 2 : 1); s++) add(c, 'kn.works.container', f.at(u + gap / 2, f.D * 0.55), f.rot + (s ? 0.06 : 0), 'prop', { y: s * 1.38 * CONTAINER, scale: CONTAINER, params: { model: Math.floor(r() * 3) } });
+      }
       else { add(c, 'kn.prop.crates', f.at(u + gap / 2 - 0.3, f.D * 0.5), f.rot + 0.2, 'prop'); add(c, 'kn.prop.barrel', f.at(u + gap / 2 + 0.35, f.D * 0.6), 0, 'prop'); }
       u += gap;
     }

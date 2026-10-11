@@ -153,7 +153,7 @@ describe('apartments district: placements', () => {
 
   it('has the full apartment mix: towers, garden apartments, townhouses, houses, parking, a playground, hedges, trees', () => {
     const n = (k: string) => D.items.filter((i) => i.kind === k).length;
-    expect(n('res.tower')).toBeGreaterThanOrEqual(3);
+    expect(n('res.tower')).toBeGreaterThanOrEqual(2); // town-art review: the Main St corner tower became a walk-up
     expect(n('res.garden')).toBeGreaterThanOrEqual(1);
     expect(n('res.townhouses')).toBeGreaterThanOrEqual(2);
     expect(n('res.house')).toBeGreaterThanOrEqual(1);

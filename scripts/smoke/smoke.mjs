@@ -218,6 +218,16 @@ async function smokeRoute(cdp, opts, route) {
         if (state.mode === null) fail(`window.__headway.mode missing (expected '${route.mode}')`);
         else if (state.mode !== route.mode) fail(`mode is '${state.mode}', expected '${route.mode}'`);
       }
+      // Spec §12: the browser's hash of a full g0 run equals the Node hash (checked once, on Watch).
+      if (opts.expectHash && route.mustAdvance) {
+        const h = await evalValue(page, "typeof window.__headway?.hash === 'function' ? window.__headway.hash('stadium_exit', 4001) : null", { timeoutMs: 30_000 })
+          .catch((e) => ({ error: e.message }));
+        res.hash = h;
+        if (h === null) fail('window.__headway.hash() is missing (spec §12 browser = Node hash check)');
+        else if (typeof h !== 'string') fail(`window.__headway.hash() failed: ${h.error}`);
+        else if (h !== opts.expectHash) fail(`browser hash ${h} != Node hash ${opts.expectHash} (g0, stadium_exit 4001)`);
+        else note(`determinism: browser hash = Node hash (${h})`);
+      }
     }
 
     if (!crashed) {
@@ -294,7 +304,7 @@ export async function runSmoke(o) {
   const opts = {
     query: '', routes: DEFAULT_ROUTES, outDir: DEFAULT_OUT_DIR, chromePath: null, width: 1600, height: 1000,
     readyTimeoutMs: 45_000, advanceTimeoutMs: 10_000, loadTimeoutMs: 30_000, failFastMs: 10_000, ignore: [], api: false,
-    log: () => {},
+    expectHash: null, log: () => {},
     ...o,
   };
   opts.url = opts.url.replace(/\/+$/, '');

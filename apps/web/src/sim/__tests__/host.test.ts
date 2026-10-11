@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { G0 } from '@headway/sim';
+import { G0, PolicyController, TOWN, runSync } from '@headway/sim';
 import type { DecisionRecord, SimEvent } from '@headway/sim';
 import type { Pick, TownRendererApi } from '../../render/types';
 import { frame } from '../../state/frame';
@@ -60,6 +60,16 @@ const makeSim = () => { const sim = fakeSim(); sims.push(sim); return { sim, kin
 
 beforeEach(() => { useApp.setState(initial, true); sims = []; vi.spyOn(console, 'warn').mockImplementation(() => {}); });
 afterEach(() => { stop(); vi.restoreAllMocks(); });
+
+describe('determinism probe', () => {
+  it('hashes a full g0 run exactly as runSync does (spec §12: the smoke test compares it with Node)', () => {
+    const h = harness();
+    stop = startHost({ ...h, makeSim, makeRenderer: () => fakeRenderer() });
+    const want = runSync({ map: TOWN, scenario: { scenarioId: 'stadium_exit', seed: 4001, split: 'showcase' }, controller: new PolicyController(G0) }).hash;
+    expect(h.probe().hash()).toBe(want);
+    expect(h.probe().hash('stadium_exit', 4001)).toBe(want);
+  });
+});
 
 describe('canvas host', () => {
   it('renders every frame, steps the sim and reports through the probe', () => {

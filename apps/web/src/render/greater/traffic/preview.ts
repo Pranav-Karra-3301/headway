@@ -3,12 +3,15 @@
 //   view=<u visible vertically>  tx, tz=<look-at>  palette=a|b|c  light=day|dusk  post=0|1  cars=<n>  seed=<n>
 //   town=0 (plain board instead of the static town)  train=0 (no stand-in train / level-crossing demo)  land=0
 //   speed=<×real time>  warm=<s>  handoff=1 (demo town hand-off: cars drive into / out of the board ports)
+//   hw=0 (without G1's expressway lanes + layer; on by default when G1 has landed)
 import * as THREE from 'three';
 import { pointAt, TOWN } from '@headway/sim';
 import { Stage } from '../../post/stage';
 import type { LightMode, PaletteId } from '../../types';
 import { greaterGrid } from '../grid';
-import { createGreaterRoadsLayer, preloadGreaterRoads } from '../roads/index';
+import { createGreaterRoadsLayer, preloadGreaterRoads, roadColors } from '../roads/index';
+import type { Lane } from '../grid';
+import type { PortLike, TrafficGraph } from './graph';
 import { createGreaterTrafficLayer, preloadGreaterTraffic } from './layer';
 
 const q = new URLSearchParams(location.search);
@@ -41,12 +44,27 @@ async function main(): Promise<void> {
   if (!town) stage.scene.add(plainBoard());
   if (q.get('land') !== '0') stage.scene.add(landStandIns(grid));
 
+  // G1's expressway (lanes + layer) when it has landed: hw=0 to preview G0's streets alone
+  let hw: { lanes: Lane[]; ports: PortLike[] } | null = null;
+  if (q.get('hw') !== '0') {
+    try {
+      const [net, lay] = await Promise.all([import('../highway/network'), import('../highway/layer')]);
+      await lay.preloadGreaterHighway();
+      stage.scene.add(lay.createGreaterHighwayLayer(TOWN, { palette }).object);
+      const n = net.greaterLanes(TOWN);
+      hw = { lanes: n.lanes, ports: n.ports as PortLike[] };
+    } catch (e) {
+      console.warn('[greater-traffic] G1 highway unavailable', e);
+    }
+  }
+
   const handoff = q.get('handoff') === '1';
   const traffic = createGreaterTrafficLayer(TOWN, {
-    palette, seed: num('seed', 1), cars: num('cars', 36), warm: num('warm', 150),
+    palette, seed: num('seed', 1), cars: num('cars', hw ? 48 : 40), warm: num('warm', 150), ...(hw ?? {}),
     ...(handoff ? { onBoardExit: () => undefined, boardShare: 0.3 } : {}),
   });
   stage.scene.add(traffic.object);
+  if (q.get('land') !== '0') stage.scene.add(approachStandIns(traffic.graph, palette));
 
   const train = q.get('train') !== '0' ? trainStandIn() : null;
   if (train) stage.scene.add(train.object);
@@ -101,6 +119,28 @@ function trainStandIn(): { object: THREE.Group; place(dist: number): void } {
       });
     },
   };
+}
+
+/** Preview-only asphalt under the approach lanes beyond the grid (G1's highway / E1 tunnels / E2 causeways own
+ *  the real ones). */
+function approachStandIns(graph: TrafficGraph, palette: PaletteId): THREE.Mesh {
+  const pos: number[] = [];
+  const W = 1.6, y = 0.035;
+  for (const l of [...graph.sources, ...graph.sinks]) {
+    const [a, b] = [l.poly.points[0]!, l.poly.points[l.poly.points.length - 1]!];
+    const L = Math.hypot(b.x - a.x, b.z - a.z) || 1, dx = (b.x - a.x) / L, dz = (b.z - a.z) / L;
+    // the lane is right of the road centre: shift left by the lane offset so two lanes share one strip
+    const cx = dz, cz = -dx; // left of the lane (G0 rightOf(d) = (-d.z, d.x))
+    const o = 0.6;
+    const p = (q: { x: number; z: number }, s: number) => [q.x + cx * (o + s * W), y, q.z + cz * (o + s * W)];
+    pos.push(...p(a, -1), ...p(b, -1), ...p(b, 1), ...p(a, -1), ...p(b, 1), ...p(a, 1));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: roadColors(palette).lane, roughness: 0.95, side: THREE.DoubleSide }));
+  m.receiveShadow = true;
+  return m;
 }
 
 function plainBoard(): THREE.Mesh {

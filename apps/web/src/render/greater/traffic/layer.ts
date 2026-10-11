@@ -18,7 +18,7 @@ import { KitMaterial, shared } from '../../materials';
 import { DEFAULT_PALETTE, PALETTES } from '../../palettes';
 import type { PaletteId } from '../../types';
 import { KERB } from '../roads/cells';
-import { buildTrafficGraph, type TrafficGraph } from './graph';
+import { buildTrafficGraph, type PortLike, type TrafficGraph } from './graph';
 import { createGreaterTrafficModel, DEFAULT_SPECS, MAX_CARS, type GreaterCar, type GreaterTrafficModel, type TrafficEnv, type VehicleSpec } from './model';
 
 /** Kenney models used (one InstancedMesh each): everyday car, SUV, delivery truck. */
@@ -26,7 +26,7 @@ export const GREATER_TRAFFIC_MODELS: readonly KenneyId[] = ['car-kit/sedan', 'ca
 const WEIGHTS = [0.5, 0.32, 0.18];
 const SPEED = [1, 1, 0.85];
 const FADE = 0.6;
-const BEAM = { length: 2.6, width: 1.5, y: 0.025, opacity: 0.55, color: '#FFE0A6' } as const;
+const BEAM = { length: 3.1, width: 1.7, y: 0.025, opacity: 0.95, color: '#FFE3AE' } as const;
 
 /** Load the Kenney vehicles (safe to call repeatedly; never rejects). */
 export function preloadGreaterTraffic(): Promise<void> {
@@ -35,14 +35,16 @@ export function preloadGreaterTraffic(): Promise<void> {
 
 export interface GreaterTrafficLayerOptions {
   seed?: number;
-  /** Target number of vehicles (default 36, max 64). */
+  /** Target number of vehicles (default 40, max 64). */
   cars?: number;
   palette?: PaletteId;
-  /** Extra lanes to drive (G1 highway + ramps); merged with G0's lanes and relinked. */
-  lanes?: readonly Lane[];
-  /** Approach length beyond the grid edge at world exits (default 8 u): cars appear / vanish there. */
+  /** Extra lanes to drive (G1 highway + ramps, `y` heights honoured); merged with G0's lanes by id and relinked. */
+  lanes?: ReadonlyArray<Lane & { y?: readonly number[] }>;
+  /** Approach length beyond the grid edge at world exits (default 4 u): cars scale in / out at its far end. */
   approach?: number;
-  /** Height of the road surface under a lane point (e.g. G1's overpass); default 0 (flat at KERB.roadTop). */
+  /** G1's expressway ports (their lanes then form one world exit per tunnel / end). */
+  ports?: readonly PortLike[];
+  /** Override for the road height under a car; default: lane `y` heights (G1 HighwayLane.y), else flat. */
   laneY?: (laneId: string, s: number, x: number, z: number) => number;
   /** Seconds of traffic simulated up front so the first frame is already busy (default 150). */
   warm?: number;
@@ -138,7 +140,9 @@ export function createGreaterTrafficLayer(map: TownMap, opts: GreaterTrafficLaye
   const object = new THREE.Group();
   object.name = 'greater-traffic';
   object.position.y = KERB.roadTop;
-  const graph = buildTrafficGraph(map, { ...(opts.lanes ? { lanes: opts.lanes } : {}), ...(opts.approach !== undefined ? { approach: opts.approach } : {}) });
+  const graph = buildTrafficGraph(map, {
+    ...(opts.lanes ? { lanes: opts.lanes } : {}), ...(opts.ports ? { ports: opts.ports } : {}), ...(opts.approach !== undefined ? { approach: opts.approach } : {}),
+  });
   let palette: PaletteId = opts.palette ?? DEFAULT_PALETTE;
   const material = new KitMaterial({ roughness: 0.55 });
   const useKenney = opts.kenney !== false;
@@ -227,7 +231,7 @@ export function createGreaterTrafficLayer(map: TownMap, opts: GreaterTrafficLaye
       const v = variants[vi];
       if (!v) continue;
       const k = counts[vi]!++;
-      const y = opts.laneY ? opts.laneY(c.lane.id, c.s, c.x, c.z) : 0;
+      const y = opts.laneY ? opts.laneY(c.lane.id, c.s, c.x, c.z) : c.y;
       pos.set(c.x, y, c.z);
       q.setFromAxisAngle(yAxis, c.heading);
       scl.setScalar(c.scale);

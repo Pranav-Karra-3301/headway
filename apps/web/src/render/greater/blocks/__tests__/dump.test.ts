@@ -2,7 +2,7 @@ import { it } from 'vitest';
 import { TOWN } from '@headway/sim';
 import { greaterGrid } from '../../grid';
 import { planGreaterBlocks } from '../plan';
-it.skipIf(!process.env.G2_DUMP)('dump', () => {
+it.skipIf(!(globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.G2_DUMP)('dump', () => {
   const g = greaterGrid(TOWN), p = planGreaterBlocks(TOWN);
   for (const b of g.blocks) {
     const its = p.items.filter((i) => i.block === b.id);

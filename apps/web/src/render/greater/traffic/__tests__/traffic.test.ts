@@ -1,8 +1,8 @@
 // Owner: G4. Greater-town traffic: graph (world exits only, boxes, signals, level crossing) and model invariants.
 import { describe, expect, it } from 'vitest';
 import { pointAt, TOWN } from '@headway/sim';
-import { greaterGrid } from '../../grid';
-import { buildTrafficGraph, signalGreen, type TLane } from '../graph';
+import { greaterGrid, type Lane } from '../../grid';
+import { buildTrafficGraph, signalGreen, type PortLike, type TLane } from '../graph';
 import { createGreaterTrafficModel, MIN_GAP, type GreaterCar, type GreaterTrafficModel } from '../model';
 
 const g = greaterGrid(TOWN);
@@ -33,6 +33,7 @@ describe('greater traffic graph', () => {
     const box = graph.lanes.filter((l) => l.box);
     expect(box.length).toBeGreaterThan(20);
     for (const l of box) for (const q of l.conflicts) expect(q.conflicts).toContain(l);
+    expect(graph.lanes.filter((l) => l.kind === "uturn").every((l) => l.conflicts.includes(l))).toBe(true);
     expect(box.some((l) => l.conflicts.length > 0)).toBe(true);
     expect([...graph.signals.keys()].sort()).toEqual(g.junctions.filter((j) => j.signals).map((j) => j.id).sort());
     const sig = [...graph.signals.values()][0]!;
@@ -60,6 +61,22 @@ describe('greater traffic graph', () => {
   });
 });
 
+/** Oriented footprint overlap (car width ≈ 0.94 u, a little slack). */
+function bodiesOverlap(a: GreaterCar, b: GreaterCar): boolean {
+  const corners = (c: GreaterCar) => {
+    const dx = Math.cos(c.heading), dz = -Math.sin(c.heading), hl = c.halfLen - 0.05, hw = 0.42;
+    return [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([u, v]) => ({ x: c.x + dx * hl * u! - dz * hw * v!, z: c.z + dz * hl * u! + dx * hw * v! }));
+  };
+  const A = corners(a), B = corners(b);
+  for (const P of [A, B]) for (let i = 0; i < 4; i++) {
+    const p = P[i]!, q = P[(i + 1) % 4]!, nx = p.z - q.z, nz = q.x - p.x;
+    const proj = (S: typeof A) => S.map((v) => v.x * nx + v.z * nz);
+    const pa = proj(A), pb = proj(B);
+    if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false;
+  }
+  return true;
+}
+
 function checkInvariants(m: GreaterTrafficModel): void {
   const byLane = new Map<TLane, GreaterCar[]>();
   for (const c of m.cars) (byLane.get(c.lane) ?? byLane.set(c.lane, []).get(c.lane)!).push(c);
@@ -73,6 +90,12 @@ function checkInvariants(m: GreaterTrafficModel): void {
   // no two cars in conflicting box lanes
   const inBox = m.cars.filter((c) => c.lane.box);
   for (const a of inBox) for (const b of inBox) if (a !== b) expect(a.lane.conflicts).not.toContain(b.lane);
+  // nobody drives through anybody (any lanes: junctions, roundabout merges, diverges, U-turns; overpasses apart)
+  const shown = m.cars.filter((c) => c.scale > 0.5);
+  for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) {
+    const a = shown[i]!, b = shown[j]!;
+    if (Math.hypot(a.x - b.x, a.z - b.z) < 3 && Math.abs(a.y - b.y) < 0.8) expect(bodiesOverlap(a, b), `${a.lane.id} × ${b.lane.id}`).toBe(false);
+  }
   for (const c of m.cars) {
     expect(c.lane.board).toBeNull();
     expect(Number.isFinite(c.x) && Number.isFinite(c.z)).toBe(true);
@@ -102,6 +125,22 @@ describe('greater traffic model', () => {
     // traffic reaches the local streets too
     const kinds = new Set(m.cars.map((c) => c.lane.kind));
     expect(kinds.has('roundabout')).toBe(true);
+  });
+
+  it('never gridlocks, even crowded', () => {
+    for (const seed of [1, 6, 8]) {
+      const m = createGreaterTrafficModel(graph, { seed, cars: 56 });
+      m.warm(30);
+      let maxWait = 0;
+      const seen = new Set<number>();
+      for (let i = 0; i < 900 * 4; i++) {
+        m.step(0.25, { trainDist: (i * 2.4) % graph.railLength });
+        for (const c of m.cars) { seen.add(c.id); maxWait = Math.max(maxWait, c.wait); }
+        if (i % 16 === 0) checkInvariants(m);
+      }
+      expect(maxWait).toBeLessThan(40);
+      expect(seen.size).toBeGreaterThan(350);
+    }
   });
 
   it('is deterministic for a seed', () => {
@@ -147,5 +186,34 @@ describe('greater traffic model', () => {
     expect(car.dest.board).toBeNull();
     const p = pointAt(car.lane.poly, 0);
     expect(Math.hypot(p.x - car.x, p.z - car.z)).toBeLessThan(1e-6);
+  });
+});
+
+describe('with G1 expressway lanes (when present)', () => {
+  it('drives the expressway: world exits at its ends, heights from lane y', async () => {
+    type Net = { lanes: Array<Lane & { y?: number[] }>; ports: PortLike[] };
+    let net: Net | null = null;
+    try {
+      const mod = await import('../../highway/network');
+      net = mod.greaterLanes(TOWN) as unknown as Net;
+    } catch {
+      net = null; // G1 not landed: nothing to check
+    }
+    if (!net) return;
+    const gx = buildTrafficGraph(TOWN, { lanes: net.lanes, ports: net.ports });
+    expect(gx.sources.length).toBeGreaterThanOrEqual(4);
+    for (const s of gx.sources) expect(s.board).toBeNull();
+    const m = createGreaterTrafficModel(gx, { seed: 2, cars: 48 });
+    m.warm(30);
+    let maxY = 0, maxWait = 0;
+    const kinds = new Set<string>();
+    for (let i = 0; i < 600 * 4; i++) {
+      m.step(0.25);
+      for (const c of m.cars) { kinds.add(c.lane.kind); maxY = Math.max(maxY, c.y); maxWait = Math.max(maxWait, c.wait); }
+      if (i % 16 === 0) checkInvariants(m);
+    }
+    expect(kinds.has('highway')).toBe(true);
+    if (net.lanes.some((l) => l.y?.some((v) => v > 0.5))) expect(maxY).toBeGreaterThan(0.5);
+    expect(maxWait).toBeLessThan(40);
   });
 });

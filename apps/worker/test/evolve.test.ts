@@ -198,7 +198,10 @@ describe('POST /api/evolve', () => {
         if (body.temperature === 1) return new Response('overloaded', { status: 503 });
         return completion(reply(body.temperature === 0.4 ? variant('dwell') : variant('alloc'), 'A change'));
       }
-      return completion(reply(variant('hold'), 'Shorter holds'));
+      // designer c (temperature 1.0) must add a new rule each round (runRound's newRuleDesigner), so its fallback reply does
+      const p = variant('hold');
+      p.rules.push({ ...structuredClone(p.rules[0]!), id: 'early-hold', priority: 5 });
+      return completion(reply(p, 'Shorter holds'));
     }) as typeof fetch;
     const ev = fakeEvaluate(TABLE);
     const app = createApp({ fetch: f, evaluate: ev.evaluate, now: () => T0 });

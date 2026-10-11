@@ -9,9 +9,9 @@
 //  - signals: G0 junctions with `signals` alternate the through axis and the side arm (+ all-red).
 //  - yield lanes (roundabout entries) give way to circulating traffic at the merge.
 //  - level crossings: lanes crossing the rail on G0's `railCrossing` tiles stop while the train is near.
-import { polyline } from '@headway/sim';
+import { pointAt, polyline, projectOnPolyline } from '@headway/sim';
 import type { Polyline, TownMap, Vec2 } from '@headway/sim';
-import { greaterGrid, linkLanes, type GreaterGrid, type Lane, type LaneKind, type Port } from '../grid';
+import { greaterGrid, linkLanes, type GreaterGrid, type Lane, type LaneKind } from '../grid';
 import { LANE_SPEED } from '../roads/lanes';
 
 export interface TLane {
@@ -25,9 +25,10 @@ export interface TLane {
   prev: TLane[];
   /** Give way at the end (roundabout entry / ramp merge). */
   readonly yield: boolean;
-  /** Junction id when this is a turn lane inside a junction box (needs a reservation), else null. */
+  /** Junction id when this is a turn lane inside a junction box, or the lane id of a dead-end U-turn (entering
+   *  needs a reservation), else null. */
   box: string | null;
-  /** Box lanes that cross or merge with this one (same junction). */
+  /** Box lanes that cross or merge with this one (same junction; a U-turn loop conflicts with itself). */
   conflicts: TLane[];
   /** This lane ends at a signalled junction: its arm belongs to signal group `group`. */
   signal: { junction: string; group: 0 | 1 } | null;
@@ -41,6 +42,13 @@ export interface TLane {
   port: string | null;
   /** Level crossings on this lane: lane arc position of the rail centre line. */
   crossings: Array<{ id: string; s: number }>;
+  /** Road surface height per path point (G1's ramps / overpass: HighwayLane.y), or null when flat. */
+  ys: number[] | null;
+  /** Lanes that start where this one starts (a diverge): cars on them are still in the way for a little while. */
+  siblings: TLane[];
+  /** Where a car waiting to enter the next lane stops its front bumper (yield lanes: clear of the traffic it
+   *  gives way to). */
+  holdS: number;
 }
 
 export interface Signal {
@@ -70,23 +78,37 @@ export interface TrafficGraph {
   readonly signals: Map<string, Signal>;
   readonly crossings: LevelCrossing[];
   readonly railLength: number;
-  /** Shortest distance (u) from the start of each lane to the end of `target` (Infinity: unreachable). */
+  /** Shortest distance (u) from the start of each lane to the end of `target` (missing: unreachable). Routes never
+   *  use dead-end U-turn loops. */
   distTo(target: TLane): Map<TLane, number>;
 }
 
+/** A port as G1 describes its expressway exits (several lanes per direction). */
+export interface PortLike { id: string; kind: string; inLane?: string | null; outLane?: string | null; inLanes?: readonly string[]; outLanes?: readonly string[] }
+
 export interface TrafficGraphOptions {
-  /** Extra lanes (G1 highway, ramps); merged with G0's lanes and relinked. */
-  lanes?: readonly Lane[];
-  /** Length (u) of the approach lanes beyond the grid edge at world exits (default 8). */
+  /** Extra lanes (G1 highway, ramps; `y` per point is honoured); merged with G0's lanes and relinked. Passing G1's
+   *  whole network (`greaterLanes(map).lanes`) is fine too: lanes are merged by id. */
+  lanes?: ReadonlyArray<Lane & { y?: readonly number[] }>;
+  /** Extra ports (G1's expressway exits) so their lanes count as one world exit each. */
+  ports?: readonly PortLike[];
+  /** Length (u) of the approach lanes beyond the grid edge at world exits (default 4). */
   approach?: number;
 }
 
 /** Default approach length beyond the grid edge (u). */
-export const APPROACH = 8;
+export const APPROACH = 4;
 const SIGNAL_PHASES = { through: 9, side: 5.5, cross: 7, red: 1.4 } as const;
+/** Front bumper gap before a junction box. */
+const STOP_BACK = 0.15;
+/** Lateral clearance (u, centreline to centreline) between a waiting car's front and the lanes it yields to, and
+ *  between box lanes of different arms below which they conflict (car width ≈ 0.98 u). */
+const CLEAR = 1.15;
 
 const sub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, z: a.z - b.z });
 const unit = (a: Vec2): Vec2 => { const L = Math.hypot(a.x, a.z) || 1; return { x: a.x / L, z: a.z / L }; };
+/** Snap a direction to the nearest axis when within ~8° (grid roads are axis-aligned; bezier ends are not quite). */
+const snap = (d: Vec2): Vec2 => (Math.abs(d.x) > 0.99 ? { x: Math.sign(d.x), z: 0 } : Math.abs(d.z) > 0.99 ? { x: 0, z: Math.sign(d.z) } : d);
 const near = (a: Vec2, b: Vec2, tol = 0.05) => Math.hypot(a.x - b.x, a.z - b.z) <= tol;
 
 function hash(s: string): number {
@@ -117,6 +139,13 @@ function polysCross(p: Polyline, q: Polyline): boolean {
   return false;
 }
 
+/** Smallest distance between two polylines (sampled every 0.2 u along p). */
+function minDist(p: Polyline, q: Polyline): number {
+  let best = Infinity;
+  for (let s = 0; s <= p.length + 1e-9; s += 0.2) best = Math.min(best, projectOnPolyline(q, pointAt(p, Math.min(s, p.length))).d);
+  return best;
+}
+
 /** Distance from p along dir until it leaves the rectangle (0 when already outside). */
 function exitDistance(g: GreaterGrid, p: Vec2, dir: Vec2): number {
   const b = g.bounds;
@@ -135,33 +164,40 @@ const cache = new WeakMap<TownMap, TrafficGraph>();
 
 /** The traffic graph for a map (memoised when no options are given). */
 export function buildTrafficGraph(map: TownMap, opts: TrafficGraphOptions = {}): TrafficGraph {
-  const plain = !opts.lanes?.length && opts.approach === undefined;
+  const plain = !opts.lanes?.length && !opts.ports?.length && opts.approach === undefined;
   if (plain) { const c = cache.get(map); if (c) return c; }
   const g = greaterGrid(map);
   const approach = opts.approach ?? APPROACH;
 
   // never mutate G0's memoised lanes: copy, then relink when extra lanes join
-  const raw: Lane[] = g.lanes.map((l) => ({ ...l, next: [...l.next] }));
+  const raw: Array<Lane & { y?: readonly number[] }> = g.lanes.map((l) => ({ ...l, next: [...l.next] }));
   if (opts.lanes?.length) {
-    const ids = new Set(raw.map((l) => l.id));
-    for (const l of opts.lanes) if (!ids.has(l.id) && l.path.points.length >= 2) raw.push({ ...l, next: [...l.next] });
+    const at = new Map(raw.map((l, i) => [l.id, i] as const));
+    for (const l of opts.lanes) {
+      if (l.path.points.length < 2) continue;
+      const i = at.get(l.id);
+      if (i === undefined) raw.push({ ...l, next: [...l.next] });
+      else if (l.y) raw[i] = { ...raw[i]!, y: l.y };
+    }
     linkLanes(raw);
   }
 
   const boardLane = new Map<string, string>(); // lane id → board port id
-  const portLane = new Map<string, Port>();
-  for (const p of g.ports) {
-    for (const id of [p.inLane, p.outLane]) {
-      if (!id) continue;
-      portLane.set(id, p);
-      if (p.kind === 'board') boardLane.set(id, p.id);
-    }
+  // a lane can be the way in at one port and the way out at another (an expressway lane end to end)
+  type P = PortLike & { dir?: Vec2 };
+  const inPort = new Map<string, P>(), outPort = new Map<string, P>();
+  for (const p of [...g.ports, ...(opts.ports ?? [])] as P[]) {
+    for (const id of [p.inLane, ...(p.inLanes ?? [])]) if (id) { inPort.set(id, p); if (p.kind === 'board') boardLane.set(id, p.id); }
+    for (const id of [p.outLane, ...(p.outLanes ?? [])]) if (id) { outPort.set(id, p); if (p.kind === 'board') boardLane.set(id, p.id); }
   }
+  const portLane = { get: (id: string): P | undefined => inPort.get(id) ?? outPort.get(id) };
 
-  const mk = (l: Lane): TLane => ({
+  const mk = (l: Lane & { y?: readonly number[] }): TLane => ({
     id: l.id, kind: l.kind, poly: l.path, len: l.path.length, speed: l.speed || LANE_SPEED[l.kind] || 4,
     next: [], prev: [], yield: !!l.yield, box: null, conflicts: [], signal: null,
     source: false, sink: false, board: boardLane.get(l.id) ?? null, port: portLane.get(l.id)?.id ?? null, crossings: [],
+    siblings: [], holdS: Math.max(0, l.path.length - STOP_BACK),
+    ys: l.y && l.y.length === l.path.points.length && l.y.some((v) => Math.abs(v) > 1e-6) ? [...l.y] : null,
   });
   const lanes = raw.filter((l) => l.path.length > 1e-6).map(mk);
   const byId = new Map(lanes.map((l) => [l.id, l] as const));
@@ -176,22 +212,38 @@ export function buildTrafficGraph(map: TownMap, opts: TrafficGraphOptions = {}):
   for (const l of open) {
     if (l.board) continue;
     const pts = l.poly.points;
+    // outward direction: the port's when it agrees with the lane end, else the end tangent (axis-snapped)
+    const outward = (p: P | undefined, t: Vec2): Vec2 => (p?.dir && p.dir.x * t.x + p.dir.z * t.z > 0.7 ? p.dir : snap(t));
     if (!l.prev.length) {
-      const d = unit(sub(pts[0]!, pts[1]!)); // outward
+      const pin = inPort.get(l.id);
+      const d = outward(pin, unit(sub(pts[0]!, pts[1]!)));
       const L = exitDistance(g, pts[0]!, d) + approach;
-      const a: TLane = { ...mk({ id: `${l.id}~in`, kind: l.kind === 'highway' ? 'highway' : 'radial', path: polyline([{ x: pts[0]!.x + d.x * L, z: pts[0]!.z + d.z * L }, pts[0]!], false), speed: 0, next: [] }), port: l.port };
+      const y0 = l.ys?.[0] ?? 0;
+      const a: TLane = { ...mk({ id: `${l.id}~in`, kind: l.kind === 'highway' ? 'highway' : 'radial', path: polyline([{ x: pts[0]!.x + d.x * L, z: pts[0]!.z + d.z * L }, pts[0]!], false), speed: 0, next: [], ...(y0 ? { y: [y0, y0] } : {}) }), port: pin?.id ?? null };
       a.next.push(l); l.prev.push(a); a.source = true;
       lanes.push(a); byId.set(a.id, a);
     }
     if (!l.next.length) {
       const n = pts.length;
-      const d = unit(sub(pts[n - 1]!, pts[n - 2]!));
+      const pout = outPort.get(l.id);
+      const d = outward(pout, unit(sub(pts[n - 1]!, pts[n - 2]!)));
       const L = exitDistance(g, pts[n - 1]!, d) + approach;
-      const a: TLane = { ...mk({ id: `${l.id}~out`, kind: l.kind === 'highway' ? 'highway' : 'radial', path: polyline([pts[n - 1]!, { x: pts[n - 1]!.x + d.x * L, z: pts[n - 1]!.z + d.z * L }], false), speed: 0, next: [] }), port: l.port };
+      const y1 = l.ys?.[n - 1] ?? 0;
+      const a: TLane = { ...mk({ id: `${l.id}~out`, kind: l.kind === 'highway' ? 'highway' : 'radial', path: polyline([pts[n - 1]!, { x: pts[n - 1]!.x + d.x * L, z: pts[n - 1]!.z + d.z * L }], false), speed: 0, next: [], ...(y1 ? { y: [y1, y1] } : {}) }), port: pout?.id ?? null };
       a.prev.push(l); l.next.push(a); a.sink = true;
       lanes.push(a); byId.set(a.id, a);
     }
   }
+  // open ends without a known port: ends within 10 u of each other are one world exit
+  const loose = lanes.filter((l) => (l.source || l.sink) && !l.port);
+  loose.forEach((l, i) => {
+    const far = l.source ? l.poly.points[0]! : l.poly.points[l.poly.points.length - 1]!;
+    const mate = loose.slice(0, i).find((o) => {
+      const q = o.source ? o.poly.points[0]! : o.poly.points[o.poly.points.length - 1]!;
+      return Math.hypot(q.x - far.x, q.z - far.z) < 10;
+    });
+    l.port = mate?.port ?? `exit-${i}`;
+  });
   const boardIn = new Map<string, TLane>(), boardOut = new Map<string, TLane>();
   for (const p of g.ports) {
     if (p.kind !== 'board') continue;
@@ -208,13 +260,33 @@ export function buildTrafficGraph(map: TownMap, opts: TrafficGraphOptions = {}):
     l.box = j;
     (boxes.get(j) ?? boxes.set(j, []).get(j)!).push(l);
   }
+  // dead-end U-turn loops are so tight that one car at a time fits
+  for (const l of lanes) if (l.kind === 'uturn') { l.box = l.id; l.conflicts = [l]; }
   for (const list of boxes.values()) {
     for (const a of list) for (const b of list) {
       if (a === b) continue;
       const pa = a.poly.points, pb = b.poly.points;
-      if (near(pa[0]!, pb[0]!)) continue; // same arm: plain following
-      if (near(pa[pa.length - 1]!, pb[pb.length - 1]!) || polysCross(a.poly, b.poly)) a.conflicts.push(b);
+      if (near(pa[0]!, pb[0]!)) continue; // same arm: following (+ siblings)
+      if (near(pa[pa.length - 1]!, pb[pb.length - 1]!) || polysCross(a.poly, b.poly) || minDist(a.poly, b.poly) < CLEAR - 0.1) a.conflicts.push(b);
     }
+  }
+
+  // ---- diverges (siblings) and yield hold lines
+  for (const l of lanes) {
+    const sib = new Set<TLane>();
+    for (const p of l.prev) for (const n of p.next) if (n !== l && near(n.poly.points[0]!, l.poly.points[0]!, 0.2)) sib.add(n);
+    l.siblings = [...sib];
+  }
+  for (const l of lanes) {
+    if (!l.yield) continue;
+    const end = l.poly.points[l.poly.points.length - 1]!;
+    const others = lanes.filter((o) => o !== l && !l.prev.includes(o) && o.poly.points.some((p) => Math.hypot(p.x - end.x, p.z - end.z) < 6));
+    let hold = 0;
+    for (let s = l.len; s >= 0; s -= 0.1) {
+      const p = pointAt(l.poly, s);
+      if (others.every((o) => projectOnPolyline(o.poly, p).d >= CLEAR)) { hold = s; break; }
+    }
+    l.holdS = hold;
   }
 
   // ---- signals at G0's major junctions
@@ -288,7 +360,9 @@ export function buildTrafficGraph(map: TownMap, opts: TrafficGraphOptions = {}):
     for (const n of l.next) if (!reach.has(n)) { reach.add(n); fwd.push(n); }
   }
   const STREET: ReadonlySet<LaneKind> = new Set<LaneKind>(['local', 'avenue', 'parkway', 'radial', 'ring']);
-  const streets = lanes.filter((l) => STREET.has(l.kind) && !l.board && !l.source && !l.sink && l.len >= 3 && reach.has(l) && canExit.has(l));
+  // detours avoid dead-end stubs (lanes into / out of a U-turn loop): queues there can only drain one car at a time
+  const stub = (l: TLane) => l.next.some((n) => n.kind === 'uturn') || l.prev.some((p) => p.kind === 'uturn');
+  const streets = lanes.filter((l) => STREET.has(l.kind) && !l.board && !l.source && !l.sink && l.len >= 3 && !stub(l) && reach.has(l) && canExit.has(l));
 
   const dcache = new Map<TLane, Map<TLane, number>>();
   const distTo = (target: TLane): Map<TLane, number> => {
@@ -304,6 +378,7 @@ export function buildTrafficGraph(map: TownMap, opts: TrafficGraphOptions = {}):
       const l = open.splice(bi, 1)[0]!;
       const dl = d.get(l)!;
       for (const p of l.prev) {
+        if (p.kind === 'uturn') continue; // routes never turn around in a cul-de-sac (one car at a time: gridlock bait)
         const nd = dl + p.len;
         if (nd < (d.get(p) ?? Infinity)) { d.set(p, nd); open.push(p); }
       }
