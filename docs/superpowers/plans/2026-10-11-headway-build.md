@@ -610,3 +610,27 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 **Copy/UX (v9):** General Sans everywhere except titles; short, visual explainers; no hard-coded fan counts.
 **Kenney (K0–K3 done):** add `'kenney'` to `FamilyId` in `assets/types.ts` and drop the catalog cast; give K1's vegetation test a permanent home (`src/render/__tests__/assets-kenney-vegetation.test.ts`, copy from `/tmp/k1test/k1veg.test.ts` if still present); `st.lamp`/`st.trafficLight`/`st.fence` stay ours (Kenney lamp heads face down and wouldn't glow); our train stays (Kenney cars are 2.7 u vs our 4.2 u platforms). Fix the rail-layout failures in `district-stadium.test.ts` (3) and the type error in `district-outskirts.test.ts` caused by the new rail.
 **Town art (showcase done, 583/583 tests):** remaining, ranked — two apartment towers and Central Station still hide route length (~39 % hidden now); teal/mustard roofs compete with route colours (palette roles); the south-west edge is sparse (will meet the greater town / world).
+
+---
+
+## v12 Play UX v2 (user: "make sure the gameplay for people works and is intuitive; completely click-based; a bus depot on the side; add buses to a line; trains with more cars")
+
+**Decisions (coordinator):**
+1. **Click-first Play.** Every control reachable by mouse; keyboard keeps shortcuts only. A **Fleet board** panel (left side, replaces the plain route legend in Play): one lane per route (colour, name, waiting count), bus tokens placed along the lane by loop progress, showing load (fill bar), state (moving / dwelling / holding ⏸ / at terminal / deadheading) and pending intents (badges). Below the lanes a **Depot** tray with reserve buses and the **Train** strip (cars, load, next station, departure timer).
+   - Click a bus (map or token) → an action card next to it: **Hold 30 s / Hold 60 s / Send now / Move to route ▸** (route chips; also: click a route lane or a route line on the map). Drag a token onto another lane = reassign (applies at its terminal, deadhead path previewed on the map).
+   - Click a depot bus → **Deploy to route ▸** (r1/r2/r3 chips). Click the train → **Leave now / Wait 30 s / Wait 60 s** (within limits).
+   - ≤ 2 clicks for every common action; disabled actions explain why in plain words; every action gives visible feedback within 1 s (badge, map highlight, toast).
+2. **Bus depot + reserves (new mechanic, AI parity):** `bus.reserve = 2` extra buses parked in a depot lot near Central (beside the r1/r2 terminal; visible on the map). New intent/action **deploy(route)**: a reserve bus leaves the depot, deadheads to the route's terminal and joins the route; it can later return only via reassign→depot (not needed in v1). The AI gets the same action through a new decision kind **`depot_check`** raised every 60 s while reserves remain (features: reserves_left, each route's queue/left-behind/gap, event_in_s), actions `deploy {to: RouteId | 'busiest'}` or `continue`. g0 baseline deploys a reserve when any route's queue ≥ 60 (simple, respectable); REF deploys to `busiest` when queue_ratio is high.
+3. **Train: 3 cars**, capacity 240 (80 per car), dwell unchanged; renderer draws 3 linked cars; the train control remains departure timing.
+4. **simVersion → '3'**; retune gates (transfers, completion, REF ≥ 3 %, Play winnable 3–12 %, doing nothing = g0) and re-run + republish the evolution campaign afterwards.
+5. **Tutorial:** 3 click-through coach steps in Play using the real UI (select a bus → move it to Stadium before closing → deploy a reserve), skippable, remembered.
+
+**Contract changes (coordinator applies before agents start):** `DecisionKind` += `'depot_check'`; `Action` += `{ type: 'deploy'; to: RouteId | 'busiest' }`; `Intent` += `{ type: 'deploy'; to: RouteId }`; `Observation` += `depot: { reserves: string[]; deploying: string[] }`; `VehicleState` += `'depot'`; `SimConfig.bus` += `reserve: number`; `SimConfig.train` += `cars: number`.
+
+| Track | Owns | Delivers |
+|---|---|---|
+| P1 sim depot + train | `packages/sim/src/{engine,controllers/policy.ts,policy,config.ts,scenarios.ts}`, `packages/sim/test/**` | depot mechanic, deploy intents/actions, `depot_check` decision point + features, 3-car train, g0/REF updates, simVersion 3, gates green |
+| P2 Play UI v2 | `apps/web/src/modes/play/**`, `apps/web/src/ui/hud/**` | Fleet board, depot tray, train strip, action cards, drag-to-reassign, click-a-route-to-pick, plain-language disabled states, feedback, tutorial; keyboard shortcuts kept |
+| P3 renderer bits | `apps/web/src/render/dynamic/**` (+ a `render/town/depot.ts` static lot) | depot lot with parked reserve buses, deploying buses drive out, 3-car train, clickable route lines (`pick` returns `{kind:'route', id}`), hover highlight |
+| P4 evolve + DSL | `packages/evolve/src/**`, `packages/sim/src/policy/{features,schema}.ts` docs only via P1 | DSL doc + prompts + probes cover `depot_check`/`deploy`; dry campaign on simVersion 3 |
+| P5 playtest + UX QA (after P1–P3) | `scripts/playtest/**`, small fixes anywhere in Play/HUD | scripted players (novice / sensible / expert) through intents: doing nothing = g0, sensible beats g0 3–12 %, expert can beat the champion sometimes; a click-path audit (every action ≤ 2 clicks, no dead ends, no console errors) with screenshots of each step; fixes |
