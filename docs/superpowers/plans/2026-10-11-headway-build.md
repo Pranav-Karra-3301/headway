@@ -488,3 +488,38 @@ T2.2 composes: base `SCENERY` (Task M) only where no district provides items (di
 | K3 buildings + props (after K0) | `src/render/assets/families/kenney-buildings.ts` (imported by `families/kenney.ts`) | `kn.house.*` (suburban, roofs recoloured to palette roles), low-rise `kn.shop.*` (≤ 3 storeys only), a few `kn.works.*` industrial pieces for an outskirts works yard, `kn.prop.*` street/survival props; catalog entries appended; PUBLISH "assets-kenney-buildings" |
 
 **Downstream (read this if you are T2.2, T2.3, E2 or the art-direction loop):** T2.3 traffic uses `KENNEY_CARS` (via `kenneyModel`) when preloaded, else the kit cars. E2's marina uses `KENNEY_BOATS` when available. The composer awaits `preloadKenney` for every `kn.*` kind in `DISTRICTS` plus the upgraded `veg.*` models before building. A later dressing pass adds Kenney houses/props to apartments/outskirts and Kenney cliffs/rocks/pines to the mountains.
+
+---
+
+## v6 greater town (user: "use the road systems to make a good, detailed, large town with highways and roundabouts and everything")
+
+**Principle:** the playable town (`TOWN`: 8 stops, 3 routes, rail loop) stays exactly as it is — the sim, engine and district art depend on it. Around it we build a **visual-only greater town ring** (28 u wide on every side) with Kenney `city-kit-roads` tiles, so the town reads as a real, large place. The default camera still frames the playable network; zooming out reveals the region, then the mountains and lake beyond it.
+
+**Grid:** one Kenney road tile = **4 u** (tiles are 1 × 1 kit units; the roundabout is 3 × 3). Grid origin `(bounds.minX − 28, bounds.minZ − 28)`, 32 columns × 27 rows; the board occupies columns 7–24, rows 7–19 (72 × 52 u). Rows 0–3 (the northern 16 u strip) are reserved for the highway.
+
+**Network:**
+- Every road that leaves the board (`worldLayout(TOWN).exits`) continues outward into a **roundabout** within the ring.
+- An **orbital ring road** links the roundabouts all the way around the board.
+- A **highway** (dual carriageway with barriers) runs east–west across the northern strip, with an **interchange** (side exit/entry ramps, slants up to an overpass on bridge pillars) where the north exit road meets it, highway signs and light poles, continuing west into a mountain tunnel and east toward the lakeshore.
+- A **lakeshore parkway** (boulevard with street lights) along the south and east, meeting the waterfront.
+- Local streets subdivide the ring into blocks.
+
+**Dressing:**
+- **Suburbs:** Kenney suburban houses, fences and gardens (north-east and north-west).
+- **Commercial strip:** low-rise Kenney commercial (two to three storeys) with parking lots along the ring road.
+- **Industrial works yard:** Kenney industrial, near the rail and mountains in the south-west.
+- Parks, street trees, power poles with wires along roads, traffic lights at major junctions, construction props for a little life.
+- A **waterfront district:** boardwalk and promenade meeting E2's marina.
+
+**Traffic:** visual-only cars and trucks drive the ring, roundabouts and highway (Kenney `car-kit` via `KENNEY_CARS`), despawning and spawning at board-edge exits and highway ends. They never affect the sim.
+
+| Track | Owns | Delivers |
+|---|---|---|
+| G0 grid + streets (first) | `src/render/greater/{grid.ts,roads/**}` | the grid seam (`greaterGrid`, `cellCenter`, `cellOf`, `RoadCell` tile map, `Lane` polylines for traffic, block polygons for dressing), roundabouts at every exit, ring road, parkway, local streets, rendered with Kenney road tiles (merged per material), sidewalks where tiles allow; PUBLISH "greater-roads" |
+| G1 highway + interchange (after G0) | `src/render/greater/highway/**` | the northern highway band, interchange, ramps, overpass, barriers, signs, lights, tunnel approach; adds its `Lane`s; PUBLISH "greater-highway" |
+| G2 outer neighbourhoods (after G0) | `src/render/greater/blocks/**` | suburbs, commercial strip, works yard, parks, parking, poles and wires, traffic lights, props; never on roads; PUBLISH "greater-blocks" |
+| G3 waterfront + parkway dressing (after G0) | `src/render/greater/waterfront/**` | boardwalk, promenade, benches, lamps, small piers meeting the marina; PUBLISH "greater-waterfront" |
+| G4 greater traffic (after G0) | `src/render/greater/traffic/**` | cars and trucks on ring, roundabouts (yield-and-merge feel) and highway lanes with spacing; headlights at dusk; ≤ 4 draw calls |
+| G5 integration (after G1–G4) | `src/render/greater/index.ts`, `src/render/greater/dev.ts`, `apps/web/greater-dev.html` | `createGreaterTownLayer(map)`, a preview of the full region with the town board, a recommendation for `world/layout.ts` margins (terrain and water start beyond the ring); PUBLISH "greater-town-v1" (full region) and "greater-town-v1-close" |
+
+Kenney models load through `src/render/assets/kenney` (K0): `await preloadKenney([...])` before building; use the road tile names from `apps/web/src/render/assets/kenney/manifest.json` (`city-kit-roads`). If K0 is not finished when you start, load the GLBs with three's `GLTFLoader` behind a tiny local helper and switch to K0's API when it exists.
