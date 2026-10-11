@@ -33,6 +33,13 @@ describe('designer prompts', () => {
     expect(sys).toMatch(/Jev \(the advisor\) is off/);
   });
 
+  it('asks designer c (only when told) to add a new rule, and states the novelty rule', () => {
+    const digest = 'x';
+    expect(designerUserPrompt({ emphasis: 'spacing', champion: POLICY, digest, requireNewRule: true })).toContain('MUST add at least one NEW rule');
+    expect(designerUserPrompt({ emphasis: 'spacing', champion: POLICY, digest })).not.toContain('MUST add at least one NEW rule');
+    expect(designerSystemPrompt()).toMatch(/Novelty: do not resubmit an idea that failed in the last 4 rounds/);
+  });
+
   it('user prompt carries the emphasis directive, the champion JSON and the digest', () => {
     const digest = '## Findings\n1. Apartments South went 14 min without a Route 2 bus.';
     const u = designerUserPrompt({ emphasis: 'transfers', champion: POLICY, digest });

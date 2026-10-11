@@ -11,7 +11,7 @@ const BASE: Record<string, EvalRow> = { g0: { train: 1000, val: 500 }, ref: { tr
 const VALID: Scripted[][] = [[reply(variant(6), 'A')], [reply(variant(10), 'B')], [reply(variant(12), 'C')]];
 
 function setup(o: { script?: Scripted[][]; table?: Record<string, EvalRow>; round?: number; champion?: Generation;
-  temperatures?: [number, number, number]; past?: Proposal[] }) {
+  temperatures?: [number, number, number]; past?: Proposal[]; newRuleDesigner?: number | null }) {
   const champion = o.champion ?? generation('g0', 0, POLICY);
   const store = new MemoryStore(champion, o.round ?? 1, o.past ?? []);
   const llm = fakeLlm(o.script ?? VALID, o.temperatures);
@@ -22,6 +22,8 @@ function setup(o: { script?: Scripted[][]; table?: Record<string, EvalRow>; roun
     llm, model: 'deepseek-ai/DeepSeek-V4.1-Flash', store, emit, evaluate: ev.evaluate,
     now: () => `2026-10-11T12:00:${String(tick++).padStart(2, '0')}Z`,
     ...(o.temperatures ? { temperatures: o.temperatures } : {}),
+    sampleFeatures: () => ({}), // no decision samples: edit probes only (new-rule probes are tested in evaluate.test.ts)
+    newRuleDesigner: o.newRuleDesigner === undefined ? null : o.newRuleDesigner,
   };
   return { store, llm, ev, events, deps };
 }
@@ -31,6 +33,19 @@ const statuses = (events: EvolveEvent[], designer: number) =>
 const valIds = (calls: Array<{ id: string; split: string }>) => calls.filter((c) => c.split === 'val').map((c) => c.id).sort();
 
 describe('runRound', () => {
+  it('makes designer c add a new rule: a threshold-only reply gets one repair request', async () => {
+    const withRule = structuredClone(variant(12));
+    withRule.rules.push({ id: 'brand-new', on: 'bus_at_terminal', priority: 50, when: [{ f: 'route_queue', op: '>=', v: 40 }], do: { type: 'dispatch' }, say: 'Leaving: {route_queue} waiting' });
+    const s = setup({ newRuleDesigner: 2, script: [[reply(variant(6), 'A')], [reply(variant(10), 'B')], [reply(variant(12), 'C'), reply(withRule, 'C2')]] });
+    const { round } = await runRound(s.deps);
+    expect(statuses(s.events, 2)).toEqual(['requested', 'received', 'repaired']);
+    expect(round.proposals[2]!.valid).toBe(true);
+    expect(round.proposals[2]!.policy!.rules.some((r) => r.id === 'brand-new')).toBe(true);
+    const c = s.llm.calls.filter((x) => x.user.includes('# Your extra requirement'));
+    expect(c.length).toBe(2); // the first call and its repair; designers a and b get no requirement
+    expect(c[1]!.user).toContain('you must add at least one NEW rule');
+  });
+
   it('runs a full round: designers, scoring, promotion, records and events', async () => {
     const { store, llm, ev, events, deps } = setup({
       table: { 'r1-a': { train: 950, val: 490 }, 'r1-b': { train: 980, val: 480 }, 'r1-c': { train: 1010, val: 500 },

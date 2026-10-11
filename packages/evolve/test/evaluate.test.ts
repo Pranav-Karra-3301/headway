@@ -1,8 +1,11 @@
 import { DEFAULT_CONFIG, G0, REF, SEEDS } from '@headway/sim';
 import type { Policy, ScenarioInstance } from '@headway/sim';
 import { describe, expect, it } from 'vitest';
-import { baselineGeneration, championProbes, createEvaluator, evaluatePolicy, evolveInstances, policyBody, runProbes, type EvaluatorCache, type RunOne } from '../src/evaluate';
-import { fakeEvaluate, gap, metrics, missed, runResult } from './fixtures';
+import {
+  baselineGeneration, championProbes, createEvaluator, evaluatePolicy, evolveInstances, MAX_PROBES, newRuleProbes, painFeatures, policyBody,
+  runProbes, sampleFeatures, type EvaluatorCache, type FeatureSamples, type RunOne,
+} from '../src/evaluate';
+import { fakeEvaluate, gap, metrics, missed, overload, runResult } from './fixtures';
 
 const STADIUM_1001: ScenarioInstance = { scenarioId: 'stadium_exit', seed: 1001, split: 'train' };
 const withId = (p: Policy, id: string): Policy => ({ ...p, meta: { ...p.meta, id, summary: `copy ${id}` } });
@@ -189,5 +192,58 @@ describe('championProbes / runProbes', () => {
     const out = await runProbes(evaluate, G0, 1000);
     expect(out).toHaveLength(14);
     expect(out.map((r) => r.id)).not.toContain('mv-r1-r2');
+  });
+});
+
+describe('new-rule probes', () => {
+  const results = [runResult({ findings: [overload(50_000, 30), missed(20_000), gap(5_000)] })];
+  const samples: FeatureSamples = {
+    bus_at_terminal: Array.from({ length: 100 }, (_, i) => ({ route_queue: i, max_other_route_queue: 2 * i, queue_ratio_other: i / 10, headway_ratio: 1, buses_on_route: 2, headway_ahead_s: 3600, layover_s: 0, event_in_s: 0, target_headway_s: 200 })),
+    bus_at_stop: Array.from({ length: 100 }, (_, i) => ({ queue_here: i % 20, downstream_queue: i, load_factor: i / 100, expected_transfers: i % 7, train_eta_s: i < 50 ? 9999 : i * 2 })),
+    train_at_station: Array.from({ length: 50 }, (_, i) => ({ platform_queue: i, onboard: 3 * i, transfers_alighted: i % 9, next_bus_eta_s: 10 * i, buses_here_or_due_60s: 0, dwell_s: 0, event_in_s: 0 })),
+  };
+
+  it('ranks related features by the impact of the champion\'s findings', () => {
+    const pain = painFeatures(results);
+    expect(pain.bus_at_terminal.map((x) => x.f)).toEqual(['route_queue', 'max_other_route_queue', 'queue_ratio_other']);
+    expect(pain.bus_at_stop[0]!.f).toBe('queue_here');
+    expect(pain.train_at_station.map((x) => x.f)).toContain('transfers_alighted');
+  });
+
+  it('builds single-condition rules from p50/p80 of the decision records, with neutral say and generated ids', () => {
+    const probes = newRuleProbes(G0, results, samples);
+    expect(probes.length).toBeGreaterThan(10);
+    for (const p of probes) {
+      expect(p.rule!.id).toMatch(/^probe-(stop|term|train)-[a-z0-9]+-[a-z0-9]+-[a-z0-9p-]+$/);
+      expect(p.rule!.id.length).toBeLessThanOrEqual(32);
+      expect(p.rule!.when).toHaveLength(1);
+      expect(p.policy.rules).toHaveLength(G0.rules.length + 1);
+      expect(p.rule!.say).toMatch(/^Probe rule: /);
+    }
+    const reas = probes.filter((p) => p.rule!.on === 'bus_at_terminal' && p.rule!.do.type === 'reassign' && p.rule!.when[0]!.f === 'route_queue');
+    expect(reas.map((p) => p.rule!.when[0])).toEqual([{ f: 'route_queue', op: '>=', v: 50 }, { f: 'route_queue', op: '>=', v: 79 }]);
+    expect(reas[0]!.rule!.priority).toBeGreaterThan(G0.rules[0]!.priority);
+    expect(reas[0]!.label).toBe('new rule on bus_at_terminal: reassign to busiest when route_queue >= 50');
+    // low-trigger features use <= p50 / p20 and ignore sentinel values (9999 = no train)
+    const eta = probes.filter((p) => p.rule!.when[0]!.f === 'train_eta_s').map((p) => p.rule!.when[0]!);
+    expect(eta.every((c) => c.op === '<=' && c.v < 9999)).toBe(true);
+    // round-robin over kinds: the first three probes cover three different kinds
+    expect(new Set(probes.slice(0, 3).map((p) => p.rule!.on)).size).toBe(3);
+  });
+
+  it('caps all probes at 50, edits first, and skips new rules without samples', () => {
+    const all = championProbes(G0, { results, samples });
+    expect(all.length).toBe(MAX_PROBES);
+    expect(all[0]!.id).toBe('rm-even-headway');
+    expect(all.filter((p) => p.rule).length).toBe(MAX_PROBES - championProbes(G0).length);
+    expect(championProbes(G0, { results }).every((p) => !p.rule)).toBe(true);
+    expect(championProbes(G0, { results, samples, limit: 5 })).toHaveLength(5);
+  });
+
+  it('records the champion\'s decision features with the real engine', { timeout: 30_000 }, () => {
+    const s0 = sampleFeatures(G0, evolveInstances('train').slice(0, 1));
+    expect(s0.bus_at_terminal!.length).toBeGreaterThan(10);
+    expect(Object.keys(s0.bus_at_stop![0]!)).toContain('queue_here');
+    expect(s0.train_at_station!.length).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,6 @@
 import type { FailureFinding, Proposal } from '@headway/sim';
 import { describe, expect, it } from 'vitest';
-import { buildDigest, pressureRanking, tripsByStop } from '../src/digest';
+import { buildDigest, ideaOf, pressureRanking, tripsByStop } from '../src/digest';
 import { SCENARIOS } from '@headway/sim';
 import { bunching, gap, missed, overload, POLICY, runResult, score, stopStats } from './fixtures';
 
@@ -104,7 +104,7 @@ describe('buildDigest', () => {
     expect(digest).not.toContain('## Probes'); // no probes, no section
     expect(d).not.toContain('promotion gate');
     const flat = buildDigest({ champion: { policy: POLICY, results }, baseline: score(1), reference: score(1), history: [], probes: [{ label: 'x', deltaPct: -0.4 }] });
-    expect(flat).toContain('No one-step probe reaches the −1.0% promotion gate.');
+    expect(flat).toContain('No one-change probe reaches the −1.0% promotion gate.');
   });
 
   it('shows up to 12 proposals across older rounds, without repeating ΔJ inside the verdict', () => {
@@ -115,6 +115,28 @@ describe('buildDigest', () => {
     expect(d).not.toContain('r1-c');
     expect(d).toContain('r2-a');
     expect(d).toContain('r5-c [transfers] ΔJ_train +2.9% · Rejected: worse on training. ·');
+  });
+
+  it('shows the exact rule JSON of the best improving new-rule probes', () => {
+    const rule = { id: 'probe-term-reas-routeque-50', on: 'bus_at_terminal' as const, priority: 20, when: [{ f: 'route_queue', op: '>=' as const, v: 50 }], do: { type: 'reassign' as const, to: 'busiest' as const }, say: 'Probe rule: route_queue is {route_queue}' };
+    const d = buildDigest({ champion: { policy: POLICY, results }, baseline: score(1), reference: score(1), history: [],
+      probes: [{ label: 'new rule A', deltaPct: -2.5, rule }, { label: 'new rule B', deltaPct: 1.2, rule: { ...rule, id: 'probe-b' } }, { label: 'move', deltaPct: -1 }] });
+    expect(d).toContain('Best new-rule probes as rule JSON (adopt exactly or refine):');
+    expect(d).toContain(`−2.5% ${JSON.stringify(rule)}`);
+    expect(d).not.toContain('"probe-b"'); // worse than the champion: no JSON
+  });
+
+  it('describes each proposal as its exact change vs the champion', () => {
+    const p = structuredClone(POLICY);
+    p.rules = p.rules.filter((r) => r.id !== 'anti-bunch');
+    p.rules.push({ id: 'new-one', on: 'bus_at_terminal', priority: 40, when: [{ f: 'route_queue', op: '<', v: 5 }], do: { type: 'reassign', to: 'busiest' }, say: 'x' });
+    p.params.allocation = { r1: 1, r2: 2, r3: 3 };
+    p.defaults.train_at_station = { type: 'setTrainDeparture', dwellS: 60 };
+    expect(ideaOf(p, POLICY)).toBe('+terminal reassign→busiest if route_queue<5; -rule anti-bunch; alloc 1/2/3; default train dwell 60s');
+    expect(ideaOf(POLICY, POLICY)).toBe('same as the champion');
+    const d = buildDigest({ champion: { policy: POLICY, results }, baseline: score(1), reference: score(1),
+      history: [proposal({ id: 'r1-a', policy: p, deltaTrainPct: 2.0, narrative: 'ΔJ +2.0% on training. Rejected: worse on training (ΔJ +2.0%).' })] });
+    expect(d).toContain('idea: +terminal reassign→busiest if route_queue<5');
   });
 
   it('stays within 6,000 characters for huge inputs', () => {

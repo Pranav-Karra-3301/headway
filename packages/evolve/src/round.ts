@@ -26,6 +26,8 @@ export interface RoundDeps {
   sampleFeatures?(policy: Policy): FeatureSamples | Promise<FeatureSamples>;
   /** Most one-change probes per round (default 50; 0 turns probes off, e.g. where CPU time is tight). */
   probeLimit?: number;
+  /** The designer who must add at least one new rule each round (default 2, designer 'c'; null: nobody). */
+  newRuleDesigner?: number | null;
 }
 
 // ---------- settings (spec §7, §8.2) ----------
@@ -133,7 +135,7 @@ async function design(ctx: Ctx, i: Designer): Promise<Draft> {
   const meta = (): Omit<Policy['meta'], 'summary'> =>
     ({ id: d.id, parent: champion.id, generation: champion.number + 1, author: d.model, emphasis: d.emphasis });
 
-  const requireNewRule = i === NEW_RULE_DESIGNER;
+  const requireNewRule = i === (deps.newRuleDesigner === undefined ? NEW_RULE_DESIGNER : deps.newRuleDesigner);
   const ruleIds = requireNewRule ? new Set(champion.policy.rules.map((r) => r.id)) : undefined;
   const req: LlmRequest = {
     model: deps.model, system: ctx.system, user: designerUserPrompt({ emphasis: d.emphasis, champion: champion.policy, digest: ctx.digest, requireNewRule }),
