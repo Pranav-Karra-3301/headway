@@ -43,7 +43,7 @@ function insert(id: string, name: string, j: number, o: { seed?: number; sim?: s
   return env.DB.prepare(
     `INSERT INTO leaderboard (id, name, scenario_id, seed, sim_version, j, metrics_json, replay_json, verified, champion_j, ip_hash, created_at)
      VALUES (?1, ?2, 'stadium_exit', ?3, ?4, ?5, '{}', '{}', 1, 2000000, NULL, ?6)`,
-  ).bind(id, name, o.seed ?? 50000, o.sim ?? '1', j, o.created ?? iso(DAY0)).run();
+  ).bind(id, name, o.seed ?? 50000, o.sim ?? '2', j, o.created ?? iso(DAY0)).run();
 }
 
 beforeEach(resetDb);
@@ -64,7 +64,7 @@ describe('POST /api/leaderboard', () => {
 
     const row = await env.DB.prepare('SELECT * FROM leaderboard WHERE id = ?1').bind(body.id)
       .first<{ name: string; seed: number; sim_version: string; j: number; verified: number; champion_j: number; ip_hash: string; replay_json: string; scenario_id: string }>();
-    expect(row).toMatchObject({ name: 'transit tom', seed: 50000, sim_version: '1', j: body.j, verified: 1, champion_j: body.championJ, scenario_id: 'stadium_exit' });
+    expect(row).toMatchObject({ name: 'transit tom', seed: 50000, sim_version: '2', j: body.j, verified: 1, champion_j: body.championJ, scenario_id: 'stadium_exit' });
     expect(row?.ip_hash).toMatch(/^[0-9a-f]{16}$/);
     expect(row?.ip_hash).not.toContain('203.0.113.7');
     expect(JSON.parse(row!.replay_json)).toEqual({ ...human.replay, controller: { kind: 'human', basePolicyId: 'g0' } });
@@ -154,7 +154,7 @@ describe('POST /api/leaderboard', () => {
 
 describe('GET /api/leaderboard', () => {
   it("defaults to today's play seed and is empty at first", async () => {
-    expect(await board(createApp({ now: () => DAY0 }))).toEqual({ seed: 50000, scenarioId: 'stadium_exit', simVersion: '1', entries: [] });
+    expect(await board(createApp({ now: () => DAY0 }))).toEqual({ seed: 50000, scenarioId: 'stadium_exit', simVersion: '2', entries: [] });
     expect((await board(createApp({ now: () => DAY10 }))).seed).toBe(50010);
   });
 

@@ -2,7 +2,7 @@
 import type { SimConfig } from './contracts';
 
 export const DEFAULT_CONFIG: SimConfig = {
-  simVersion: '1',
+  simVersion: '2',
   bus: { count: 6, capacity: 40, speed: 0.3, boardS: 2, alightS: 1.5, minDwellS: 8 },
   // Train speed 1.2 u/s (was 0.75; sim tuning, docs/research/sim-tuning.md): the regional loop is 234.5 u, so a loop is
   // ~5.5 min nominal (195 s running + 3 × 45 s dwells) and ~6 min in the stadium crush.

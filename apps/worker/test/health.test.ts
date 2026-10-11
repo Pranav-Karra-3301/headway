@@ -10,7 +10,7 @@ describe('GET /api/health', () => {
     expect(res.status).toBe(200);
     const body = await res.json<{ ok: boolean; simVersion: string; time: string }>();
     expect(body.ok).toBe(true);
-    expect(body.simVersion).toBe('1');
+    expect(body.simVersion).toBe('2');
     expect(Number.isNaN(Date.parse(body.time))).toBe(false);
   }, 30_000);
 });

@@ -14,6 +14,17 @@ describe('scoring with the real engine', () => {
     expect(score.metrics.completionPct).toBeGreaterThan(0);
   });
 
+  it('evaluateSplit yields to the event loop between runs, so the /api/evolve NDJSON stream flushes while it scores', async () => {
+    let ticks = 0;
+    const timer = setInterval(() => ticks++, 0);
+    try {
+      await evaluateSplit(G0, 'val');
+    } finally {
+      clearInterval(timer);
+    }
+    expect(ticks).toBeGreaterThan(0);
+  });
+
   it('memoEvaluate scores each (policy body, split) once per request', async () => {
     const calls: string[] = [];
     const fake: Evaluate = async (p, split) => {

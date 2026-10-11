@@ -115,7 +115,7 @@ describe('replays', () => {
     const sim = playWithIntents();
     const res = sim.result();
     const rep = sim.replay();
-    expect(rep).toMatchObject({ scenarioId: 'stadium_exit', seed: 50000, simVersion: '1', mapVersion: TOWN.version, controller: { kind: 'human', basePolicyId: 'g0' } });
+    expect(rep).toMatchObject({ scenarioId: 'stadium_exit', seed: 50000, simVersion: '2', mapVersion: TOWN.version, controller: { kind: 'human', basePolicyId: 'g0' } });
     expect(rep.intents!.map((x) => x.t)).toEqual([100, 300, 650, 800, 900]);
     expect(rep.decisions).toBeUndefined();
     const again = createSim({ map: TOWN, scenario: PLAY, controller: g0(), intents: rep.intents });
