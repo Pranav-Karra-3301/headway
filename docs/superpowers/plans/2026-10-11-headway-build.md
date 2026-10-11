@@ -351,3 +351,34 @@ export function createFileStore(dir: string): EvolveStore;
 ## Wave 2 preview — art-direction loop (after integration)
 
 A dedicated look-dev workflow: an "art director" agent screenshots Watch (day + dusk, palette A, three zoom levels) and the HUD, writes a ranked critique (composition, proportion, colour harmony, readability of vehicles/people/queues, clutter, post-processing artefacts), a "renderer" agent fixes the top items, repeat until two consecutive critiques find nothing above "minor". Every iteration publishes before/after screenshots for the user.
+
+---
+
+## v2 parallel split (supersedes ownership in T2 and T3 above; their requirements still apply)
+
+**Restart note:** the first workflow was stopped at 14:56 and checkpointed (`git log`: "wip: wave 0b/1 partial progress"). Foundation agents **continue from the files on disk**: read what exists, keep what is good, finish the rest. Two duplicate agents briefly collided in `apps/web/src/render/**` and possibly `packages/sim/src/map/**`; T2.1 and M reconcile those files into one coherent design (e.g. `render/__tests__/kit.test.ts` and `project.test.ts` import `../bake`, `../kit`, `../interp`, which do not exist).
+
+**New seams (coordinator wrote them; owners may extend, never break):** `apps/web/src/state/store.ts` (zustand `useApp`), `apps/web/src/state/frame.ts` (per-frame `frame.runner` / `frame.renderer`), `apps/web/src/sim/runner.ts` (`SimRunner`, working), `apps/web/src/render/layers.ts` (`RenderLayer`, `FrameContext`), stub components (`ui/hud/*`, `modes/{watch,play,lab}/*`, `ui/landing/Landing.tsx`, `ui/about/AboutPanel.tsx`), stub layers `render/traffic/index.ts` (`createTrafficLayer`) and `render/fx/index.ts` (`createTownFxLayer`).
+
+### Renderer split
+| Track | Owns | Starts after | Delivers |
+|---|---|---|---|
+| T2.1 kit + look | `render/kit/**`, `render/palettes.ts`, `render/materials.ts`, `render/post/**`, `render/camera.ts`, `render/lights.ts`, `render/dev.ts`, `apps/web/render-dev.html`, `render/__tests__/kit.test.ts` | now | kit per user feedback (lower buses, ≥ 5 trees incl. sway material variant, ≥ 8 building types, 3 car variants, palette role `car`), Wooden Toy default, look pipeline (post chain, clay material tweak with shared `uTime`/`uSimT` uniforms, gradient sky, board drop shadow, quality tiers). PUBLISH "kit-v2", then "look-v1-day" / "look-v1-dusk". Final message lists every exported builder and its signature. |
+| T2.2 town composition | `render/index.ts` (TownRenderer), `render/town/**` (static town from TOWN + SCENERY, merged/instanced), `render/dynamic/**` (buses, train, people, picking, select, highlight), `render/__tests__/project.test.ts` | T2.1 + M | TownRenderer per spec §10 composing static town, dynamic layer, `createTrafficLayer`, `createTownFxLayer`; drives shared uniforms. PUBLISH "town-3d-day" / "town-3d-dusk". |
+| T2.3 traffic | `render/traffic/**` | T2.1 + M | ambient cars per the T2 traffic bullet. |
+| T2.4 town FX | `render/fx/**` | T2.1 + M | route ribbons (T2.2 draws none) with flowing dashes + highlight glow/desaturate, street lamps (dusk glow), clock-tower hands from `simT`, stadium floodlight cones at dusk, subtle procedural board/lawn variation decal, a small celebratory confetti burst over the stadium at the advertised closing time. |
+
+### App split
+| Track | Owns | Delivers |
+|---|---|---|
+| T3a shell | `index.html`, `src/main.tsx`, `src/App.tsx`, `src/styles/**`, `src/state/**`, `src/sim/**`, `src/api.ts`, `src/modes/watch/**`, `src/ui/shell/**`, `public/data/**` | canvas host (rAF: `runner.frame` → `renderer.render`; 4 Hz `setHudFeed`; event → toasts), top bar frame (wordmark, tabs, slots for T3b components), routing `/` `/play` `/lab`, Watch mode, api with `/data` fallbacks, `window.__headway = { t, mode, ready }` for smoke tests, design tokens. Mounts every T3b/T3c/T3d/T7 component. |
+| T3b HUD | `src/ui/hud/**` | MetricsCluster, SpeedControls, ScenarioChip, RouteLegend, QueueMarkers, Inspector, Toasts, `alerts.ts` (observation → alert toasts, rate-limited) |
+| T3c Play | `src/modes/play/**` | everything in "Play mechanics" above, incl. `headless.worker.ts` (champion + g0 runs on the play seed with pace sampling), results screen, leaderboard panel, keyboard controls, coach marks |
+| T3d Lab | `src/modes/lab/**` | timeline, J chart (SVG), proposal cards, `diffPolicies` + diff view, evolve feed (`streamEvolve`), sealed panel, replay-generation |
+| T7 story | `src/ui/landing/**`, `src/ui/about/**`, `docs/demo-script.md`, `docs/pitch.md`, `README.md` | landing title card + about panel (precise claims: evolves the dispatch policy, not the model; DeepSeek designers on Luminal; Jev for station holds; sealed test never shown to agents), 4-minute demo script with fallbacks, pitch, README with run/deploy commands |
+
+### Tooling tracks
+| Track | Owns | Delivers |
+|---|---|---|
+| T8 eval CLIs | `packages/evolve/src/cli/{eval-sealed,export-web,sweep,verify-leaderboard}.ts`, `packages/evolve/test/cli-*.test.ts` | `sweep` (policies × scenarios × seeds → metrics table, for tuning), `export-web` (data/ → `apps/web/public/data/{champion,generations}.json`), `eval-sealed` (seeds from `SEALED_TEST_SEEDS` in `.env`, generating 3 random seeds into `.env` if absent; evaluates champion/g0/ref; POSTs to `/api/admin/sealed-eval`), `verify-leaderboard`. Run via `pnpm --filter @headway/evolve exec tsx src/cli/<name>.ts`. |
+| T9 smoke | `scripts/smoke/**` | dependency-free smoke harness (Node 26 + Chrome DevTools Protocol over the global WebSocket): launches headless Chrome, visits `/`, `/play`, `/lab` on a given base URL, fails on console errors or a blank canvas (pixel sample), waits for `window.__headway.ready`, checks sim time advances, saves screenshots to `.superpowers/wip/smoke/`. `node scripts/smoke/run.mjs --url <base>`. |
