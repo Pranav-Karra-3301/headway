@@ -1,0 +1,117 @@
+[
+  {
+    "type": "round_start",
+    "round": 5,
+    "champion": "g0"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "received",
+    "summary": "Pre-position buses before the stadium exit and add a bounded queue-relief hold at Old Main, keeping the 2/2/2 allocation and terminal headway hold."
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "received",
+    "summary": "Keep 2/2/2 buses and terminal headway hold, but hold buses at rail stops when a train is arriving and riders are transferring, and add a bounded Old Main queue-relief hold."
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "received",
+    "summary": "Keep the 2/2/2 allocation but tighten terminal spacing, add a short queue-aware stop hold for early buses, and hold R2 at Central for inbound train transfers."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-a",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-a",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r5-a",
+    "deltaTrainPct": 3.95,
+    "narrative": "ΔJ +4.0% on training. Eased: 76 people waiting for Route 2 were left behind at Central Station; the queue peaked at 59 (now 67 left behind). Eased: 93 people waiting for Route 1 were left behind at Old Main; the queue peaked at 80 (−141 pax-min over the training runs). Worse: 245 people waiting for Route 3 were left behind at Old Main; the queue peaked at 244 (was 232 left behind). Worse: 104 riders reached Central Station from the train just after Route 2 left (was 94 riders)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-b",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-b",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r5-b",
+    "deltaTrainPct": 0.24,
+    "narrative": "ΔJ +0.2% on training. Eased: 71 riders reached Downtown from Route 3 just after Route 2 left (now 68 riders). Worse: 232 people waiting for Route 3 were left behind at Old Main; the queue peaked at 229 (+142 pax-min over the training runs). New: Holding b5 30 s at Old Main gained 0 transfers but delayed 40 riders."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-c",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r5-c",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r5-c",
+    "deltaTrainPct": 14.57,
+    "narrative": "ΔJ +14.6% on training. Eased: 94 riders reached Central Station from the train just after Route 2 left (now 53 riders). Eased: 76 people waiting for Route 2 were left behind at Central Station; the queue peaked at 59 (now 74 left behind). Worse: 242 people waiting for Route 3 were left behind at Old Main; the queue peaked at 242 (was 232 left behind). Worse: 75 people were left behind at Stadium Station; the queue peaked at 68 (was 59 left behind)."
+  },
+  {
+    "type": "decision",
+    "promoted": null,
+    "reason": "No promotion: no proposal passed the training gates (r5-b worse on training (ΔJ +0.2%); r5-a worse on training (ΔJ +4.0%); r5-c worse on training (ΔJ +14.6%)); g0 stays champion."
+  }
+]

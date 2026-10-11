@@ -1,0 +1,117 @@
+[
+  {
+    "type": "round_start",
+    "round": 3,
+    "champion": "g0"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "received",
+    "summary": "Add a transfer-hold at rail stops for imminent train arrivals and a queue-relief hold at Old Main, keeping the baseline 2/2/2 allocation and terminal headway rule."
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "received",
+    "summary": "Keep 2/2/2 buses and terminal headway hold, but add a bounded stop-level spacing hold for early buses facing queues, plus a queue-relief hold at Old Main."
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "received",
+    "summary": "Rebalance to 2/3/1 buses for the apartment-heavy surges and reassign idle Route 3 buses to the busiest route at terminals."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-a",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-a",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r3-a",
+    "deltaTrainPct": 0.8,
+    "narrative": "ΔJ +0.8% on training. Eased: 71 riders reached Downtown from Route 3 just after Route 2 left (now 31 riders). Eased: 93 people waiting for Route 1 were left behind at Old Main; the queue peaked at 80 (−16 pax-min over the training runs). New: Holding b2 30 s at Old Main gained 0 transfers but delayed 40 riders. Worse: 232 people waiting for Route 3 were left behind at Old Main; the queue peaked at 229 (+339 pax-min over the training runs)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-b",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-b",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r3-b",
+    "deltaTrainPct": 0.28,
+    "narrative": "ΔJ +0.3% on training. Eased: 71 riders reached Downtown from Route 3 just after Route 2 left (now 68 riders). Worse: 232 people waiting for Route 3 were left behind at Old Main; the queue peaked at 229 (+137 pax-min over the training runs). New: Holding b5 40 s at Old Main gained 0 transfers but delayed 40 riders."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-c",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r3-c",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r3-c",
+    "deltaTrainPct": 5.22,
+    "narrative": "ΔJ +5.2% on training. Eased: 232 people waiting for Route 3 were left behind at Old Main; the queue peaked at 229 (−5990 pax-min over the training runs). Eased: 59 people were left behind at Stadium Station; the queue peaked at 65 (now 34 left behind). Worse: 94 people waiting for Route 1 were left behind at Old Main; the queue peaked at 118 (was 93 left behind). New: 88 people waiting for Route 2 were left behind at Downtown; the queue peaked at 99."
+  },
+  {
+    "type": "decision",
+    "promoted": null,
+    "reason": "No promotion: no proposal passed the training gates (r3-b worse on training (ΔJ +0.3%); r3-a worse on training (ΔJ +0.8%); r3-c worse on training (ΔJ +5.2%)); g0 stays champion."
+  }
+]

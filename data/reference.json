@@ -1,0 +1,25 @@
+{
+  "J": 9058608,
+  "runs": 8,
+  "metrics": {
+    "J": 9058608,
+    "spawned": 9171,
+    "completed": 8615,
+    "unfinished": 556,
+    "completionPct": 93.94,
+    "meanJourneyS": 773.7,
+    "meanWaitS": 296.58,
+    "p95WaitS": 755.54,
+    "maxWaitS": 1793,
+    "transfersMade": 1142,
+    "missedConnections": 156,
+    "leftBehind": 2020,
+    "walkaways": 0,
+    "effort": {
+      "busDistanceU": 27937.1,
+      "deadheadDistanceU": 1413.18,
+      "holdS": 1140,
+      "trainDwellS": 9156
+    }
+  }
+}

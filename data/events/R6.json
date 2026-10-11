@@ -1,0 +1,117 @@
+[
+  {
+    "type": "round_start",
+    "round": 6,
+    "champion": "g0"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "requested"
+  },
+  {
+    "type": "proposal",
+    "designer": 0,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "transfers",
+    "status": "received",
+    "summary": "Add a bounded Old Main queue-relief hold for r3/r1 and a short Central hold for r2 when a train is arriving with transfers, keeping 2/2/2 and the terminal headway hold."
+  },
+  {
+    "type": "proposal",
+    "designer": 1,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "spacing",
+    "status": "received",
+    "summary": "Shift one bus from Route 3 to Route 1 (3/2/1) and restrict the terminal headway hold to a tighter ratio window, keeping the 45 s train dwell."
+  },
+  {
+    "type": "proposal",
+    "designer": 2,
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+    "emphasis": "allocation",
+    "status": "received",
+    "summary": "Shift one bus from Route 1 to Route 3 (2/1/3) to attack the 232-left-behind Old Main / Stadium Station backlog while keeping R1 and R2 at Central."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-a",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-a",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r6-a",
+    "deltaTrainPct": 0,
+    "narrative": "ΔJ 0.0% on training. No finding changed noticeably."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-b",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-b",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r6-b",
+    "deltaTrainPct": 15.01,
+    "narrative": "ΔJ +15.0% on training. Eased: 76 people waiting for Route 2 were left behind at Central Station; the queue peaked at 59 (now 35 left behind). Eased: 93 people waiting for Route 1 were left behind at Old Main; the queue peaked at 80 (now 44 left behind). Worse: 93 people were left behind at Stadium Station; the queue peaked at 103 (was 59 left behind). Worse: 237 people waiting for Route 3 were left behind at Old Main; the queue peaked at 237 (was 232 left behind)."
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-c",
+    "split": "train",
+    "done": 0,
+    "total": 8
+  },
+  {
+    "type": "eval",
+    "proposalId": "r6-c",
+    "split": "train",
+    "done": 8,
+    "total": 8
+  },
+  {
+    "type": "scored",
+    "proposalId": "r6-c",
+    "deltaTrainPct": 0.97,
+    "narrative": "ΔJ +1.0% on training. Eased: 232 people waiting for Route 3 were left behind at Old Main; the queue peaked at 229 (now 230 left behind). Fixed: 94 riders reached Central Station from the train just after Route 2 left. Worse: 77 people waiting for Route 2 were left behind at Central Station; the queue peaked at 77 (was 76 left behind). New: 73 people waiting for Route 2 were left behind at Downtown; the queue peaked at 85."
+  },
+  {
+    "type": "decision",
+    "promoted": null,
+    "reason": "No promotion: no proposal passed the training gates (r6-a less than 1% better on training; r6-c worse on training (ΔJ +1.0%); r6-b worse on training (ΔJ +15.0%)); g0 stays champion."
+  }
+]
