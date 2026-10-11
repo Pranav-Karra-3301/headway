@@ -14,7 +14,7 @@
 import type { TownMap, Vec2 } from '@headway/sim';
 import { BUILDING_SPEC_BY_KIND } from '../../assets/families/kenney-buildings';
 import type { AssetParams } from '../../assets/types';
-import { greaterGrid, type Block, type Dir, type GreaterGrid, type Rect, type RoadClass } from '../grid';
+import { greaterGrid, isWater, type Block, type Dir, type GreaterGrid, type Rect, type RoadClass } from '../grid';
 import { footprintRect, frameOf, inset, pick, rng, sizeOf, type Frame } from './frame';
 import { planStreetFurniture } from './street';
 
@@ -91,7 +91,8 @@ interface Ctx {
   streetClass: Map<string, RoadClass>;
 }
 
-function add(c: Ctx, kind: string, p: Vec2, rot: number, role: ItemRole, extra: Partial<BlockItem> = {}): BlockItem {
+function add(c: Ctx, kind: string, p: Vec2, rot: number, role: ItemRole, extra: Partial<BlockItem> = {}): BlockItem | null {
+  if (c.block.shore && !dry(c, p, role === 'building' ? 1.2 : 0.6)) return null;
   const it: BlockItem = { kind, x: round(p.x), z: round(p.z), rot: rot + frontYaw(kind), role, block: c.block.id, ...extra };
   if (role === 'building' || role === 'car' || SOLID.test(kind)) {
     const s = sizeOf(kind);
@@ -114,14 +115,38 @@ export function frontYaw(kind: string): number {
 /** Props with a footprint worth checking (no overlaps with buildings). */
 const SOLID = /^kn\.works\.|^kn\.prop\.dumpster$|^res\./;
 
-function tree(c: Ctx, kinds: readonly string[], p: Vec2, s = 1): BlockItem {
+function tree(c: Ctx, kinds: readonly string[], p: Vec2, s = 1): BlockItem | null {
   const kind = pick(c.r, kinds);
   const n = TREE_VARIANTS[kind] ?? 1;
   return add(c, kind, p, c.r() * Math.PI * 2, 'tree', { scale: round(s * (0.88 + c.r() * 0.3)), params: { variant: Math.floor(c.r() * n) } });
 }
 
-function lot(c: Ctx, kind: LotKind, rect: Rect, idx?: number): void {
-  if (rect.maxX - rect.minX < 0.05 || rect.maxZ - rect.minZ < 0.05) return;
+/** Land within m of p in every direction (the bay never under an asset). */
+function dry(c: Ctx, p: Vec2, m: number): boolean {
+  for (const [dx, dz] of [[0, 0], [m, 0], [-m, 0], [0, m], [0, -m]] as const) if (isWater(c.g, p.x + dx, p.z + dz)) return false;
+  return true;
+}
+
+/** Shrink a shore lot until its corners and edge midpoints are on land (null if nothing is left). */
+function dryRect(c: Ctx, R: Rect): Rect | null {
+  const r = { ...R };
+  for (let k = 0; k < 60; k++) {
+    const mx = (r.minX + r.maxX) / 2, mz = (r.minZ + r.maxZ) / 2;
+    const pts: Array<[number, number]> = [[r.minX, r.minZ], [r.maxX, r.minZ], [r.minX, r.maxZ], [r.maxX, r.maxZ], [mx, r.minZ], [mx, r.maxZ], [r.minX, mz], [r.maxX, mz]];
+    const wet = pts.filter(([x, z]) => isWater(c.g, x, z));
+    if (!wet.length) return r;
+    for (const [x, z] of wet) {
+      if (x === r.maxX) r.maxX -= 0.2; else if (x === r.minX) r.minX += 0.2;
+      if (z === r.maxZ) r.maxZ -= 0.2; else if (z === r.minZ) r.minZ += 0.2;
+    }
+    if (r.maxX - r.minX < 0.3 || r.maxZ - r.minZ < 0.3) return null;
+  }
+  return null;
+}
+
+function lot(c: Ctx, kind: LotKind, rect0: Rect, idx?: number): void {
+  const rect = c.block.shore ? dryRect(c, rect0) : rect0;
+  if (!rect || rect.maxX - rect.minX < 0.05 || rect.maxZ - rect.minZ < 0.05) return;
   c.lots.push({ kind, rect: { minX: round(rect.minX), maxX: round(rect.maxX), minZ: round(rect.minZ), maxZ: round(rect.maxZ) }, ...(idx !== undefined ? { idx } : {}) });
 }
 

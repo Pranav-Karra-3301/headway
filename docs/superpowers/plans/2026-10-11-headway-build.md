@@ -608,3 +608,4 @@ Owners: K1 (vegetation incl. pine), K2 (vehicles, boats, train evaluation), K3 (
 **Traffic:** cars spawn/despawn only at tunnels and causeway bridges (v9).
 **Art notes (v8/v10):** downtown gray blocks → warm brick/cream; route ribbons ~20 % dimmer at dusk; gameplay owns saturation.
 **Copy/UX (v9):** General Sans everywhere except titles; short, visual explainers; no hard-coded fan counts.
+**Kenney (K0–K3 done):** add `'kenney'` to `FamilyId` in `assets/types.ts` and drop the catalog cast; give K1's vegetation test a permanent home (`src/render/__tests__/assets-kenney-vegetation.test.ts`, copy from `/tmp/k1test/k1veg.test.ts` if still present); `st.lamp`/`st.trafficLight`/`st.fence` stay ours (Kenney lamp heads face down and wouldn't glow); our train stays (Kenney cars are 2.7 u vs our 4.2 u platforms). Fix the rail-layout failures in `district-stadium.test.ts` (3) and the type error in `district-outskirts.test.ts` caused by the new rail.

@@ -13,6 +13,7 @@ import {
 import { _setKenneyTemplate, KENNEY_SCALE, kenneyIdsFor, type KenneyId, type KenneyKit, type KenneyPartInfo } from '../assets/kenney';
 import manifestJson from '../assets/kenney/manifest.json';
 import type { KenneyTemplate } from '../assets/kenney/template';
+import { createRegistry } from '../assets/index';
 import { AssetRegistry } from '../assets/registry';
 import { PALETTES } from '../palettes';
 
@@ -86,6 +87,11 @@ describe('K2 catalog + specs', () => {
       expect(kenneyIdsFor([kind]).sort(), kind).toEqual([...vehicleSpec(kind)!.ids].sort());
     }
     expect([...kenneyIdsFor(VEHICLE_KINDS)].sort()).toEqual([...VEHICLE_KENNEY_IDS].sort());
+  });
+
+  it('createRegistry() includes every K2 kind (families/kenney.ts calls the K2 register)', () => {
+    const r = createRegistry();
+    for (const kind of VEHICLE_KINDS) expect(r.get(kind), kind).toBeDefined();
   });
 
   it('keeps our train (v7 evaluation)', () => {
