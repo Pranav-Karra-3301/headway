@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Headway · dynamic dev (depot, 3-car train, route picking)</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #DDEFE5; color: #1F2A44;
+        font-family: "General Sans", "Avenir Next Rounded Std", Nunito, system-ui, sans-serif; }
+      #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      #info { position: fixed; left: 12px; bottom: 10px; font-size: 13px; background: rgba(255,251,242,.9); padding: 6px 10px;
+        border-radius: 10px; pointer-events: none; }
+      body.clean #info { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="info"></div>
+    <script type="module" src="./dev.ts"></script>
+  </body>
+</html>

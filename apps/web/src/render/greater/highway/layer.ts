@@ -102,7 +102,34 @@ export function createGreaterHighwayLayer(map: TownMap, opts: GreaterHighwayOpti
   };
 
   // ---- carriageway surfaces + markings (surface mesh)
-  ribbon(S, 'lane', full, -HW.edge, HW.edge, top);
+  // asphalt: a fine grid whose vertices carry a dusk-glow weight = soft pools of lamplight under the median lights
+  // (asphalt-coloured by day; the markings sit on top)
+  {
+    const lamps = plan.props.filter((p) => p.kind === 'light').map((p) => p.x);
+    const lats = [-3.6, -3.1, -2.6, -2.1, -1.6, -1.1, -0.6, -0.2, 0.2, 0.6, 1.1, 1.6, 2.1, 2.6, 3.1, 3.6];
+    const xs: number[] = [];
+    for (let x = xw; x < xe; x += 0.75) xs.push(x);
+    xs.push(xe);
+    const pool = (x: number, lat: number): number => {
+      let w = 0;
+      for (const lx of lamps) {
+        if (Math.abs(x - lx) > 3) continue;
+        for (const c of [-1.35, 1.35]) {
+          const d = Math.hypot((x - lx) / 2.4, (lat - c) / 1.55);
+          if (d < 1) w = Math.max(w, (1 - d) * (1 - d) * (1 + 2 * d));
+        }
+      }
+      return w;
+    };
+    for (let i = 0; i + 1 < xs.length; i++) {
+      const xa = xs[i]!, xb = xs[i + 1]!, ya = plan.heightAt(xa) + top, yb = plan.heightAt(xb) + top;
+      for (let j = 0; j + 1 < lats.length; j++) {
+        const la = lats[j]!, lb = lats[j + 1]!;
+        S.quad('lightPool', V(xa, ya, zc + la), V(xa, ya, zc + lb), V(xb, yb, zc + lb), V(xb, yb, zc + la),
+          [pool(xa, la), pool(xa, lb), pool(xb, lb), pool(xb, la)]);
+      }
+    }
+  }
   for (const sd of [1, -1] as const) {
     const lo = (a: number, b: number) => (sd > 0 ? [a, b] : [-b, -a]) as [number, number];
     // inner edge line (by the median), lane divider (dashed), outer gutter + edge line (dashed across slip roads)
@@ -262,15 +289,32 @@ function placeProp(X: Acc, p: Prop, plan: HighwayPlan): void {
       if (!kenneyInto(X, PROPS.light, mat4(p.x, y, p.z, p.rot, 1.2), (i) => (i.role === 'knWhite' ? 'lampGlass' : null))) {
         X.box('post', p.x, y + 1.0, p.z, 0.09, 2.0, 0.09);
         X.box('post', p.x, y + 2.0, p.z, 0.07, 0.06, 1.3);
-        for (const s of [-1, 1]) X.box('lampGlass', p.x, y + 1.95, p.z + s * 0.62, 0.16, 0.06, 0.24);
       }
+      for (const s of [-1, 1]) X.box('lampGlass', p.x, y + 1.93, p.z + s * 0.56, 0.24, 0.07, 0.15);
       return;
     }
     case 'gantry':
     case 'gantryWide': {
       const id = p.kind === 'gantry' ? PROPS.gantry : PROPS.gantryWide;
-      const ok = kenneyInto(X, id, mat4(p.x, 0, p.z, p.rot, sRoad), (i) => (i.role === 'knGrey' ? 'signPanel' : i.role === 'knWhite' ? 'signText' : null));
-      if (!ok) {
+      const ok = kenneyInto(X, id, mat4(p.x, 0, p.z, p.rot, sRoad), (i) => (i.role === 'knGrey' ? 'signPanel' : i.role === 'knWhite' ? 'signText' : i.role === 'knGreen' ? 'signFace' : null));
+      if (ok) {
+        // white "lettering" bars + an arrow on the front faces (the Kenney panels are blank)
+        const c = Math.cos(p.rot), sn = Math.sin(p.rot);
+        const at = (lx: number, ly: number, lz: number, sx: number, sy: number, sz: number) =>
+          X.box('signText', p.x + lx * c + lz * sn, ly, p.z - lx * sn + lz * c, sx, sy, sz, p.rot);
+        const fx = -0.455;
+        if (p.kind === 'gantryWide') {
+          at(fx, 2.5, -0.25, 0.03, 0.09, 2.1);
+          at(fx, 2.28, -0.55, 0.03, 0.09, 1.5);
+          at(fx, 2.38, 1.35, 0.03, 0.3, 0.09);
+          at(fx, 2.49, 1.35, 0.03, 0.09, 0.3);
+        } else {
+          for (const zc of [-0.95, 0.95]) {
+            at(fx, 2.62, zc - 0.1, 0.03, 0.08, 1.1);
+            at(fx, 2.42, zc - 0.25, 0.03, 0.08, 0.8);
+          }
+        }
+      } else {
         for (const s of [-1, 1]) X.box('post', p.x, 1.4, p.z + s * 1.95, 0.1, 2.8, 0.1);
         X.box('post', p.x, 2.7, p.z, 0.08, 0.08, 3.9);
         X.box('signPanel', p.x - 0.12, 2.25, p.z - 0.2, 0.08, 0.8, 2.6, 0);
@@ -442,7 +486,7 @@ export function hillHeight(plan: HighwayPlan, x: number, z: number): number {
     if (Math.abs(dz) < PORTAL.half) return 0;
     along = crest * (1 - sm(ux / (PORTAL.wing + 0.5)));
   }
-  const bump = 0.32 * Math.sin(x * 0.9 + z * 0.4) * Math.cos(z * 0.7 - x * 0.3) + 0.2 * Math.sin(x * 1.7 - z * 1.3);
+  const bump = 0.26 * Math.sin(x * 0.9 + z * 0.4) * Math.cos(z * 0.7 - x * 0.3) + 0.1 * Math.sin(x * 1.7 - z * 1.3);
   return Math.max(0, along * across + bump * across * Math.min(1, along / 2));
 }
 
@@ -456,25 +500,33 @@ function buildHill(X: Acc, plan: HighwayPlan): void {
   const step = 0.85;
   const patch = (x0: number, x1: number, z0: number, z1: number) => {
     const nx = Math.max(1, Math.round((x1 - x0) / step)), nz = Math.max(1, Math.round((z1 - z0) / step));
-    const P: THREE.Vector3[][] = [];
+    const P: THREE.Vector3[][] = [], NN: THREE.Vector3[][] = [];
+    const e = 0.35;
     for (let i = 0; i <= nx; i++) {
-      const row: THREE.Vector3[] = [];
+      const row: THREE.Vector3[] = [], nrow: THREE.Vector3[] = [];
       for (let j = 0; j <= nz; j++) {
         const x = x0 + ((x1 - x0) * i) / nx, z = z0 + ((z1 - z0) * j) / nz;
         row.push(V(x, hillHeight(plan, x, z) - 0.03, z));
+        // smooth normal from the height field, sampled on this patch's side of the portal plane
+        const xa = Math.max(x0, x - e), xb = Math.min(x1, x + e), za = Math.max(z0, z - e), zb = Math.min(z1, z + e);
+        const dx = (hillHeight(plan, xb, z) - hillHeight(plan, xa, z)) / Math.max(1e-3, xb - xa);
+        const dz = (hillHeight(plan, x, zb) - hillHeight(plan, x, za)) / Math.max(1e-3, zb - za);
+        nrow.push(V(-dx, 1, -dz).normalize());
       }
       P.push(row);
+      NN.push(nrow);
     }
     for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
       const a = P[i]![j]!, b = P[i]![j + 1]!, c = P[i + 1]![j + 1]!, d = P[i + 1]![j]!;
-      // two triangles, each coloured by its slope + height (low-poly facets)
-      for (const [p, q, r] of [[a, b, c], [a, c, d]] as Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3]>) {
+      const na = NN[i]![j]!, nb = NN[i]![j + 1]!, nc = NN[i + 1]![j + 1]!, nd = NN[i + 1]![j]!;
+      // two smooth-shaded triangles, each coloured by its slope + height (soft patchwork)
+      for (const [p, q, r, np, nq, nr] of [[a, b, c, na, nb, nc], [a, c, d, na, nc, nd]] as Array<[THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3]>) {
         const hy = (p.y + q.y + r.y) / 3;
         if (p.y < 0.02 && q.y < 0.02 && r.y < 0.02) continue; // flat foot: the band / world ground shows through
-        const n = new THREE.Vector3().subVectors(q, p).cross(new THREE.Vector3().subVectors(r, p)).normalize();
-        const jitter = hash01(Math.round(p.x * 7), Math.round(p.z * 7));
-        const key: ColorKey = n.y < 0.42 ? 'hillRock' : hy > 3.4 + jitter * 0.9 ? 'hillForest' : hy > 1.2 + jitter ? 'hillMeadow' : 'hillGrass';
-        X.tri(key, p, q, r);
+        const ny = (np.y + nq.y + nr.y) / 3;
+        const jitter = hash01(Math.round((p.x + q.x + r.x) * 2), Math.round((p.z + q.z + r.z) * 2));
+        const key: ColorKey = ny < 0.4 ? 'hillRock' : hy > 3.4 + jitter * 0.9 ? 'hillForest' : hy > 1.2 + jitter ? 'hillMeadow' : 'hillGrass';
+        X.triN(key, p, q, r, np, nq, nr);
       }
     }
   };

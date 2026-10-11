@@ -8,20 +8,24 @@ import type { Action, DecisionKind, Op, Policy, RouteId } from '../contracts';
 import { FEATURES, PLACEHOLDERS } from './features';
 
 // ---------- limits (spec §6, §5.3) ----------
-const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station'];
+const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station', 'depot_check'];
+/** Kinds every policy must give a default for (policies written before v3 have no depot_check default: = continue). */
+const REQUIRED_DEFAULTS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station'];
 const OPS: Op[] = ['<', '<=', '>', '>=', '=='];
 const ROUTES: RouteId[] = ['r1', 'r2', 'r3'];
 const EMPHASES = ['transfers', 'spacing', 'allocation', 'baseline', 'reference'] as const;
-const ACTION_TYPES: Action['type'][] = ['continue', 'dispatch', 'hold', 'reassign', 'setTrainDeparture'];
+const ACTION_TYPES: Action['type'][] = ['continue', 'dispatch', 'hold', 'reassign', 'setTrainDeparture', 'deploy'];
 const LEGAL: Record<DecisionKind, Action['type'][]> = {
   bus_at_stop: ['continue', 'hold'],
   bus_at_terminal: ['dispatch', 'hold', 'reassign'],
   train_at_station: ['setTrainDeparture'],
+  depot_check: ['continue', 'deploy'],
 };
 const EXAMPLE_ACTION: Record<DecisionKind, string> = {
   bus_at_stop: '{"type": "continue"}',
   bus_at_terminal: '{"type": "dispatch"}',
   train_at_station: '{"type": "setTrainDeparture", "dwellS": 45}',
+  depot_check: '{"type": "continue"}',
 };
 const RULE_ID = /^[a-z0-9-]{3,32}$/;
 const PLACEHOLDER = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
@@ -154,7 +158,7 @@ function checkAction(a: unknown, path: Path, kind: DecisionKind | null, maxHold:
     } else {
       checkIntIn(a.seconds, [...path, 'seconds'], add, MIN_STOP_HOLD_S, TERMINAL_HOLD[1]);
     }
-  } else if (type === 'reassign') {
+  } else if (type === 'reassign' || type === 'deploy') {
     if (!(ROUTES as unknown[]).includes(a.to) && a.to !== 'busiest') {
       add([...path, 'to'], `must be ${ROUTES.join(', ')} or "busiest" (got ${show(a.to)})`);
     }
@@ -175,8 +179,10 @@ function checkSay(say: unknown, path: Path, kind: DecisionKind | null, actionTyp
     if (!PLACEHOLDERS[kind].includes(name)) {
       add(path, `unknown placeholder {${name}} for ${kind}`);
     } else if (actionType) {
-      const needs = name === 'seconds' ? 'hold' : name === 'to' ? 'reassign' : name === 'dwellS' ? 'setTrainDeparture' : null;
-      if (needs && needs !== actionType) add(path, `placeholder {${name}} needs a ${needs} action (this rule does ${actionType})`);
+      const needs = name === 'seconds' ? ['hold'] : name === 'to' ? ['reassign', 'deploy'] : name === 'dwellS' ? ['setTrainDeparture'] : null;
+      if (needs && !needs.includes(actionType)) {
+        add(path, `placeholder {${name}} needs a ${needs.join(' or ')} action (this rule does ${actionType})`);
+      }
     }
   }
 }
@@ -256,9 +262,9 @@ function checkRules(rules: unknown, maxHold: number, add: Add): void {
 
 function checkDefaults(d: unknown, maxHold: number, add: Add): void {
   const path = ['defaults'];
-  if (!isRecord(d)) return add(path, `must be an object with an action for each of ${KINDS.join(', ')} (got ${show(d)})`);
+  if (!isRecord(d)) return add(path, `must be an object with an action for each of ${REQUIRED_DEFAULTS.join(', ')} (got ${show(d)})`);
   for (const k of KINDS) {
-    if (d[k] === undefined) add([...path, k], `missing (e.g. ${EXAMPLE_ACTION[k]})`);
+    if (d[k] === undefined) { if (REQUIRED_DEFAULTS.includes(k)) add([...path, k], `missing (e.g. ${EXAMPLE_ACTION[k]})`); }
     else checkAction(d[k], [...path, k], k, maxHold, add);
   }
 }
@@ -306,8 +312,9 @@ const zAction = z.union([
   z.object({ type: z.literal('hold'), until: z.literal('target_headway') }),
   z.object({ type: z.literal('reassign'), to: z.enum(['r1', 'r2', 'r3', 'busiest']) }),
   z.object({ type: z.literal('setTrainDeparture'), dwellS: z.number() }),
+  z.object({ type: z.literal('deploy'), to: z.enum(['r1', 'r2', 'r3', 'busiest']) }),
 ]);
-const zKind = z.enum(['bus_at_stop', 'bus_at_terminal', 'train_at_station']);
+const zKind = z.enum(['bus_at_stop', 'bus_at_terminal', 'train_at_station', 'depot_check']);
 const zPolicy = z.object({
   meta: z.object({
     id: z.string(), parent: z.string().nullable(), generation: z.number(), author: z.string(),
@@ -320,7 +327,7 @@ const zPolicy = z.object({
     targetHeadwayS: z.object({ r1: z.number().optional(), r2: z.number().optional(), r3: z.number().optional() }).optional(),
   }),
   rules: z.array(z.object({ id: z.string(), on: zKind, priority: z.number(), when: z.array(zCondition), do: zAction, say: z.string() })),
-  defaults: z.object({ bus_at_stop: zAction, bus_at_terminal: zAction, train_at_station: zAction }),
+  defaults: z.object({ bus_at_stop: zAction, bus_at_terminal: zAction, train_at_station: zAction, depot_check: zAction.optional() }),
   advisor: z.object({
     provider: z.literal('jev'), enabled: z.boolean(), askWhen: z.array(zCondition),
     holdOptionsS: z.array(z.number()), instructions: z.string(),
@@ -345,60 +352,60 @@ export function validatePolicy(input: unknown): ValidationResult {
 // ---------- DSL doc for LLM prompts (≤ 5,000 chars) ----------
 const described = new Map<string, unknown>();
 function featureLines(kind: DecisionKind): string {
-  return Object.entries(FEATURES[kind])
-    .map(([f, s]) => {
-      const same = described.get(f) === s;
-      described.set(f, s);
-      return `- ${f} ${s.min}..${s.max}: ${same ? 'as above' : s.desc}`;
-    })
-    .join('\n');
+  const lines: string[] = [];
+  const above: string[] = [];
+  for (const [f, s] of Object.entries(FEATURES[kind])) {
+    const per = /^r([123])_(.+)$/.exec(f);
+    if (per && per[1] !== '1') continue; // r2_x / r3_x share r1_x's line
+    const name = per ? `r1_${per[2]}, r2_${per[2]}, r3_${per[2]}` : f;
+    if (described.get(f) === s) above.push(`${f} ${s.min}..${s.max}`);
+    else lines.push(`- ${name} ${s.min}..${s.max}: ${s.desc}`);
+    described.set(f, s);
+  }
+  if (above.length) lines.push(`- as above: ${above.join(', ')}`);
+  return lines.join('\n');
 }
 
 export const POLICY_DSL_DOC = `# Headway dispatch policy DSL
-A policy is JSON. The sim raises 3 kinds of decision point: bus_at_stop (after boarding at a stop),
-bus_at_terminal (bus in layover at its route terminal), train_at_station (after boarding).
+A policy is JSON. Decision points: bus_at_stop (after boarding), bus_at_terminal (layover at its route terminal),
+train_at_station (after boarding), depot_check (every 60 s while reserves are parked in the depot).
 
 ## Semantics
-1. Rules with on == kind are tried by descending priority (ties: array order).
-2. The first rule whose "when" conditions ALL hold (empty = always) and whose action is applicable fires.
-3. Otherwise defaults[kind] applies (ruleId "default").
-4. The explanation is the rule's "say" with {feature} → its value and {seconds}/{dwellS}/{to} → the resolved action parameter.
+Rules with on == kind are tried by descending priority (ties: array order). The first whose "when" conditions ALL hold
+(empty = always) and whose action is applicable fires; otherwise defaults[kind] (ruleId "default"). The explanation is
+"say" with {feature} → its value and {seconds}/{dwellS}/{to} → the resolved action parameter.
 
 ## Shape
-- meta: {id, parent, generation, author, emphasis: transfers|spacing|allocation|baseline|reference, summary}
-- params: {allocation: {r1, r2, r3}, maxHoldS, trainDefaultDwellS, targetHeadwayS?: {r1?, r2?, r3?}}
-- rule: {id, on, priority, when: [{f, op, v}], do: Action, say}
-- defaults: {bus_at_stop: Action, bus_at_terminal: Action, train_at_station: Action}
-- advisor? (Jev picks station-stop holds): {provider: "jev", enabled, askWhen: [bus_at_stop conditions], holdOptionsS: [0,20,40,60], instructions}
+- meta: {id, parent, generation, author, emphasis: transfers|spacing|allocation|baseline|reference, summary ≤ ${MAX_SUMMARY} chars}
+- params: {allocation: {r1, r2, r3} whole ≥ 1 summing to ${FLEET}, maxHoldS 0..${MAX_HOLD_S}, trainDefaultDwellS 30..120, targetHeadwayS?: {r1?, r2?, r3?} 60..1800}
+- rule: {id (^[a-z0-9-]{3,32}$, unique), on, priority, when: [{f, op, v}] (≤ ${MAX_CONDITIONS}), do: Action, say (≤ ${MAX_SAY} chars)}; ≤ ${MAX_RULES} rules
+- defaults: an Action for each of bus_at_stop, bus_at_terminal, train_at_station; depot_check optional (missing = continue)
+- advisor? (Jev picks station-stop holds): {provider: "jev", enabled, askWhen: [bus_at_stop conditions], holdOptionsS: [0,20,40,60], instructions ≤ ${MAX_INSTRUCTIONS} chars}
 
-## Actions
-- {"type":"continue"}: bus_at_stop, leave now.
+## Actions (only on the kinds named; seconds and dwellS are whole numbers)
+- {"type":"continue"}: bus_at_stop, leave now; depot_check, keep the reserves parked.
 - {"type":"dispatch"}: bus_at_terminal, start the next loop now.
-- {"type":"hold","seconds":N}: bus_at_stop 5..params.maxHoldS; bus_at_terminal 10..120. Stop holds also share a 180 s budget per loop.
+- {"type":"hold","seconds":N}: bus_at_stop 5..params.maxHoldS (180 s budget per loop); bus_at_terminal 10..120.
 - {"type":"hold","until":"target_headway"}: stop or terminal; holds target_headway_s - headway_ahead_s (clamped).
-- {"type":"reassign","to":"r1"|"r2"|"r3"|"busiest"}: bus_at_terminal; deadheads to that route's terminal (r1/r2 share Central, r3 starts at Stadium Gate). Not applicable to its own route or if its route would drop below 1 bus. busiest = the other route with the largest queue.
+- {"type":"reassign","to":"r1"|"r2"|"r3"|"busiest"}: bus_at_terminal; deadheads to that route's terminal (r1/r2: Central, r3: Stadium Gate); not its own route, nor leaving it < 1 bus; busiest = the other route with the largest queue.
 - {"type":"setTrainDeparture","dwellS":N}: train_at_station, depart 30..120 s after arrival.
-Routes: r1 Campus Loop, r2 Apartments, r3 Stadium. 6 buses, 1 train.
+- {"type":"deploy","to":"r1"|"r2"|"r3"|"busiest"}: depot_check; a reserve leaves the depot by Central (20 s) and joins that route for good; busiest = the largest queue.
+Routes: r1 Campus Loop, r2 Apartments, r3 Stadium. 6 buses + 2 depot reserves; 1 train (3 cars, 240 riders).
 
-## Features (f, range of v)
+## Features (f, range; v must be inside it; op one of ${OPS.join(' ')})
 ### bus_at_stop
 ${featureLines('bus_at_stop')}
 ### bus_at_terminal
 ${featureLines('bus_at_terminal')}
 ### train_at_station
 ${featureLines('train_at_station')}
-
-## Validation (else rejected)
-- at most ${MAX_RULES} rules, at most ${MAX_CONDITIONS} conditions per rule; ids match ^[a-z0-9-]{3,32}$, unique.
-- f from the list for the rule's "on"; v inside that feature's range; op one of ${OPS.join(' ')}.
-- actions legal for the kind and inside bounds; seconds and dwellS are whole numbers.
-- allocation: whole numbers >= 1 summing to ${FLEET}; maxHoldS 0..${MAX_HOLD_S}; trainDefaultDwellS 30..120; targetHeadwayS 60..1800.
-- say at most ${MAX_SAY} chars using only that kind's placeholders ({seconds} needs hold, {to} reassign, {dwellS} setTrainDeparture).
-- meta.summary at most ${MAX_SUMMARY} chars; advisor.instructions at most ${MAX_INSTRUCTIONS} chars.
+### depot_check
+${featureLines('depot_check')}
+say may use only its kind's features plus {seconds} (hold), {to} (reassign/deploy), {dwellS} (setTrainDeparture).
 
 ## Example
-rule: {"id":"hold-for-connection","on":"bus_at_stop","priority":20,
- "when":[{"f":"train_eta_s","op":"<=","v":45},{"f":"expected_transfers","op":">=","v":8},{"f":"headway_behind_s","op":">=","v":180}],
- "do":{"type":"hold","seconds":45},"say":"Holding {seconds}s for the train ({train_eta_s}s away, {expected_transfers} transfers)"}
-defaults: {"bus_at_stop":{"type":"continue"},"bus_at_terminal":{"type":"dispatch"},"train_at_station":{"type":"setTrainDeparture","dwellS":45}}
+rule: {"id":"hold-for-connection","on":"bus_at_stop","priority":20,"when":[{"f":"train_eta_s","op":"<=","v":45},
+ {"f":"expected_transfers","op":">=","v":8}],"do":{"type":"hold","seconds":45},"say":"Holding {seconds}s for {expected_transfers} transfers"}
+rule: {"id":"send-reserve","on":"depot_check","priority":10,"when":[{"f":"max_route_queue","op":">=","v":60}],
+ "do":{"type":"deploy","to":"busiest"},"say":"Reserve bus to {to}: {max_route_queue} waiting"}
 `;

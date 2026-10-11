@@ -20,8 +20,12 @@ export interface PlayLocal {
   /** Coach-mark step while the tour runs. */
   tour: number | null;
   picker: Picker;
-  /** Route hovered in the reassign picker (deadhead preview). */
+  /** Route hovered in the reassign picker / action card / lane, or under a dragged token (deadhead preview). */
   preview: RouteId | null;
+  /** Where the action card opens: the map click or the fleet-board token that made the selection (CSS px, viewport). */
+  anchor: { x: number; y: number; from: 'map' | 'board' } | null;
+  /** A fleet-board token being dragged onto another lane (reassign) or out of the depot (deploy). */
+  drag: { id: string; kind: 'bus' | 'reserve'; x: number; y: number; over: RouteId | null } | null;
   tracked: TrackedIntent[];
   ai: AiState;
   you: RunResult | null;
@@ -41,8 +45,8 @@ export interface PlayLocal {
 
 export const freshAi = (championId = '', key = ''): AiState => ({ status: 'idle', champion: null, baseline: null, championId, key, error: null });
 
-export const freshRun = (): Pick<PlayLocal, 'obs' | 'picker' | 'preview' | 'tracked' | 'you' | 'replay' | 'youPace' | 'spectating' | 'finishing' | 'nudge' | 'submit'> => ({
-  obs: null, picker: null, preview: null, tracked: [], you: null, replay: null, youPace: [], spectating: false, finishing: null,
+export const freshRun = (): Pick<PlayLocal, 'obs' | 'picker' | 'preview' | 'anchor' | 'drag' | 'tracked' | 'you' | 'replay' | 'youPace' | 'spectating' | 'finishing' | 'nudge' | 'submit'> => ({
+  obs: null, picker: null, preview: null, anchor: null, drag: null, tracked: [], you: null, replay: null, youPace: [], spectating: false, finishing: null,
   nudge: null, submit: { status: 'idle', name: '', j: null, error: null },
 });
 

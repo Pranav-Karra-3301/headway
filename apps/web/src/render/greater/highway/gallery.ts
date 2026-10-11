@@ -29,6 +29,7 @@ export async function gallery(canvas: HTMLCanvasElement, msg: HTMLElement): Prom
     const o = kenneyModel(id);
     const s = 4 / 2.6; // KENNEY_SCALE 2.6 → tile 4 u
     o.scale.setScalar(s);
+    o.rotation.y = Number(q.get('rot') ?? 0);
     const c = i % cols, r = Math.floor(i / cols);
     o.position.set((c - (cols - 1) / 2) * step, 0, (r - (Math.ceil(ids.length / cols) - 1) / 2) * step);
     stage.scene.add(o);

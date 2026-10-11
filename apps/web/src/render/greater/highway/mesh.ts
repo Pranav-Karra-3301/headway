@@ -27,7 +27,7 @@ function keyHex(key: ColorKey, p: PaletteId): string {
   return highwayColors(p)[key as HwRole] ?? '#ff00ff';
 }
 
-interface Bucket { pos: number[]; nor: number[]; idx: number[] }
+interface Bucket { pos: number[]; nor: number[]; idx: number[]; /** per-vertex glow weight */ w: number[] }
 interface Range { key: ColorKey; start: number; count: number }
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpN = new THREE.Vector3();
@@ -37,13 +37,13 @@ export class Acc {
   readonly b = new Map<ColorKey, Bucket>();
   private bucket(key: ColorKey): Bucket {
     let k = this.b.get(key);
-    if (!k) { k = { pos: [], nor: [], idx: [] }; this.b.set(key, k); }
+    if (!k) { k = { pos: [], nor: [], idx: [], w: [] }; this.b.set(key, k); }
     return k;
   }
   get empty(): boolean { return this.b.size === 0; }
 
-  /** Quad a-b-c-d, counter-clockwise seen from its front face (flat normal). */
-  quad(key: ColorKey, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3): void {
+  /** Quad a-b-c-d, counter-clockwise seen from its front face (flat normal). `w` = per-corner dusk-glow weights. */
+  quad(key: ColorKey, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, w?: readonly [number, number, number, number]): void {
     tmpN.subVectors(b, a).cross(tmpA.subVectors(d, a));
     if (tmpN.lengthSq() < 1e-14) tmpN.subVectors(c, b).cross(tmpA.subVectors(d, b));
     if (tmpN.lengthSq() < 1e-14) return;
@@ -51,7 +51,18 @@ export class Acc {
     const k = this.bucket(key);
     const i = k.pos.length / 3;
     for (const v of [a, b, c, d]) { k.pos.push(v.x, v.y, v.z); k.nor.push(tmpN.x, tmpN.y, tmpN.z); }
+    if (w) k.w.push(...w); else k.w.push(1, 1, 1, 1);
     k.idx.push(i, i + 1, i + 2, i, i + 2, i + 3);
+  }
+
+  /** Triangle with explicit (smooth) vertex normals. */
+  triN(key: ColorKey, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, na: THREE.Vector3, nb: THREE.Vector3, nc: THREE.Vector3): void {
+    const k = this.bucket(key);
+    const i = k.pos.length / 3;
+    k.pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    k.nor.push(na.x, na.y, na.z, nb.x, nb.y, nb.z, nc.x, nc.y, nc.z);
+    k.w.push(1, 1, 1);
+    k.idx.push(i, i + 1, i + 2);
   }
 
   tri(key: ColorKey, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): void {
@@ -61,6 +72,7 @@ export class Acc {
     const k = this.bucket(key);
     const i = k.pos.length / 3;
     for (const v of [a, b, c]) { k.pos.push(v.x, v.y, v.z); k.nor.push(tmpN.x, tmpN.y, tmpN.z); }
+    k.w.push(1, 1, 1);
     k.idx.push(i, i + 1, i + 2);
   }
 
@@ -104,6 +116,7 @@ export class Acc {
           ni = k.pos.length / 3;
           k.pos.push(va.x, va.y, va.z);
           k.nor.push(vb.x, vb.y, vb.z);
+          k.w.push(1);
           remap.set(rk, ni);
         }
         k.idx.push(ni);
@@ -120,7 +133,7 @@ export class Acc {
   build(palette: PaletteId): THREE.BufferGeometry {
     let nv = 0, ni = 0;
     for (const k of this.b.values()) { nv += k.pos.length / 3; ni += k.idx.length; }
-    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3);
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), glowW = new Float32Array(nv);
     const index = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
     const ranges: Range[] = [];
     let vo = 0, io = 0;
@@ -128,6 +141,7 @@ export class Acc {
       if (!k.idx.length) continue;
       pos.set(k.pos, vo * 3);
       nor.set(k.nor, vo * 3);
+      glowW.set(k.w, vo);
       for (let i = 0; i < k.idx.length; i++) index[io + i] = k.idx[i]! + vo;
       const n = k.pos.length / 3;
       ranges.push({ key, start: vo, count: n });
@@ -143,6 +157,7 @@ export class Acc {
     geo.computeBoundingBox();
     geo.computeBoundingSphere();
     geo.userData.hwRanges = ranges;
+    geo.userData.hwGlowW = glowW;
     recolorHighway(geo, palette);
     return geo;
   }
@@ -154,6 +169,7 @@ const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 /** Rewrite colour + dusk glow of a geometry built by Acc for a palette (in place). */
 export function recolorHighway(geo: THREE.BufferGeometry, p: PaletteId): void {
   const ranges = geo.userData.hwRanges as Range[] | undefined;
+  const W = geo.userData.hwGlowW as Float32Array | undefined;
   if (!ranges) return;
   const ca = (geo.getAttribute('color') as THREE.BufferAttribute).array as Float32Array;
   const ga = (geo.getAttribute('aGlow') as THREE.BufferAttribute).array as Float32Array;
@@ -162,7 +178,10 @@ export function recolorHighway(geo: THREE.BufferGeometry, p: PaletteId): void {
     for (let i = r.start; i < r.start + r.count; i++) { ca[i * 3] = col.r; ca[i * 3 + 1] = col.g; ca[i * 3 + 2] = col.b; }
     const g = HW_GLOW[r.key as HwRole];
     if (g) col.set(PALETTES[p].lamp).multiplyScalar(g); else col.setRGB(0, 0, 0);
-    for (let i = r.start; i < r.start + r.count; i++) { ga[i * 3] = col.r; ga[i * 3 + 1] = col.g; ga[i * 3 + 2] = col.b; }
+    for (let i = r.start; i < r.start + r.count; i++) {
+      const w = W ? W[i]! : 1;
+      ga[i * 3] = col.r * w; ga[i * 3 + 1] = col.g * w; ga[i * 3 + 2] = col.b * w;
+    }
   }
   geo.getAttribute('color').needsUpdate = true;
   geo.getAttribute('aGlow').needsUpdate = true;

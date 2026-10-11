@@ -1,15 +1,17 @@
-// Owner: T3c. Keyboard → Play command (pure). D dispatch · H hold 30 (Shift 60) · R reassign · T train +30 (Shift: depart now)
-// · Space pause · 1/2/3/4 speed (or r1/r2/r3 while the reassign picker is open) · [ ] cycle the selected bus · Esc close.
+// Owner: T3c (+P2). Keyboard → Play command (pure). D dispatch · H hold 30 (Shift 60) · R reassign · T train +30 (Shift: depart now)
+// · Space pause · 1/2/3/4 speed (or r1/r2/r3 while the reassign or deploy picker is open) · [ ] cycle the selected bus · Esc close.
+// Play is click-first (fleet board + action cards); these are shortcuts only.
 import type { RouteId } from '@headway/sim';
 import type { Speed } from '../../sim/runner';
 
-export type Picker = 'reassign' | 'train' | null;
+export type Picker = 'reassign' | 'train' | 'deploy' | null;
 export type Command =
   | { kind: 'dispatch' }
   | { kind: 'hold'; seconds: 30 | 60 }
   | { kind: 'reassign-open' }
   | { kind: 'reassign'; to: RouteId }
-  | { kind: 'train'; mode: 'extend' | 'now' }
+  | { kind: 'deploy'; to: RouteId }
+  | { kind: 'train'; mode: 'extend' | 'now'; extraS?: number }
   | { kind: 'pause-toggle' }
   | { kind: 'speed'; speed: Speed }
   | { kind: 'cycle'; dir: 1 | -1 }
@@ -34,6 +36,10 @@ export function keyCommand(e: KeyLike, ctx: { picker: Picker }): Command | null 
   if (ctx.picker === 'reassign') {
     if (d !== null) { const to = ROUTE_KEYS[d]; return to ? { kind: 'reassign', to } : null; }
     if (key === 'Escape' || key === 'r') return { kind: 'close' };
+  }
+  if (ctx.picker === 'deploy') {
+    if (d !== null) { const to = ROUTE_KEYS[d]; return to ? { kind: 'deploy', to } : null; }
+    if (key === 'Escape') return { kind: 'close' };
   }
   if (ctx.picker === 'train' && (key === 'Escape')) return { kind: 'close' };
 

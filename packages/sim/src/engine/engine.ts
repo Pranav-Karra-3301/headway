@@ -1,7 +1,7 @@
 // Owner: T1a. The deterministic engine (spec §5): 1 s ticks, buses + train, passengers, decision points,
 // human intents, async controllers, replays. All randomness is drawn before the run (passengers, traffic table,
 // train delays); controllers never consume randomness; ties resolve by id.
-import { withConfig } from '../config';
+import { DEPOT, withConfig } from '../config';
 import type {
   Action, AsyncController, Controller, ControllerRef, CreateSimArgs, Decision, DecisionKind, DecisionPoint,
   DecisionRecord, FeatureVector, Intent, Itinerary, Leg, Observation, PassengerInfo, PassengerSpec, PersonView, Policy,
@@ -48,10 +48,12 @@ const ARRIVED_KEEP_S = 3;
 const EVENT_BUFFER = 5000;
 const TRAIN_DELAY_SLOTS = 256;
 
-type Phase = 'move' | 'deadhead' | 'arrive' | 'layover' | 'thold' | 'board0' | 'b0hold' | 'serve' | 'shold';
+// 'depot' = a reserve parked in the depot lot; 'depotOut' = a deployed reserve pulling out of the lot (both VehicleState
+// 'depot'; the deployed one already belongs to its route and has holdUntil = when it reaches Central).
+type Phase = 'move' | 'deadhead' | 'arrive' | 'layover' | 'thold' | 'board0' | 'b0hold' | 'serve' | 'shold' | 'depot' | 'depotOut';
 const STATE: Record<Phase, VehicleState> = {
   move: 'moving', deadhead: 'deadhead', arrive: 'dwelling', layover: 'layover', thold: 'holding',
-  board0: 'dwelling', b0hold: 'holding', serve: 'dwelling', shold: 'holding',
+  board0: 'dwelling', b0hold: 'holding', serve: 'dwelling', shold: 'holding', depot: 'depot', depotOut: 'depot',
 };
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);
@@ -79,6 +81,8 @@ interface Bus {
   reassigned: boolean; decidedAt: number;
   pendingHold: number | null; pendingReassign: RouteId | null;
   lastDecision: DecisionRecord | null;
+  /** Deployed from the depot and not yet at its route's terminal (Observation.depot.deploying). */
+  fromDepot: boolean;
 }
 interface Train {
   id: string; phase: 'arrive' | 'dwell' | 'move'; pos: number; stationIdx: number; remaining: number;
@@ -122,6 +126,8 @@ export class Engine implements Sim {
   private readonly routeIds: RouteId[] = [];
   private readonly buses: Bus[] = [];
   private readonly busById = new Map<string, Bus>();
+  /** The route whose terminal the depot sits beside (deploys start there). */
+  private readonly depotRoute: RouteId | null;
   private readonly stations: Station[];
   private readonly stationPlace: number[];
   private readonly train: Train;
@@ -208,15 +214,22 @@ export class Engine implements Sim {
     const order: RouteRt[] = [];
     for (const rt of this.routes) for (let i = 0; i < Math.max(0, Math.floor(params.allocation?.[rt.id] ?? 0)); i++) order.push(rt);
     for (let i = 0; order.length < this.cfg.bus.count && this.routes.length; i++) order.push(this.routes[i % this.routes.length]!);
-    order.slice(0, this.cfg.bus.count).forEach((rt, i) => {
+    const addBus = (rt: RouteRt, phase: Phase) => {
       const b: Bus = {
-        id: `b${i + 1}`, r: rt, phase: 'layover', pos: 0, stopIdx: 0, riders: [], alightQ: [], served: 0, budget: 0,
+        id: `b${this.buses.length + 1}`, r: rt, phase, pos: 0, stopIdx: 0, riders: [], alightQ: [], served: 0, budget: 0,
         holdUntil: 0, holdUsedS: 0, layoverStart: 0, dead: null, reassigned: false, decidedAt: -1,
-        pendingHold: null, pendingReassign: null, lastDecision: null,
+        pendingHold: null, pendingReassign: null, lastDecision: null, fromDepot: false,
       };
       this.buses.push(b);
       this.busById.set(b.id, b);
-    });
+    };
+    for (const rt of order.slice(0, this.cfg.bus.count)) addBus(rt, 'layover');
+    // reserves b7, b8, … parked in the depot (their route is a placeholder until deployed)
+    this.depotRoute = this.routeRt.get(DEPOT.fromRoute)?.id ?? this.routes[0]?.id ?? null;
+    if (this.routes.length) {
+      const home = this.routeRt.get(this.depotRoute!)!;
+      for (let i = 0; i < Math.max(0, Math.floor(this.cfg.bus.reserve ?? 0)); i++) addBus(home, 'depot');
+    }
 
     // the train starts at the first station in travel order
     const st0 = this.stations[0];
@@ -273,10 +286,11 @@ export class Engine implements Sim {
     if (this.pending) return { pending: this.pending.dp };
     if (this.done) return { pending: null };
     if (this.cursor < 0) { this.beginTick(); this.cursor = 0; }
-    const n = this.buses.length + 1;
+    const nb = this.buses.length;   // fixed for the run (reserves are buses from the start)
+    const n = nb + 2;               // buses, the train, the depot
     while (this.cursor < n) {
       const vi = this.cursor++;
-      const dp = vi < this.buses.length ? this.busTick(this.buses[vi]!) : this.trainTick();
+      const dp = vi < nb ? this.busTick(this.buses[vi]!) : vi === nb ? this.trainTick() : this.depotTick();
       if (!dp) continue;
       const dec = this.resolveNow(dp);
       if (dec) this.apply(dp, dec, false);
@@ -306,7 +320,7 @@ export class Engine implements Sim {
   observe(): Observation {
     const t = this.t;
     const cap = this.cfg.bus.capacity;
-    const buses = this.buses.map((b) => {
+    const buses = this.buses.filter((b) => b.phase !== 'depot').map((b) => {
       const n = b.r.route.stops.length;
       const nextIdx = this.nextStopIdx(b);
       const gaps = this.busGaps(b);
@@ -314,7 +328,7 @@ export class Engine implements Sim {
         id: b.id, routeId: b.r.id, state: STATE[b.phase], onboard: b.riders.length, capacity: cap,
         nextStopId: n ? b.r.route.stops[nextIdx]! : null,
         etaNextStopS: n ? Math.round(this.etaBus(b, nextIdx)) : null,
-        holdUntil: this.isHolding(b) ? b.holdUntil : null,
+        holdUntil: this.holdUntilOf(b),
         headwayAheadS: gaps.ahead, headwayBehindS: gaps.behind, holdUsedS: b.holdUsedS,
       };
     });
@@ -358,22 +372,32 @@ export class Engine implements Sim {
         return { id: s.id, queue: pl.queue.length, queueByRoute, longestWaitS: this.longestWait(pl), lastDepartureT };
       }),
       routes: this.routes.map((rt) => ({
-        id: rt.id, buses: this.buses.filter((b) => b.r === rt).map((b) => b.id),
+        id: rt.id, buses: this.buses.filter((b) => b.r === rt && b.phase !== 'depot').map((b) => b.id),
         targetHeadwayS: this.targetHeadway(rt), queue: this.routeQueue(rt.id),
       })),
       running: this.collector.running(),
+      depot: {
+        reserves: this.buses.filter((b) => b.phase === 'depot').map((b) => b.id),
+        deploying: this.buses.filter((b) => b.fromDepot).map((b) => b.id),
+      },
     };
   }
 
   snapshot(): SimSnapshot {
     const t = this.t;
-    const vehicles: VehicleView[] = this.buses.map((b) => ({
-      id: b.id, kind: 'bus', routeId: b.r.id,
-      path: b.phase === 'deadhead' && b.dead ? { kind: 'deadhead', from: b.dead.from, to: b.dead.to } : { kind: 'route', routeId: b.r.id },
-      dist: b.pos, state: STATE[b.phase], onboard: b.riders.length, capacity: this.cfg.bus.capacity,
-      nextStopId: b.r.route.stops.length ? b.r.route.stops[this.nextStopIdx(b)]! : null,
-      holdUntil: this.isHolding(b) ? b.holdUntil : null, lastDecision: b.lastDecision,
-    }));
+    // Depot buses (state 'depot'): parked → routeId null, holdUntil null; pulling out → routeId = its new route,
+    // holdUntil = when it reaches Central. Both sit at dist 0 of the depot route's path (Central) for path-only renderers.
+    const vehicles: VehicleView[] = this.buses.map((b) => {
+      const inDepot = b.phase === 'depot' || b.phase === 'depotOut';
+      return {
+        id: b.id, kind: 'bus', routeId: b.phase === 'depot' ? null : b.r.id,
+        path: inDepot ? { kind: 'route', routeId: this.depotRoute ?? b.r.id }
+          : b.phase === 'deadhead' && b.dead ? { kind: 'deadhead', from: b.dead.from, to: b.dead.to } : { kind: 'route', routeId: b.r.id },
+        dist: inDepot ? 0 : b.pos, state: STATE[b.phase], onboard: b.riders.length, capacity: this.cfg.bus.capacity,
+        nextStopId: b.phase !== 'depot' && b.r.route.stops.length ? b.r.route.stops[this.nextStopIdx(b)]! : null,
+        holdUntil: this.holdUntilOf(b), lastDecision: b.lastDecision,
+      };
+    });
     const tr = this.train;
     vehicles.push({
       id: tr.id, kind: 'train', routeId: null, path: { kind: 'rail' }, dist: tr.pos,
@@ -444,6 +468,7 @@ export class Engine implements Sim {
   /** The §6 feature vector for a vehicle right now (what the HUD inspector shows). */
   featuresFor(kind: DecisionKind, vehicleId: string): FeatureVector {
     if (kind === 'train_at_station') return this.featTrain();
+    if (kind === 'depot_check') return this.featDepot();
     const b = this.busById.get(vehicleId);
     if (!b) return {};
     return kind === 'bus_at_stop' ? this.featStop(b) : this.featTerminal(b);
@@ -694,6 +719,11 @@ export class Engine implements Sim {
 
   private busTick(b: Bus): DecisionPoint | null {
     const t = this.t;
+    if (b.phase === 'depot') return null;
+    if (b.phase === 'depotOut') {
+      if (t < b.holdUntil) return null;
+      this.leaveDepot(b);
+    }
     if (b.phase === 'move') {
       const route = b.r.route;
       const n = route.stops.length;
@@ -708,7 +738,7 @@ export class Engine implements Sim {
       const L = b.dead.path.length;
       const ds = this.cfg.bus.speed * this.mult(b.dead.profile, b.pos);
       this.collector.distance(b.id, Math.min(ds, Math.max(0, L - b.pos)), true);
-      if (b.pos + ds >= L - 1e-9) { b.dead = null; b.pos = 0; b.stopIdx = 0; b.phase = 'layover'; b.layoverStart = t; }
+      if (b.pos + ds >= L - 1e-9) { b.dead = null; b.pos = 0; b.stopIdx = 0; b.phase = 'layover'; b.layoverStart = t; b.fromDepot = false; }
       else b.pos += ds;
     }
     switch (b.phase) {
@@ -871,6 +901,51 @@ export class Engine implements Sim {
     else { b.phase = 'deadhead'; b.dead = { from, to, path, profile: pathProfile(this.map, `dead:${from}>${to}`, path) }; }
   }
 
+  /** Sends a parked reserve out of the depot to `to` (it pulls out for DEPOT.exitS, then joins at Central). */
+  private deploy(b: Bus, to: RouteId): void {
+    const rt = this.routeRt.get(to);
+    if (!rt || b.phase !== 'depot') return;
+    b.r = rt;
+    b.phase = 'depotOut';
+    b.fromDepot = true;
+    b.holdUntil = this.t + DEPOT.exitS;
+    b.pos = 0;
+    b.stopIdx = 0;
+    b.reassigned = false;
+  }
+
+  /** The deployed reserve reaches Central: a layover there (r1/r2) or a deadhead to its terminal (r3). */
+  private leaveDepot(b: Bus): void {
+    const from = this.depotRoute ?? b.r.id;
+    const path = this.depotPath(b.r.id);
+    b.holdUntil = 0;
+    b.pos = 0;
+    b.stopIdx = 0;
+    if (path.length <= 1e-6) { b.phase = 'layover'; b.layoverStart = this.t; b.dead = null; b.fromDepot = false; }
+    else { b.phase = 'deadhead'; b.dead = { from, to: b.r.id, path, profile: pathProfile(this.map, `dead:${from}>${b.r.id}`, path) }; }
+  }
+
+  /** Road path from the depot's terminal (Central) to route `to`'s terminal (length 0 when shared). */
+  private depotPath(to: RouteId): Polyline {
+    const from = this.depotRoute ?? to;
+    try { return deadheadPath(this.map, from, to); } catch {
+      const a = this.routeRt.get(from);
+      const b = this.routeRt.get(to);
+      return a && b ? polyline([this.places[a.stopPlace[0]!]!.pos, this.places[b.stopPlace[0]!]!.pos], false) : polyline([{ x: 0, z: 0 }, { x: 0, z: 0 }], false);
+    }
+  }
+
+  /** Parked reserves in id order; `prefer` first when it is still parked. */
+  private parked(prefer?: string): Bus | null {
+    const p = prefer ? this.busById.get(prefer) : undefined;
+    if (p && p.phase === 'depot') return p;
+    return this.buses.find((b) => b.phase === 'depot') ?? null;
+  }
+
+  private holdUntilOf(b: Bus): number | null {
+    return this.isHolding(b) || b.phase === 'depotOut' ? b.holdUntil : null;
+  }
+
   private isHolding(b: Bus): boolean { return b.phase === 'shold' || b.phase === 'thold' || b.phase === 'b0hold'; }
 
   private nextStopIdx(b: Bus): number {
@@ -878,7 +953,7 @@ export class Engine implements Sim {
     switch (b.phase) {
       case 'move': return b.stopIdx % n;
       case 'serve': case 'shold': return (b.stopIdx + 1) % n;
-      case 'deadhead': return 0;
+      case 'deadhead': case 'depot': case 'depotOut': return 0;
       default: return 1 % n;
     }
   }

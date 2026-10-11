@@ -1,7 +1,7 @@
 // Owner: T3c. Tracks the player's intents from "issued" to "applied" (pure). The sim applies them (spec §5.6);
 // this only follows along for pending badges and the results timeline, from human DecisionRecords or observed state.
 import type { DecisionRecord, Intent, Observation } from '@headway/sim';
-import { TRAIN_ID } from './logic';
+import { DEPOT_ID, TRAIN_ID } from './logic';
 
 export type IntentStatus = 'pending' | 'applied' | 'replaced' | 'expired';
 export interface TrackedIntent {
@@ -9,9 +9,13 @@ export interface TrackedIntent {
   status: IntentStatus; appliedT: number | null; result: string | null;
   /** The vehicle has been seen moving since the intent was issued (guards the observation fallback). */
   sawMoving: boolean;
+  /** deploy: applied once the depot holds at most this many reserves (reserves at issue − deploys already pending − 1). */
+  expectReserves?: number;
 }
 
-export const vehicleOf = (i: Intent): string => (i.type === 'setTrainDeparture' ? TRAIN_ID : i.vehicleId);
+/** The vehicle an intent is about: the train, the depot (deploy picks any reserve) or a bus id. */
+export const vehicleOf = (i: Intent): string =>
+  i.type === 'setTrainDeparture' ? TRAIN_ID : i.type === 'deploy' ? DEPOT_ID : i.vehicleId;
 
 export function describeIntent(i: Intent): string {
   switch (i.type) {
@@ -19,17 +23,20 @@ export function describeIntent(i: Intent): string {
     case 'hold': return `Hold ${i.vehicleId} ${i.seconds} s`;
     case 'reassign': return `Move ${i.vehicleId} to ${i.to}`;
     case 'setTrainDeparture': return `Train dwell ${i.dwellS} s`;
+    case 'deploy': return `Deploy a reserve to ${i.to}`;
   }
 }
 
 export function addIntent(
   list: readonly TrackedIntent[],
-  next: { id: number; t: number; intent: Intent },
+  next: { id: number; t: number; intent: Intent; expectReserves?: number },
   now: { applied: boolean; result?: string },
 ): TrackedIntent[] {
   const v = vehicleOf(next.intent);
+  // Deploys stack (each one sends another reserve); every other intent replaces a pending one of its kind.
+  const stacks = next.intent.type === 'deploy';
   const out = list.map((x) =>
-    x.status === 'pending' && x.intent.type === next.intent.type && vehicleOf(x.intent) === v ? { ...x, status: 'replaced' as const } : x);
+    !stacks && x.status === 'pending' && x.intent.type === next.intent.type && vehicleOf(x.intent) === v ? { ...x, status: 'replaced' as const } : x);
   out.push({
     ...next,
     status: now.applied ? 'applied' : 'pending',
@@ -40,8 +47,14 @@ export function addIntent(
   return out;
 }
 
+/** Deploys issued but not yet seen leaving the depot. */
+export const pendingDeploys = (list: readonly TrackedIntent[]): number =>
+  list.reduce((n, x) => n + (x.status === 'pending' && x.intent.type === 'deploy' ? 1 : 0), 0);
+
 const matches = (i: Intent, r: DecisionRecord) => {
-  if (r.source !== 'human' || r.vehicleId !== vehicleOf(i)) return false;
+  if (r.source !== 'human') return false;
+  if (i.type === 'deploy') return r.action.type === 'deploy'; // the sim picks which reserve leaves
+  if (r.vehicleId !== vehicleOf(i)) return false;
   return i.type === 'setTrainDeparture' ? r.action.type === 'setTrainDeparture' : r.action.type === i.type;
 };
 
@@ -69,6 +82,9 @@ export function resolveWithObservation(list: readonly TrackedIntent[], obs: Obse
       const tr = obs.train;
       if (tr.state === 'moving') sawMoving = true;
       else if (sawMoving && tr.state === 'dwelling' && tr.departAt !== null) applied = 'Train dwell set';
+    } else if (i.type === 'deploy') {
+      const left = obs.depot?.reserves.length;
+      if (left !== undefined && left <= (x.expectReserves ?? 0)) applied = `Reserve bus heading to ${i.to}`;
     } else {
       const b = obs.buses.find((y) => y.id === i.vehicleId);
       if (b) {
@@ -100,6 +116,7 @@ export function badgeFor(list: readonly TrackedIntent[], vehicleId: string): str
       case 'reassign': return `→${i.to}`;
       case 'dispatch': return 'GO';
       case 'setTrainDeparture': return `${i.dwellS}s`;
+      case 'deploy': return `→${i.to}`;
     }
   }
   return null;

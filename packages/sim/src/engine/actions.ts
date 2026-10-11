@@ -1,12 +1,12 @@
 // Owner: T1a. Action resolution shared by the engine and PolicyController (spec §5.5, §6): resolves
-// `hold until target_headway` and `reassign busiest` to concrete parameters, clamps holds and dwells to their
-// bounds, and reports inapplicable actions as null (the policy then tries its next rule, the engine its default).
+// `hold until target_headway`, `reassign busiest` and `deploy busiest` to concrete parameters, clamps holds and dwells
+// to their bounds, and reports inapplicable actions as null (the policy then tries its next rule, the engine its default).
 import type { Action, DecisionKind, FeatureVector, RouteId } from '../contracts';
 
 export interface ResolveCtx {
   kind: DecisionKind;
   features: FeatureVector;
-  /** The deciding bus's route (bus decisions). */
+  /** The deciding bus's route (bus decisions; undefined for depot_check). */
   routeId?: RouteId;
   /** Route ids that exist on the map (for `busiest`). */
   routeIds: readonly RouteId[];
@@ -26,7 +26,7 @@ export const TERMINAL_HOLD_S: [number, number] = [10, 120];
 
 const clamp = (x: number, lo: number, hi: number) => (x < lo ? lo : x > hi ? hi : x);
 
-/** The route with the largest total queue, excluding `own`; ties → lowest id. */
+/** The route with the largest total queue, excluding `own` (none for a deploy); ties → lowest id. */
 export function busiestRoute(own: RouteId | undefined, ids: readonly RouteId[], q: (r: RouteId) => number): RouteId | null {
   let best: RouteId | null = null;
   for (const id of [...ids].sort()) {
@@ -73,24 +73,31 @@ export function resolveAction(action: Action | null | undefined, c: ResolveCtx):
       if (!Number.isFinite(d)) return null;
       return { type: 'setTrainDeparture', dwellS: clamp(Math.round(d), c.trainMinDwellS, c.trainMaxDwellS) };
     }
+    case 'depot_check': {
+      if (action.type === 'continue') return { type: 'continue' };
+      if (action.type !== 'deploy' || !((f.reserves_left ?? 0) >= 1)) return null;
+      const to = action.to === 'busiest' ? busiestRoute(undefined, c.routeIds, c.routeQueue) : action.to;
+      return to && c.routeIds.includes(to) ? { type: 'deploy', to } : null;
+    }
   }
   return null;
 }
 
 /** Last-resort action when neither the decision nor the policy default applies. */
 export function safeAction(kind: DecisionKind, trainDwellS: number): Action {
-  if (kind === 'bus_at_stop') return { type: 'continue' };
+  if (kind === 'bus_at_stop' || kind === 'depot_check') return { type: 'continue' };
   if (kind === 'bus_at_terminal') return { type: 'dispatch' };
   return { type: 'setTrainDeparture', dwellS: trainDwellS };
 }
 
 /** Explanation for a default (no rule fired) decision. */
-export function defaultExplanation(action: Action): string {
+export function defaultExplanation(action: Action, kind?: DecisionKind): string {
   switch (action.type) {
-    case 'continue': return 'No rule fired: leaving on schedule';
+    case 'continue': return kind === 'depot_check' ? 'No rule fired: reserves stay in the depot' : 'No rule fired: leaving on schedule';
     case 'dispatch': return 'No rule fired: starting the next loop';
     case 'hold': return 'seconds' in action ? `Holding ${action.seconds}s (default)` : 'Holding to the target headway (default)';
     case 'reassign': return `Moving to ${action.to} (default)`;
     case 'setTrainDeparture': return `Standard ${action.dwellS}s station dwell`;
+    case 'deploy': return `Sending a reserve bus to ${action.to} (default)`;
   }
 }

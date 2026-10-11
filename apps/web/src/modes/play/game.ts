@@ -9,12 +9,18 @@ import { useApp } from '../../state/store';
 import type { SimRunner, Speed } from '../../sim/runner';
 import { createSessionSim, playSpec, type SessionSpec } from '../../sim/session';
 import { aiRunsFor } from './aiRuns';
-import { addIntent, expirePending, resolveWithDecisions, resolveWithObservation, type TrackedIntent } from './intents';
+import { addIntent, expirePending, pendingDeploys, resolveWithDecisions, resolveWithObservation, type TrackedIntent } from './intents';
 import { keyCommand, type Command } from './keys';
-import { clock, cleanName, legalActions, paceAt, trainDwellFor, TRAIN_ID, type DockLegality, type Gate } from './logic';
-import { freshAi, freshRun, usePlay } from './playStore';
+import {
+  clock, cleanName, DEPOT_ID, isDepotPick, legalActions, paceAt, ROUTES, trainDwellFor, TRAIN_ID, type DockLegality, type Gate,
+} from './logic';
+import { freshAi, freshRun, usePlay, type PlayLocal } from './playStore';
+import { routeName } from './ui';
 
-export const TOUR_KEY = 'headway.play.tour.v1';
+/** v2: the click-first tour (select a bus → move it to Stadium → deploy a reserve). Players who saw v1 see it once more. */
+export const TOUR_KEY = 'headway.play.tour.v2';
+/** Tour steps: 0 select a bus · 1 move it to Stadium · 2 deploy a reserve. */
+export const TOUR_STEPS = 3;
 export const PLAY_SPEED: Speed = 8;
 const PACE_EVERY_S = 30;
 const OBS_EVERY_MS = 250;
@@ -75,16 +81,88 @@ export function resetLocal(): void {
   resetCounters();
 }
 
+// ---------- selection: anchors, route clicks, tour progress ----------
+let lastCanvasClick: { x: number; y: number; at: number } | null = null;
+let nextAnchor: PlayLocal['anchor'] = null;
+let restoring = false;
+let unsubSelection: (() => void) | null = null;
+const CLICK_ANCHOR_MS = 600;
+
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function onPointerUp(e: PointerEvent): void {
+  if (frame.canvas && e.target === frame.canvas) lastCanvasClick = { x: e.clientX, y: e.clientY, at: now() };
+}
+
+type Sel = { kind: string; id: string } | null;
+const isRouteId = (id: string): id is RouteId => (ROUTES as readonly string[]).includes(id);
+
+/** Select from the fleet board / action card: the action card opens next to `anchor`. */
+export function selectFrom(pick: Sel, anchor: { x: number; y: number } | null): void {
+  nextAnchor = anchor ? { ...anchor, from: 'board' } : null;
+  useApp.getState().select(pick as never);
+}
+
+/** The selection for "the depot": a parked reserve when there is one (the renderer can highlight it), else the depot. */
+export function depotPick(): Sel {
+  const r = usePlay.getState().obs?.depot?.reserves[0];
+  return { kind: 'bus', id: r ?? DEPOT_ID };
+}
+
+function onSelection(sel: Sel, prev: Sel): void {
+  if (restoring) return;
+  const local = usePlay.getState();
+  const app = useApp.getState();
+  // A route line clicked on the map (renderer pick { kind: 'route' }): move the selected bus there, or deploy a reserve
+  // there when the depot is selected; otherwise just highlight the route.
+  if (sel && sel.kind === 'route' && isRouteId(sel.id)) {
+    const to = sel.id;
+    const live = app.play.phase === 'playing' && !local.spectating;
+    if (live && prev && isDepotPick(prev, local.obs)) {
+      restore(prev);
+      act({ kind: 'deploy', to });
+      return;
+    }
+    if (live && prev && prev.kind === 'bus' && local.obs?.buses.some((b) => b.id === prev.id)) {
+      restore(prev);
+      act({ kind: 'reassign', to });
+      return;
+    }
+    app.highlightRoute(to);
+    frame.renderer?.highlightRoute(to);
+    local.set({ picker: null, preview: null, anchor: null });
+    return;
+  }
+  const click = lastCanvasClick && now() - lastCanvasClick.at < CLICK_ANCHOR_MS ? lastCanvasClick : null;
+  const anchor: PlayLocal['anchor'] = nextAnchor ?? (click ? { x: click.x, y: click.y, from: 'map' } : null);
+  nextAnchor = null;
+  lastCanvasClick = null;
+  const depot = isDepotPick(sel, local.obs);
+  local.set({ anchor: sel ? anchor : null, picker: depot ? 'deploy' : null, preview: null });
+  if (sel && sel.kind === 'bus' && !depot && local.tour === 0 && local.obs?.buses.some((b) => b.id === sel.id)) setTour(1);
+}
+
+function restore(prev: Sel): void {
+  restoring = true;
+  try { useApp.getState().select(prev as never); } finally { restoring = false; }
+}
+
 /** PlayMode mounted: the AI runs on today's crowd start right away (they take well under a second each). */
 export function enterPlay(): void {
   usePlay.getState().set({ spectating: false, restarting: false });
   if (useApp.getState().play.phase === 'intro') resetLocal();
+  unsubSelection?.();
+  unsubSelection = useApp.subscribe((s, p) => { if (s.selection !== p.selection) onSelection(s.selection, p.selection); });
+  if (typeof window !== 'undefined') window.addEventListener('pointerup', onPointerUp, true);
   void ensureAi(playScenario());
 }
 
 export function leavePlay(): void {
   awaiting = null;
-  usePlay.getState().set({ picker: null, preview: null, tour: null, restarting: false });
+  unsubSelection?.();
+  unsubSelection = null;
+  if (typeof window !== 'undefined') window.removeEventListener('pointerup', onPointerUp, true);
+  usePlay.getState().set({ picker: null, preview: null, anchor: null, drag: null, tour: null, restarting: false });
 }
 
 export async function ensureAi(scenario: ScenarioInstance = playScenario()): Promise<void> {
@@ -128,6 +206,7 @@ export function start(opts: { tour?: boolean } = {}): void {
 }
 
 export function setTour(step: number | null): void {
+  if (step !== null && step >= TOUR_STEPS) step = null;
   if (step === null) {
     try { localStorage.setItem(TOUR_KEY, '1'); } catch { /* private mode */ }
     usePlay.getState().set({ tour: null });
@@ -144,7 +223,7 @@ export function finish(): void {
   const o = observe(r.sim);
   const to = o ? o.scenario.durationS + o.scenario.clearingS : r.sim.t + 2700;
   ffLastMs = null;
-  usePlay.getState().set({ finishing: { from: r.sim.t, to, t: r.sim.t }, picker: null, preview: null, tour: null });
+  usePlay.getState().set({ finishing: { from: r.sim.t, to, t: r.sim.t }, picker: null, preview: null, drag: null, tour: null });
   useApp.getState().setPlay({ phase: 'finishing' });
   setPaused(false);
 }
@@ -325,11 +404,14 @@ export function issue(i: Intent): boolean {
   if (!r || r.sim.done) return false;
   const o = observe(r.sim);
   const t = r.sim.t;
+  const tracked = usePlay.getState().tracked;
+  // deploy: applied once the depot shows one reserve fewer than now (minus the deploys still on their way)
+  const expectReserves = i.type === 'deploy' ? (o?.depot?.reserves.length ?? 0) - pendingDeploys(tracked) - 1 : undefined;
   try { r.intent(i); } catch (e) { nudge(`Could not send that: ${errText(e)}`, 'warn'); return false; }
   const app = useApp.getState();
   app.setPlay({ intents: [...app.play.intents, { t, intent: i }] });
-  const now = appliesNow(i, o);
-  usePlay.getState().set({ tracked: addIntent(usePlay.getState().tracked, { id: ++intentSeq, t, intent: i }, now) });
+  const applied = appliesNow(i, o);
+  usePlay.getState().set({ tracked: addIntent(tracked, { id: ++intentSeq, t, intent: i, expectReserves }, applied) });
   return true;
 }
 
@@ -355,7 +437,9 @@ export function currentLegality(): DockLegality {
   const r = frame.runner;
   const sel = app.selection && (app.selection.kind === 'bus' || app.selection.kind === 'train') ? app.selection : null;
   const view = sel && r ? r.next.vehicles?.find((v) => v.id === sel.id) ?? null : null;
-  return legalActions(obs, sel, { view, pendingAway: pendingAway(tracked, obs, sel?.id ?? null), done: !!r?.sim.done });
+  return legalActions(obs, sel, {
+    view, pendingAway: pendingAway(tracked, obs, sel?.id ?? null), pendingDeploys: pendingDeploys(tracked), done: !!r?.sim.done,
+  });
 }
 
 function trainLast(): DecisionRecord | null {
@@ -363,9 +447,17 @@ function trainLast(): DecisionRecord | null {
   return v?.lastDecision ?? null;
 }
 
-export function trainPlan(mode: 'extend' | 'now') {
+export function trainPlan(mode: 'extend' | 'now', extraS?: number) {
   const o = usePlay.getState().obs;
-  return o ? trainDwellFor(o, mode, trainLast()) : null;
+  return o ? trainDwellFor(o, mode, trainLast(), undefined, extraS) : null;
+}
+
+/** Why "Wait" cannot add any more time (the dwell already sits at the 2-minute cap), else null. */
+export function trainWaitBlocked(extraS?: number): string | null {
+  const plan = trainPlan('extend', extraS);
+  const cur = usePlay.getState().obs?.train.departAt ?? null;
+  return plan && plan.immediate && plan.capped && cur !== null && plan.departAt !== null && plan.departAt <= cur
+    ? 'The train already waits the 2-minute maximum' : null;
 }
 
 function gated(g: Gate, run: () => void): void {
@@ -384,8 +476,9 @@ export function act(c: Command): boolean {
     case 'speed': setSpeed(c.speed); return true;
     case 'cycle': cycle(c.dir); return true;
     case 'close':
-      if (local.picker) { local.set({ picker: null, preview: null }); return true; }
+      if (local.picker && local.picker !== 'deploy') { local.set({ picker: null, preview: null }); return true; }
       if (app.selection) { app.select(null); return true; }
+      if (local.picker) { local.set({ picker: null, preview: null }); return true; }
       return false;
     case 'dispatch':
       gated(legal.dispatch, () => { if (busId && issue({ type: 'dispatch', vehicleId: busId })) nudge(`${busId} dispatched`); });
@@ -405,17 +498,29 @@ export function act(c: Command): boolean {
       return true;
     case 'reassign':
       gated(legal.reassignTo[c.to], () => {
-        if (busId && issue({ type: 'reassign', vehicleId: busId, to: c.to })) nudge(`${busId} moves to ${c.to} at its next terminal`);
+        if (busId && issue({ type: 'reassign', vehicleId: busId, to: c.to })) {
+          const b = local.obs?.buses.find((x) => x.id === busId);
+          nudge(b?.state === 'layover' ? `${busId} heads to ${routeName(c.to)} now` : `${busId} switches to ${routeName(c.to)} at its terminal`);
+          if (usePlay.getState().tour === 1) setTour(2);
+        }
         local.set({ picker: null, preview: null });
       });
       return true;
+    case 'deploy':
+      gated(legal.deployTo[c.to], () => {
+        if (issue({ type: 'deploy', to: c.to })) {
+          nudge(`A spare bus leaves the depot for ${routeName(c.to)}`);
+          if (usePlay.getState().tour === 2) setTour(null);
+        }
+        local.set({ preview: null });
+      });
+      return true;
     case 'train': {
-      const plan = trainPlan(c.mode);
+      const plan = trainPlan(c.mode, c.extraS);
       if (!plan) return true;
-      const cur = local.obs?.train.departAt ?? null;
-      if (c.mode === 'extend' && plan.immediate && plan.capped && cur !== null && plan.departAt !== null && plan.departAt <= cur) {
-        nudge('The train already waits the 2-minute maximum', 'warn');
-        return true;
+      if (c.mode === 'extend') {
+        const blocked = trainWaitBlocked(c.extraS);
+        if (blocked) { nudge(blocked, 'warn'); return true; }
       }
       if (issue({ type: 'setTrainDeparture', dwellS: plan.dwellS })) {
         nudge(plan.immediate && plan.departAt !== null ? `Train departs ${scenarioClock(plan.departAt)}`

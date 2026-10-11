@@ -20,7 +20,7 @@ function actionParam(name: string, action: Action, features: FeatureVector): str
     return undefined;
   }
   if (name === 'dwellS' && action.type === 'setTrainDeparture') return num(action.dwellS);
-  if (name === 'to' && action.type === 'reassign') return action.to;
+  if (name === 'to' && (action.type === 'reassign' || action.type === 'deploy')) return action.to;
   return undefined;
 }
 

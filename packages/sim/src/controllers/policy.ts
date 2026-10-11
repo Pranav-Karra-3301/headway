@@ -7,7 +7,7 @@ import type { Condition, Controller, Decision, DecisionKind, DecisionPoint, Obse
 import { defaultExplanation, resolveAction, safeAction, type ResolveCtx } from '../engine/actions';
 import { explain } from '../policy/explain';
 
-const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station'];
+const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station', 'depot_check'];
 
 function holds(c: Condition, f: DecisionPoint['features']): boolean {
   const x = f[c.f];
@@ -47,9 +47,10 @@ export class PolicyController implements Controller {
       if (!action) continue;
       return { action, ruleId: rule.id, explanation: explain(rule.say, dp.features, action), source: 'policy' };
     }
+    // A policy written before v3 has no depot_check default: resolveAction(undefined) → null → safeAction = continue.
     const action = resolveAction(this.policy.defaults?.[dp.kind], ctx)
       ?? safeAction(dp.kind, this.policy.params?.trainDefaultDwellS ?? DEFAULT_CONFIG.train.defaultDwellS);
-    return { action, ruleId: 'default', explanation: defaultExplanation(action), source: 'default' };
+    return { action, ruleId: 'default', explanation: defaultExplanation(action, dp.kind), source: 'default' };
   }
 
   private ctx(dp: DecisionPoint, obs: Observation): ResolveCtx {

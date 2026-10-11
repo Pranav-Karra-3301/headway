@@ -7,7 +7,7 @@ import { FEATURES, PLACEHOLDERS } from '../src/policy/features';
 import { POLICY_DSL_DOC, PolicySchema, legalActionTypes, validatePolicy } from '../src/policy/schema';
 
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
-const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station'];
+const KINDS: DecisionKind[] = ['bus_at_stop', 'bus_at_terminal', 'train_at_station', 'depot_check'];
 
 function errorsOf(p: unknown): string[] {
   const r = validatePolicy(p);
@@ -354,12 +354,12 @@ describe('explain', () => {
 describe('POLICY_DSL_DOC', () => {
   it('is compact and covers kinds, every feature, actions and limits', () => {
     expect(POLICY_DSL_DOC.length).toBeGreaterThan(1500);
-    expect(POLICY_DSL_DOC.length).toBeLessThanOrEqual(5000);
+    expect(POLICY_DSL_DOC.length).toBeLessThanOrEqual(5400); // v3: + depot_check (4th kind, 13 features)
     for (const k of KINDS) {
       expect(POLICY_DSL_DOC).toContain(k);
       for (const f of Object.keys(FEATURES[k])) expect(POLICY_DSL_DOC).toContain(f);
     }
-    for (const t of ['continue', 'dispatch', 'hold', 'target_headway', 'reassign', 'busiest', 'setTrainDeparture']) {
+    for (const t of ['continue', 'dispatch', 'hold', 'target_headway', 'reassign', 'busiest', 'setTrainDeparture', 'deploy']) {
       expect(POLICY_DSL_DOC).toContain(t);
     }
     for (const s of ['24', '140', '200', '1200', 'priority', 'defaults', 'allocation']) expect(POLICY_DSL_DOC).toContain(s);

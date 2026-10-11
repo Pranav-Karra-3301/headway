@@ -1,6 +1,6 @@
 // Owner: T3c. Pure Play-mode logic: action legality, train dwell maths, pace, verdict, findings diff, formatting.
 // Everything here reads only the Observation / snapshot the player already sees (no future information).
-import { clockAt, findingSentence } from '@headway/sim';
+import { DEFAULT_CONFIG, clockAt, findingSentence } from '@headway/sim';
 import type { DecisionRecord, FailureFinding, Observation, QueuePlace, RouteId, VehicleView } from '@headway/sim';
 
 // ---------- legality ----------
@@ -10,6 +10,8 @@ const no = (why: string): Gate => ({ ok: false, why });
 
 export const ROUTES: readonly RouteId[] = ['r1', 'r2', 'r3'];
 export const TRAIN_ID = 't1';
+/** Pseudo vehicle id for depot intents (deploy names a route, not a bus) and the depot selection. */
+export const DEPOT_ID = 'depot';
 
 export interface Limits { maxHoldPerLoopS: number; minBusesPerRoute: number }
 export const DEFAULT_LIMITS: Limits = { maxHoldPerLoopS: 180, minBusesPerRoute: 1 };
@@ -18,6 +20,41 @@ export interface DockLegality {
   target: { kind: 'bus' | 'train'; id: string } | null;
   dispatch: Gate; hold: Gate; reassign: Gate; train: Gate;
   reassignTo: Record<RouteId, Gate>;
+  /** Send a reserve bus out of the depot (independent of the selection). */
+  deploy: Gate;
+  deployTo: Record<RouteId, Gate>;
+}
+
+// ---------- depot ----------
+export interface DepotState { open: boolean; reserves: string[]; deploying: string[] }
+
+/** The depot as observed (closed until the engine provides `obs.depot`). */
+export function depotOf(obs: Observation | null): DepotState {
+  const d = obs?.depot;
+  return d ? { open: true, reserves: [...d.reserves], deploying: [...d.deploying] } : { open: false, reserves: [], deploying: [] };
+}
+
+/** True when the selection means "the depot": the depot itself or a parked reserve bus. */
+export function isDepotPick(sel: { kind: string; id: string } | null | undefined, obs: Observation | null): boolean {
+  if (!sel) return false;
+  if (sel.kind === 'depot') return true;
+  if (sel.kind !== 'bus') return false;
+  if (sel.id === DEPOT_ID) return true;
+  if (obs?.depot?.reserves.includes(sel.id)) return true;
+  return obs?.buses.find((b) => b.id === sel.id)?.state === 'depot';
+}
+
+export function deployGate(obs: Observation | null, pending = 0, done = false): Gate {
+  if (done) return no('Run finished');
+  if (!obs) return no('Waiting for the simulator');
+  if (!obs.depot) return no('The depot opens with the next sim update');
+  return obs.depot.reserves.length - pending <= 0 ? no('No spare buses left in the depot') : OK;
+}
+
+/** Fleet sizes for copy (config defaults; v3 adds reserves and train cars). */
+export function fleetFacts(): { buses: number; reserves: number; cars: number; trainCapacity: number } {
+  const c = DEFAULT_CONFIG;
+  return { buses: c.bus.count, reserves: c.bus.reserve ?? 2, cars: c.train.cars ?? 3, trainCapacity: c.train.capacity };
 }
 
 type Bus = Observation['buses'][number];
@@ -31,18 +68,26 @@ export function atTerminal(b: Bus, view?: VehicleView | null): boolean {
 export function legalActions(
   obs: Observation | null,
   selection: { kind: string; id: string } | null,
-  opts: { view?: VehicleView | null; limits?: Limits; pendingAway?: Partial<Record<RouteId, number>>; done?: boolean } = {},
+  opts: { view?: VehicleView | null; limits?: Limits; pendingAway?: Partial<Record<RouteId, number>>; pendingDeploys?: number; done?: boolean } = {},
 ): DockLegality {
   const limits = opts.limits ?? DEFAULT_LIMITS;
   const target = selection && (selection.kind === 'bus' || selection.kind === 'train')
     ? { kind: selection.kind as 'bus' | 'train', id: selection.id } : null;
-  const all = (g: Gate): DockLegality => ({ target, dispatch: g, hold: g, reassign: g, train: g, reassignTo: { r1: g, r2: g, r3: g } });
+  const dep = deployGate(obs, opts.pendingDeploys ?? 0, opts.done);
+  const all = (g: Gate): DockLegality => ({
+    target, dispatch: g, hold: g, reassign: g, train: g, reassignTo: { r1: g, r2: g, r3: g },
+    deploy: dep, deployTo: { r1: dep, r2: dep, r3: dep },
+  });
   if (opts.done) return all(no('Run finished'));
   if (!obs) return all(no('Waiting for the simulator'));
 
   const out = all(no(target?.kind === 'train' ? 'Select a bus — this is the train' : 'Select a bus first'));
   out.train = OK;
   if (target?.kind !== 'bus') return out;
+  if (isDepotPick(target, obs)) {
+    const why = 'Parked in the depot — deploy it to a route';
+    return { ...out, dispatch: no(why), hold: no(why), reassign: no(why), reassignTo: { r1: no(why), r2: no(why), r3: no(why) } };
+  }
   const b = obs.buses.find((x) => x.id === target.id);
   if (!b) return { ...out, dispatch: no('Bus not found'), hold: no('Bus not found'), reassign: no('Bus not found') };
 
@@ -66,20 +111,21 @@ export const DWELL: DwellRule = { min: 30, max: 120, def: 45, step: 30 };
 
 export interface DwellPlan { dwellS: number; departAt: number | null; immediate: boolean; capped: boolean }
 
-/** dwellS for "+30 s" (extend) or "depart now" (now). While dwelling it applies at this station; otherwise at the next. */
-export function trainDwellFor(obs: Observation, mode: 'extend' | 'now', last: DecisionRecord | null, rule: DwellRule = DWELL): DwellPlan {
+/** dwellS for "wait `extraS` longer" (extend, default +30 s) or "depart now" (now). While dwelling it applies at this
+ *  station; otherwise at the next. */
+export function trainDwellFor(obs: Observation, mode: 'extend' | 'now', last: DecisionRecord | null, rule: DwellRule = DWELL, extraS = rule.step): DwellPlan {
   const clamp = (s: number) => Math.min(rule.max, Math.max(rule.min, Math.round(s)));
   const tr = obs.train;
   const immediate = tr.state === 'dwelling' || tr.state === 'holding';
   if (!immediate) {
-    const want = mode === 'extend' ? rule.def + rule.step : rule.min;
+    const want = mode === 'extend' ? rule.def + extraS : rule.min;
     return { dwellS: clamp(want), departAt: null, immediate: false, capped: want > rule.max };
   }
   const arrival = last && last.kind === 'train_at_station'
     ? last.t - (last.features['dwell_s'] ?? 0)
     : tr.departAt !== null ? tr.departAt - rule.def : obs.t;
   const current = (tr.departAt ?? arrival + rule.def) - arrival;
-  const want = mode === 'extend' ? current + rule.step : obs.t - arrival;
+  const want = mode === 'extend' ? current + extraS : obs.t - arrival;
   const dwellS = clamp(want);
   return { dwellS, departAt: arrival + dwellS, immediate: true, capped: want > rule.max };
 }
@@ -246,4 +292,35 @@ export function lerpDist(a: number, b: number, alpha: number, length: number, cl
   else if (bb > a + length / 2) bb -= length;
   const v = a + (bb - a) * alpha;
   return ((v % length) + length) % length;
+}
+
+// ---------- plain-language status (fleet board, action cards) ----------
+type Names = { stop(id: string | null | undefined): string; station(id: string | null | undefined): string };
+
+/** One short line about what a bus is doing right now, in plain words. */
+export function busStatus(b: Bus, t: number, names: Names): string {
+  switch (b.state) {
+    case 'moving':
+      return b.nextStopId
+        ? `Driving to ${names.stop(b.nextStopId)}${b.etaNextStopS !== null ? ` · ${fmtMMSS(b.etaNextStopS)}` : ''}`
+        : 'On the move';
+    case 'dwelling': return b.nextStopId ? `Boarding at ${names.stop(b.nextStopId)}` : 'Boarding riders';
+    case 'holding': return b.holdUntil !== null ? `Holding · ${fmtMMSS(b.holdUntil - t)} left` : 'Holding';
+    case 'layover':
+      return b.headwayAheadS !== null && b.headwayAheadS < 3600 ? `At the terminal · last bus left ${fmtMMSS(b.headwayAheadS)} ago` : 'At the terminal';
+    case 'deadhead': return `Driving empty to join ${b.routeId}`;
+    case 'depot': return 'Parked in the depot';
+  }
+}
+
+export interface TrainStatus { at: boolean; line: string; departInS: number | null }
+
+export function trainStatus(o: Observation, names: Names): TrainStatus {
+  const tr = o.train;
+  const at = tr.state === 'dwelling' || tr.state === 'holding';
+  if (at) {
+    const departInS = tr.departAt !== null ? Math.max(0, tr.departAt - o.t) : null;
+    return { at, departInS, line: `At ${names.station(tr.stationId)}${departInS !== null ? ` · leaves in ${fmtMMSS(departInS)}` : ''}` };
+  }
+  return { at, departInS: null, line: `Next ${names.station(tr.stationId)} · ${fmtMMSS(tr.etaS)}` };
 }
