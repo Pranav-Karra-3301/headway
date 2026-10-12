@@ -13,3 +13,9 @@ video/**/*.mp4
 video/**/*.wav
 video/**/*.mp3
 video/renders/
+
+# Licensed fonts: kept locally, never committed (General Sans: Fontshare ITF FFL; Gumball Rounded)
+*.otf
+*.ttf
+*.woff
+*.woff2

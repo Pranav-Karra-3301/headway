@@ -1,200 +1,229 @@
-# Headway
+<p align="center">
+  <img src="docs/media/intro.jpg" alt="Headway title screen over the live isometric town" width="100%">
+</p>
 
-> A team of AI planners teaches the town's dispatcher, and you can try to beat it.
+<h1 align="center">Headway</h1>
 
-**Live:** https://headway.pranavkarra001.workers.dev
+<p align="center">
+  <b>A toy-diorama transit game whose bus dispatcher is designed by AI, and you can try to beat it.</b><br>
+  <a href="https://headway.pranavkarra.me"><b>Play it live → headway.pranavkarra.me</b></a>
+</p>
 
-Headway is a small isometric transit-dispatch game set in a fictional, State College–inspired college town. You can
-watch the town run, dispatch it yourself, or replay how successive AI-designed controllers handled the same rush hour.
+<p align="center">
+  Three.js · React · TypeScript · Cloudflare Workers + D1 · DeepSeek V4.1 Flash on Luminal · TypeSafe Jev
+</p>
 
-Between games, three LLM **policy designers** rewrite the town's **dispatch policy**: a bounded, versioned JSON
-rulebook. Only changes that measurably help are kept. The language models are never retrained. What improves is the
-policy, and the policy runs in your browser with no model calls.
+---
 
-## What is actually going on
+Headway is a small isometric college town (inspired by State College, PA) with three bus routes, a regional train
+that runs through a ridge tunnel and across a bay bridge, and a stadium that is about to empty. Every passenger has
+a real trip. Your job, and the AI's job, is the same: **get everyone home with the least total travel time.**
 
-- **What evolves.** The dispatch policy, which is at most 24 rules of the form "when these features hold, do this
-  action". The actions are hold, dispatch, reassign a bus to another route, or set the train's departure. When a
-  rule fires, its explanation is the rule's own `say` template filled with the real feature values. It is never
-  written after the fact.
-- **Who designs it.** Each round, 3 designers propose changes. All three run `deepseek-ai/DeepSeek-V4.1-Flash` on
-  [Luminal](https://luminal.com), and they differ only in emphasis (transfers, spacing or allocation) and
-  temperature. If Luminal times out, rate-limits or returns a 5xx, the call falls back once to
-  `deepseek/deepseek-v4-pro` on OpenRouter, and the proposal records which model answered. Proposals are validated
-  with zod plus semantic checks, and each designer gets one repair attempt.
-- **How a change survives.** Valid proposals are simulated on 8 training runs (`stadium_exit` and `class_change` ×
-  seeds 1001–1004). The best one is promoted only if all of these hold:
-  - J improves by at least 1% on training;
-  - it is no worse on 4 validation runs that the designers never see;
-  - completion drops by at most 1 percentage point;
-  - the worst service gap at any stop stays within max(the champion's worst, 15 min).
+The twist is how the AI dispatcher gets better. The language models are **never retrained**. Between games, AI
+*designers* propose edits to a small, readable **rulebook**; a deterministic simulator tests every edit, and only the
+ones that measurably help on crowds the designers have never seen survive. The rulebook then runs in your browser
+with no model calls at all.
 
-  If the best fails validation, the runner-up gets one try.
-- **Jev for station holds.** A policy can hand a single decision to Jev (TypeSafe `typesafe/jev-1.13` via
-  OpenRouter). The decision is whether a bus at one of the 3 station stops leaves now or holds 20, 40 or 60 s when a
-  train is due. Code generates the legal options, and Jev picks one with probabilities. On a timeout or error, the
-  rules decide. Every Jev decision is logged, so replays never call Jev again. What evolves on this track is the
-  advisor's instructions and when it is asked. Jev itself does not change.
-- **The sealed test.** 3 extra seeds are kept secret as `SEALED_TEST_SEEDS` in the gitignored root `.env`. They are
-  never in a prompt, in `evolve`'s code paths or in the repo. After optimization, the champion, `g0` and `ref` are scored
-  on them, and the results appear in the Lab's "never shown to agents" panel.
-- **Fair comparisons.** All randomness (crowd, traffic, train delays, rider behaviour) is drawn from the seed before
-  the run starts, so every controller faces the identical crowd. In Play you control the baseline `g0` plus your own
-  interventions, on the same seed the champion and baseline are scored on. Doing nothing scores exactly the
-  baseline.
+## Three modes
 
-The objective is **J**, total passenger time, and lower is better. Everyone who got home contributes their
-door-to-door time. Anyone still travelling at the end contributes their time so far plus a penalty
-(`objective.unfinishedPenaltyS`, 2,700 s by default). The full design is in
-[`docs/superpowers/specs/2026-10-11-headway-design.md`](docs/superpowers/specs/2026-10-11-headway-design.md).
-
-## Modes
-
-| Route | Mode | What you do |
-|---|---|---|
-| `/` | Watch | The current champion runs the showcase crowds. Click a bus, stop or person to inspect it, and switch the controller between g0, ref and champion. |
-| `/play` | Play | Dispatch the `stadium_exit` crowd on today's play seed, then compare yourself with the champion and the baseline on the identical seed. |
-| `/lab`, `/lab/:generationId` | Lab | See the generation timeline, the J chart, proposal cards, rule diffs, the evolve feed and the sealed-test panel. |
-
-- **Play keys:**
-  - `D` dispatch, `H` hold 30 s (`Shift+H` 60 s), `Space` pause, `1`–`4` for 1×/4×/8×/16×.
-  - `R` reassign, then `1`/`2`/`3` to pick the route.
-  - `T` holds the train 30 s more (`Shift+T` departs now).
-  - `[` and `]` cycle the selected bus. `Esc` closes a picker.
-- **Anywhere:** `?` opens "How Headway works" and `Esc` closes it. `/#about` deep-links to that panel.
-- **Title card:** it shows on the first visit to `/`. Use `/?intro` to show it again, for example in a demo.
-
-## Repository layout
-
-```
-packages/sim/      @headway/sim     deterministic sim: contracts, town, scenarios, engine, policy DSL + interpreter, metrics
-packages/evolve/   @headway/evolve  LLM client (Luminal + OpenRouter fallback), prompts, rounds, narratives, Jev provider, CLIs
-apps/web/          @headway/web     Vite + React HUD + Three.js TownRenderer; SimRunner; Web Worker for headless runs
-apps/worker/       @headway/worker  Cloudflare Worker: static assets + Hono /api/*, D1 migrations
-scripts/smoke/                      dependency-free headless-Chrome smoke test
-data/                               CLI output: generations/, rounds/ (published to D1 with --publish)
-docs/                               spec, plan, research, demo script, pitch
-```
-
-- **Dependency rules:** `sim` depends only on `zod`. It has no DOM, network, `Date` or `Math.random`, and it runs
-  identically in the browser, in Node and in the Worker.
-- `evolve` reaches models only through `fetch`. `node:*` imports are allowed only under `src/cli/`.
-- `web` never imports `evolve`.
-
-## Setup
-
-You need:
-
-- Node ≥ 22 (developed on Node 26);
-- pnpm 11 (`corepack enable`);
-- Google Chrome, for the smoke test;
-- a Cloudflare login, for deploys.
-
-```bash
-export npm_config_registry=https://registry.npmjs.org/   # the repo .npmrc pins this too
-pnpm install
-```
-
-Secrets live in two gitignored files. Never commit or print them.
-
-| File | Keys |
+| **Watch** — the AI runs the town | **Play** — beat the AI on the same crowd |
 |---|---|
-| `.env` (repo root, used by the CLIs) | `LUMINAL_API_KEY`, `OPENROUTER_API_KEY`, `ADMIN_TOKEN` (`SEALED_TEST_SEEDS` is added by `eval-sealed`) |
-| `apps/worker/.dev.vars` (`wrangler dev`) | the same keys |
+| <img src="docs/media/watch.jpg" alt="Watch mode"> | <img src="docs/media/play.jpg" alt="Play mode"> |
+| Click any bus to see the exact rule it just followed. Switch *Who's dispatching?* between the baseline, the hand-written plan and the AI champion, and compare them on the identical crowd. | Same crowd, same fleet, same information as the AI. Move buses between routes, hold buses for transfers, time the train, then see your score against the AI and the baseline. |
 
-## Run locally
+| **Lab** — see how the AI learned |
+|---|
+| <img src="docs/media/lab.jpg" alt="Lab mode"> |
+| Every round of evolution: which designer proposed what, what the simulator measured, and why each change was kept or rejected. |
 
-```bash
-pnpm dev                     # web app on http://localhost:5173 (Vite)
+## Results
+
+Total passenger time **J** (walk + wait + ride, plus a penalty for anyone not home by the end). Lower is better.
+
+| Dispatcher | Training crowds | Unseen validation crowds |
+|---|---:|---:|
+| `g0` baseline: 2 buses per route, wait at the terminal for even gaps | 0 % | 0 % |
+| Hand-written reference plan | −5.1 % | −4.6 % |
+| **`g2` AI champion** (evolved) | **−6.0 %** | **−5.3 %** |
+
+16 evolution rounds · 48 designer proposals · **2 promoted**. The loop rejects anything that does not measurably help.
+
+## How the DeepSeek designers create strategies
+
+The strategy is a **policy**: a versioned JSON rulebook of at most 24 rules of the form *"on this decision, when these
+features hold, do this action"*. Rules can only read whitelisted features (queue lengths, headway ratios, train ETA, …)
+and choose from four actions: **hold**, **dispatch**, **reassign** a bus to another route, or set the **train's
+departure**. Each rule carries a `say` template, so the explanation you see when you click a bus is the rule itself,
+filled in with the real numbers, never a story written afterwards.
+
+```mermaid
+flowchart LR
+  C[Champion policy] --> D[Evidence digest<br/>route pressure, failures,<br/>measured probes]
+  D --> L1[Designer 1<br/>transfers]
+  D --> L2[Designer 2<br/>spacing]
+  D --> L3[Designer 3<br/>allocation]
+  L1 & L2 & L3 --> V[Schema + semantic<br/>validation, 1 repair]
+  V --> S[Simulate on<br/>8 training runs]
+  S --> G{Gate on 4 unseen<br/>validation runs}
+  G -- better --> P[Promote: new generation]
+  G -- not better --> R[Reject, with the reason<br/>fed into the next round]
+  P --> C
 ```
 
-In `pnpm dev` there is no API. Every `/api` read falls back to the static files in `apps/web/public/data/*.json`,
-which `export-web` writes (see below).
+1. **Evidence.** Each round starts from the champion and a compact digest (≤ 6,000 characters) of what went wrong
+   on the training crowds: which routes are under pressure, where people waited longest, missed connections, and
+   **probes**: dozens of one-step variants of the champion (drop a rule, move a bus, tighten a threshold, add a
+   queue guard) that the simulator has already scored. Designers therefore propose changes backed by measurements,
+   not guesses.
+2. **Three designers.** Three calls to **DeepSeek V4.1 Flash on [Luminal](https://luminal.com)**, each with a
+   different emphasis (transfers, spacing, allocation) that rotates between rounds. A novelty rule forbids
+   resubmitting ideas that already failed. If Luminal times out or errors, the call falls back once to
+   `deepseek/deepseek-v4-pro` on OpenRouter, and the proposal records which model answered.
+3. **Validation.** Every proposal is checked with zod plus semantic checks (known features, legal actions, sane
+   thresholds). A malformed proposal gets one repair attempt with the exact errors.
+4. **Simulation.** Valid proposals run on 8 training runs (`stadium_exit` and `class_change` × 4 seeds). The sim is
+   deterministic, so every candidate faces the identical crowds.
+5. **Promotion gate.** The best candidate is promoted only if J improves by at least 1 % on training **and** it is no
+   worse on 4 validation runs the designers never see, completion drops by at most 1 point, and the worst service
+   gap at any stop stays within max(the champion's, 15 min). If it fails, the runner-up gets one try. Three more **sealed test** seeds are kept out of the
+   repo and out of every prompt.
 
-To run the full stack locally (Worker + D1 + the built app):
+What survived (`g0 → g1 → g2`):
 
-```bash
-pnpm build                                                                    # apps/web/dist
-pnpm --filter @headway/worker exec wrangler d1 migrations apply headway --local
-pnpm --filter @headway/worker dev                                             # http://localhost:8787
+```jsonc
+// g1: "Buses leave early when a crowd is waiting" (−3.2 %)
+{ "on": "bus_at_terminal", "when": [{ "f": "route_queue", "op": ">=", "v": 3 }], "do": { "type": "dispatch" },
+  "say": "Queue relief: {route_queue} waiting, dispatching now" }
+
+// g2: "Move a bus from a quiet route to the busiest" (−6.0 %)
+"allocation": { "r1": 1, "r2": 2, "r3": 3 },
+{ "on": "bus_at_terminal", "when": [{ "f": "queue_ratio_other", "op": ">=", "v": 6.67 }],
+  "do": { "type": "reassign", "to": "busiest" }, "say": "Reassigning to busiest route: queue_ratio_other is {queue_ratio_other}" }
 ```
 
-## Test
+## How Jev is used
 
-```bash
-pnpm test                                  # vitest across all packages
-pnpm typecheck                             # tsc in every package
-pnpm --filter @headway/web build           # production build of the web app
-pnpm --filter @headway/web test            # one package (or: pnpm --filter @headway/sim test, ...)
-node scripts/smoke/run.mjs --url http://localhost:8787   # headless Chrome on /, /play, /lab
+**Jev** (TypeSafe `typesafe/jev-1.13`, via OpenRouter's `/systemone` endpoint) is a fast
+decision model that picks one option from a list and returns a probability for each. Headway uses it for exactly one
+kind of decision, a **station hold**:
+
+> A bus is at a train-station stop and a train is due. Should it **depart now**, or **hold 20, 40 or 60 s** so
+> transferring passengers can make it?
+
+- **Code generates the legal options**, and Jev only chooses among them, so it can never produce an invalid action.
+  The policy decides *when* Jev is asked (by default when `train_eta_s ≤ 120`) and the hold options to offer. Those
+  fields, plus Jev's operating instructions, are part of the policy, so the designers can evolve them too.
+- **Rules are the safety net.** On a timeout (800 ms) or an error, the rulebook decides as usual.
+- **Replays stay deterministic.** Every Jev answer is logged into the replay, so re-simulating a run (for the
+  leaderboard or the Lab) never calls Jev again.
+- In the browser, Jev is reached through the Worker's rate-limited, cached proxy `POST /api/jev/decide`. The CLI uses
+  the same request body, so browser and CLI decisions match.
+
+Honest result so far: in the recorded comparison ([`data/jev-compare.json`](data/jev-compare.json)) Jev was asked 20
+times and chose *depart now* every time, which is exactly what the rules do, so the shipped champion `g2` is
+rules-only. The Jev track is fully wired and ready for designers to evolve its instructions.
+
+## The simulator
+
+- **Deterministic.** 1-second ticks; every random draw (crowd, rider behaviour, train delays) comes from named
+  seeded streams before the run starts. A full scenario runs in about 10 ms, with identical hashes in the browser,
+  in Node and in the Worker. That makes comparisons fair (everyone faces the same crowd) and lets the server
+  **re-simulate** submitted leaderboard runs instead of trusting the client.
+- **Fair Play mode.** You control the baseline `g0` plus your own interventions, on the same seed the AI and baseline
+  are scored on. Doing nothing scores exactly the baseline.
+- **Render-only extras.** Ambient car traffic, bus queuing on screen and the day/night cycle are visual only. They
+  never touch the score.
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph Browser
+    UI["React HUD"] --- R["Three.js TownRenderer<br/>Kenney + custom models, GTAO, tilt-shift, bloom"]
+    UI --- SIM1["@headway/sim<br/>runs the champion locally"]
+  end
+  subgraph Cloudflare
+    W["Worker: static assets + Hono /api"] --- DB[("D1: rounds, proposals,<br/>generations, leaderboard")]
+    W --- SIM2["@headway/sim<br/>re-simulates leaderboard runs"]
+  end
+  subgraph Evolve ["packages/evolve (CLI or Worker)"]
+    E["Rounds, digest, probes, gate"]
+  end
+  UI -->|/api| W
+  E -->|designers| LUM["Luminal: DeepSeek V4.1 Flash"]
+  E -.->|fallback| OR["OpenRouter: DeepSeek V4 Pro"]
+  W -->|station holds| JEV["OpenRouter /systemone: Jev"]
+  E -->|publish generation| W
 ```
 
-## Simulate and evolve (CLI)
+| Package | What it is |
+|---|---|
+| `packages/sim` | Deterministic sim: town map, scenarios, engine, policy DSL and interpreter, metrics, Jev advisor controller. Depends only on `zod`. |
+| `packages/evolve` | LLM client (Luminal + OpenRouter fallback), prompts, digest, probes, rounds, Jev provider, CLIs. |
+| `apps/web` | Vite + React HUD, Three.js renderer, sim runner and Web Worker for headless comparisons. |
+| `apps/worker` | Cloudflare Worker: static assets, Hono `/api/*`, D1 migrations, Jev proxy, leaderboard verification. |
+| `data/` | Evolution output: generations, rounds, events, Jev comparison. |
+| `docs/` | Design spec, build plan, art direction, demo scripts. |
+
+## Run it
+
+Requires Node ≥ 22 and pnpm 11 (`corepack enable`).
 
 ```bash
-pnpm sim:run --policy g0 --scenario stadium_exit --seed 1001     # one run, prints metrics (g0 | ref | <policy file>)
-pnpm evolve --rounds 3                                           # 3 rounds with Luminal designers → data/generations, data/rounds
-pnpm evolve --rounds 3 --publish https://headway.pranavkarra001.workers.dev   # also POSTs to /api/admin/publish (ADMIN_TOKEN)
+pnpm install
+pnpm dev                 # http://localhost:5173 — reads the published champion from apps/web/public/data
+pnpm test                # vitest across all packages
+pnpm typecheck
 ```
 
-Tooling CLIs run from the evolve package:
+Evolve your own generations (needs `LUMINAL_API_KEY` and `OPENROUTER_API_KEY` in a gitignored `.env`):
 
 ```bash
-pnpm --filter @headway/evolve exec tsx src/cli/export-web.ts      # data/ → apps/web/public/data/{champion,generations}.json
-pnpm --filter @headway/evolve exec tsx src/cli/sweep.ts --policies g0,ref,champion --split train   # metrics table + sanity gates
-pnpm --filter @headway/evolve exec tsx src/cli/eval-sealed.ts --url https://headway.pranavkarra001.workers.dev  # sealed test
-pnpm --filter @headway/evolve exec tsx src/cli/verify-leaderboard.ts   # re-simulate leaderboard replays from D1
+pnpm sim:run --policy g0 --scenario stadium_exit --seed 1001   # one run, prints metrics
+pnpm evolve --rounds 3                                         # 3 rounds → data/generations, data/rounds
+pnpm evolve --rounds 3 --publish https://headway.pranavkarra.me   # also publishes to D1 (needs ADMIN_TOKEN)
 ```
 
-`eval-sealed` reads `SEALED_TEST_SEEDS` from `.env`. If it is missing, it generates 3 seeds and appends them there.
-It never prints the seeds; only a short fingerprint identifies the set.
-
-## Deploy (Cloudflare)
-
-The app deploys as a single Worker named `headway`. The Worker serves `apps/web/dist` as static assets and handles
-`/api/*` with Hono over D1. Config: [`apps/worker/wrangler.jsonc`](apps/worker/wrangler.jsonc).
-
-One-time setup:
+Deploy (one Worker serving the app and the API):
 
 ```bash
-cd apps/worker
-pnpm exec wrangler login
-pnpm exec wrangler d1 migrations apply headway --remote
-pnpm exec wrangler secret put LUMINAL_API_KEY
-pnpm exec wrangler secret put OPENROUTER_API_KEY
-pnpm exec wrangler secret put ADMIN_TOKEN
+cd apps/worker && pnpm exec wrangler d1 migrations apply headway --remote
+pnpm exec wrangler secret put LUMINAL_API_KEY      # also OPENROUTER_API_KEY, ADMIN_TOKEN
+cd ../.. && pnpm run deploy
 ```
 
-To deploy, run this from the repo root. It runs `pnpm build`, then `wrangler deploy`. Use `pnpm run deploy`: plain
-`pnpm deploy` is pnpm's own built-in command.
-
-```bash
-pnpm run deploy
-```
-
-To check the deploy:
-
-```bash
-curl https://headway.pranavkarra001.workers.dev/api/health
-curl https://headway.pranavkarra001.workers.dev/api/champion
-node scripts/smoke/run.mjs --url https://headway.pranavkarra001.workers.dev
-```
-
-## API
+<details>
+<summary><b>API</b></summary>
 
 | Endpoint | Behaviour |
 |---|---|
 | `GET /api/health` | `{ ok, simVersion, time }` |
 | `GET /api/champion` | `{ policy, generation, train, val }` (falls back to `g0`) |
-| `GET /api/generations`, `GET /api/generations/:id` | generation summaries with baseline and reference scores; one generation with its round |
-| `POST /api/evolve` (Bearer `ADMIN_TOKEN`) | runs one round, streaming `EvolveEvent`s as NDJSON; one round at a time |
-| `GET /api/leaderboard?seed=`, `POST /api/leaderboard` | top 20 for a play seed; submit `{ name, replay }`, which the server re-simulates |
-| `POST /api/jev/decide` | rate-limited, cached proxy to Jev on OpenRouter `/systemone` |
-| `POST /api/admin/publish`, `POST /api/admin/sealed-eval`, `GET /api/sealed` | CLI publish; sealed results |
+| `GET /api/generations`, `GET /api/generations/:id` | generation summaries with baseline and reference scores |
+| `POST /api/evolve` (Bearer `ADMIN_TOKEN`) | runs one round, streaming events as NDJSON |
+| `GET /api/leaderboard?seed=`, `POST /api/leaderboard` | top 20 for a play seed; submissions are re-simulated on the server |
+| `POST /api/jev/decide` | rate-limited, cached proxy to Jev |
+| `POST /api/admin/publish`, `POST /api/admin/sealed-eval`, `GET /api/sealed` | CLI publish and sealed-test results |
 
-## Docs
+</details>
 
-- [Design spec](docs/superpowers/specs/2026-10-11-headway-design.md) and
-  [build plan](docs/superpowers/plans/2026-10-11-headway-build.md)
-- [4-minute demo script](docs/demo-script.md) and [pitch](docs/pitch.md)
-- [LLM provider research](docs/research/llm-providers.md)
+<details>
+<summary><b>Play controls</b></summary>
+
+Click-first: click a bus, a stop or the train and use the buttons on the card. Keyboard: `D` dispatch, `H` hold 30 s
+(`Shift+H` 60 s), `R` then `1`/`2`/`3` to reassign, `T` hold the train, `Space` pause, `1`–`4` for 1×/4×/8×/16×,
+`?` for *How Headway works*. `/?intro` replays the title card.
+
+</details>
+
+## Credits
+
+- 3D models: [Kenney](https://kenney.nl) asset kits (CC0), plus custom low-poly models for the buses, train,
+  stations, campus and stadium.
+- Fonts: [General Sans](https://www.fontshare.com/fonts/general-sans) (Indian Type Foundry) and Gumball Rounded
+  for titles. Font files are **not** included in this repo. Add them to `apps/web/public/fonts/` to match the live
+  site; otherwise the app falls back to system fonts.
+- Models: DeepSeek V4.1 Flash on Luminal (policy designers), DeepSeek V4 Pro on OpenRouter (fallback), TypeSafe Jev
+  (station holds).
+
+Built in one day for a hackathon, 11 October 2026.
