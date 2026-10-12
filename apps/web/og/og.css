@@ -1,0 +1,51 @@
+/* Open Graph card templates (1200×630). Rendered to PNG by scripts/og.sh; never shipped with the app. */
+@font-face { font-family: "Gumball Rounded"; src: url("/apps/web/public/fonts/GumballRounded.ttf") format("truetype"); }
+@font-face { font-family: "General Sans"; src: url("/apps/web/public/fonts/GeneralSans-Medium.otf") format("opentype"); font-weight: 500; }
+@font-face { font-family: "General Sans"; src: url("/apps/web/public/fonts/GeneralSans-Semibold.otf") format("opentype"); font-weight: 600; }
+
+:root {
+  --ink: #1f2a44;
+  --paper: #fffbf2;
+  --mint: #ddefe5;
+  --accent: #2e5bda;
+  --r1: #1fa99a;
+  --r2: #f0a830;
+  --r3: #8a6bd8;
+  --title: "Gumball Rounded", system-ui, sans-serif;
+  --ui: "General Sans", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1200px; height: 630px; overflow: hidden; }
+body { position: relative; font-family: var(--ui); color: var(--ink); -webkit-font-smoothing: antialiased; }
+img { display: block; }
+
+.dots { display: inline-flex; gap: 5px; }
+.dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--r1); }
+.dots i:nth-child(2) { background: var(--r2); }
+.dots i:nth-child(3) { background: var(--r3); }
+
+.wordmark { font-family: var(--title); font-weight: 400; line-height: 0.86; letter-spacing: 0.012em; white-space: nowrap; }
+/* The landing card's stacked "toy block" shadow (light mode). */
+.wordmark--light {
+  color: var(--ink);
+  text-shadow:
+    0 4px 0 color-mix(in srgb, var(--ink) 45%, var(--mint)),
+    0 8px 0 color-mix(in srgb, var(--ink) 18%, var(--mint)),
+    0 22px 40px rgba(31, 42, 68, 0.2);
+}
+.wordmark--dark {
+  color: #fff8ec;
+  text-shadow:
+    0 4px 0 rgba(255, 248, 236, 0.28),
+    0 8px 0 rgba(255, 248, 236, 0.1),
+    0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 12px;
+  padding: 9px 18px 9px 14px; border-radius: 999px;
+  font-size: 19px; font-weight: 600; letter-spacing: 0.01em;
+}
+.pitch { font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+.url { font-size: 19px; font-weight: 500; letter-spacing: 0.01em; }

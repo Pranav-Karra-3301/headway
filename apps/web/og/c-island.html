@@ -1,0 +1,27 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><link rel="stylesheet" href="og.css">
+<style>
+  body { background: linear-gradient(180deg, #eceddc 0%, #e8e8d6 60%, #e3e2ce 100%); }
+  .island { position: absolute; left: 330px; top: 52px; width: 960px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 14%), linear-gradient(180deg, transparent 0%, #000 12%);
+    -webkit-mask-composite: source-in; mask-composite: intersect; }
+  .glow { position: absolute; left: -160px; top: -120px; width: 860px; height: 860px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(245,244,232,.96) 0%, rgba(245,244,232,.75) 48%, rgba(245,244,232,0) 100%); }
+  .copy { position: absolute; left: 76px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; gap: 28px; }
+  .eyebrow { align-self: flex-start; background: rgba(255,251,242,.9); color: color-mix(in srgb, var(--ink) 72%, transparent);
+    box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 4px 14px rgba(31,42,68,.08); }
+  .wordmark { font-size: 98px; margin-bottom: 4px; }
+  .wordmark--light { text-shadow: 0 4px 0 #8a8f8f, 0 8px 0 #c9cbbe, 0 22px 40px rgba(31,42,68,.18); }
+  .pitch { font-size: 31px; line-height: 1.28; color: color-mix(in srgb, var(--ink) 82%, transparent); }
+  .url { position: absolute; left: 76px; bottom: 44px; color: color-mix(in srgb, var(--ink) 55%, transparent); }
+</style></head>
+<body>
+  <img class="island" src="/video/assets/img/world-day.png" alt="">
+  <div class="glow"></div>
+  <div class="copy">
+    <div class="eyebrow"><span class="dots"><i></i><i></i><i></i></span>A tiny transit town</div>
+    <h1 class="wordmark wordmark--light">HEADWAY</h1>
+    <p class="pitch">AI planners teach the town’s bus dispatcher. Try to beat it.</p>
+  </div>
+  <div class="url">headway.pranavkarra.me</div>
+</body></html>
