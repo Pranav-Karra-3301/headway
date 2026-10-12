@@ -101,10 +101,11 @@ What survived (`g0 → g1 → g2`):
   "do": { "type": "reassign", "to": "busiest" }, "say": "Reassigning to busiest route: queue_ratio_other is {queue_ratio_other}" }
 ```
 
-### Bring your own model: local, Ollama or any provider
+### Run the designers on local AI
 
-DeepSeek on Luminal is only the default. The designers talk to any **OpenAI-compatible `/chat/completions`
-endpoint**, so you can swap in a local model with no code changes. For example, with [Ollama](https://ollama.com):
+The designers don't need the cloud. They talk to any **OpenAI-compatible `/chat/completions` endpoint**, so you
+can run the whole evolution loop on **local AI**, on your own machine, with no cloud account and no code changes. DeepSeek
+on Luminal is just the hosted default. For example, with [Ollama](https://ollama.com):
 
 ```bash
 ollama pull qwen3:14b                      # or any model that can answer in JSON
@@ -119,17 +120,15 @@ LUMINAL_API_KEY=ollama                       # any non-empty value; local server
 
 ```bash
 pnpm evolve --smoke --model qwen3:14b        # one designer call, nothing saved
-pnpm evolve --rounds 3 --model qwen3:14b     # real rounds with your local designers
+pnpm evolve --rounds 3 --model qwen3:14b     # real evolution rounds, designed entirely by local AI
 ```
 
-- The same works for **LM Studio** (`http://localhost:1234/v1`), **llama.cpp server**, **vLLM** or any hosted
-  OpenAI-compatible provider: set the base URL and pass `--model`.
-- With only `OPENROUTER_API_KEY` set, every designer call goes to OpenRouter instead. Choose the model with
-  `--fallback-model` (for example `--fallback-model qwen/qwen3-235b-a22b`).
-- The model must return a JSON object (JSON mode) within the 90 s designer timeout. Smaller models lean on the
-  repair attempt more often, but the promotion gate is the same for everyone, so a weaker model only means fewer
-  promotions: it can never make the champion worse.
-- A local server is reachable from the CLI only. The deployed Worker's `/api/evolve` needs a public URL.
+- Any local AI server works the same way: **LM Studio** (`http://localhost:1234/v1`), **llama.cpp server** or
+  **vLLM**. Set the base URL and pass `--model`.
+- The model must return a JSON object (JSON mode) within the 90 s designer timeout. Smaller local models lean on
+  the repair attempt more often, but the simulator's promotion gate is the same for every model, so a smaller model
+  only means fewer promotions: it can never make the champion worse.
+- Local AI runs from the CLI (`pnpm evolve`). The deployed Worker's `/api/evolve` needs a publicly reachable URL.
 
 ## How Jev is used
 
